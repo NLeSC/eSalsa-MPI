@@ -12,24 +12,22 @@ This wide area MPI consists of two parts, an MPI wrapper (written in C),
 and a Hub (written in Java). 
 
 The MPI wrapper uses the MPI profiling interface to intercept calls to a 
-_real_ MPI implementation and change their behaviour. 
-
-The Hub acts as a (currently centralized) server that can be used to 
-exchange data. 
+_real_ MPI implementation and change their behaviour. The Hub acts as a 
+(currently centralized) server that can be used to exchange data. 
 
 The combination of the Hub and the MPI wrapper can be used to merge 
-several distinct MPI application (possibly running on different sites 
+several distinct MPI applications (possibly running on different sites 
 and using different MPI libraries) into one large application.
 
-To do this, each MPI process that uses the MPI wrapper creates a socket 
-connection to the Hub when it starts. All MPI calls are then intercepted, 
+To do this, each MPI process using the MPI wrapper creates a socket 
+connection to the Hub at startup. All MPI calls are then intercepted, 
 and the illusion of a single large MPI application is presented to the 
-processes. 
+MPI processes. 
 
 For each intercepted call a decision is made if the call can be handled 
 locally (for example, an MPI_Send to a different process in the same 
 cluster) or if the hub must be involved (for example an MPI_Send between 
-clusters or a collective operation that involved all nodes). 
+clusters or a collective operation that involves all processes). 
 
 As mentioned above, this code is __VERY__ experimental. However, its has 
 already been used to run both the Parallel Ocean Program (POP) and the 
