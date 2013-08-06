@@ -1,0 +1,101 @@
+TODO
+----
+
+FIX!!! -> MPI_Request_test_status only polls remote network?
+
+FIX!!! -> impl of operations doesn't make sense! 
+
+FIX!!! -> local_comm_create
+
+FIX!!! -> MPI_Recv cannot handle MPI_ANY_SOURCE yet!
+
+CHECK on MPI_TYPE* + MPI_TYPE_EXTENT + MPI_TYPE_SIZE
+
+CORRECTLY IMPLEMENT synchronous sending
+
+    send  -> mpi decides on buffering and sync.
+    ssend -> uses rendezvous, send wait until receive is posted before starting communication
+    rsend -> similar to ssend, but user guarentees receive is already posted, so skip rendezvous
+    bsend -> buffer data locally before sending
+
+ENDIANESS CONVERSION for heterogeneous systems (ie. combining DAS-Huygens)
+
+mpi_group_difference
+mpi_group_intersection
+mpi_initialized
+
+INCORRECT-ish
+-------------
+
+mpi_ssend 
+
+UNTESTED
+--------
+
+mpi_sendrecv
+
+DONE
+----
+
+REFACTOR  return ERROR(level, func, errorcode, message)  
+REFACTOR  return IERROR(level, func, messsage)
+MERGE if (bla) MPI_Send else messaging_send 
+ADD/FIX various special tags
+
+mpi_scan
+mpi_allgather (on top of allgatherv)
+mpi_allgatherv
+mpi_allreduce
+mpi_gather    (on top op gatherv)
+mpi_gatherv
+mpi_alltoall (on top of alltoallv)
+mpi_alltoallv
+mpi_scatter (on top of scatterv)
+mpi_scatterv
+
+mpi_comm_free
+mpi_comm_group
+mpi_comm_rank
+mpi_comm_size
+mpi_comm_split
+mpi_comm_create
+mpi_comm_dup
+
+mpi_group_rank 
+mpi_group_size
+mpi_group_free
+mpi_group_incl
+mpi_group_range_incl
+mpi_group_union
+mpi_group_translate_ranks
+
+mpi_irecv
+mpi_recv
+
+mpi_irsend
+mpi_isend
+mpi_rsend
+mpi_send
+
+mpi_reduce
+mpi_abort
+mpi_barrier
+mpi_bcast
+
+mpi_finalize
+
+mpi_test
+mpi_wait
+mpi_waitall
+mpi_waitany
+
+
+SKIPPED
+-------
+
+mpi_error_string
+mpi_pack
+mpi_unpack
+mpi_get_processor_name
+mpi_op_create
+mpi_wtime

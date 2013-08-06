@@ -1,0 +1,12 @@
+Example C arguments (usually provided to mpirun): 
+
+--wa-server fs0.das4.cs.vu.nl --wa-server-port 45678 --wa-cluster-name VU4.C1 --wa-cluster-rank 0 --wa-cluster-count 1
+
+Example FORTRAN mpibis.config: 
+
+fs0.das4.cs.vu.nl 45678 VU4.C1 0 1
+
+Example HUB command line parameters:
+
+java -cp ./lib/cesm-0.1.jar cesm.Server  --port 45678 --clusters 1
+

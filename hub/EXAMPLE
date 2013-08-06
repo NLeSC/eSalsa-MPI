@@ -1,0 +1,1 @@
+java -cp ./lib/cesm-0.1.jar cesm.Server  --port 45678 --clusters 1

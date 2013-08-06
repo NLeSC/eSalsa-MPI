@@ -1,0 +1,57 @@
+<project name="CESM" default="all" basedir=".">
+
+	<property name="version" value="0.1" />
+	<property name="jar" value="cesm-${version}.jar" />
+
+	<property name="srcdir" value="./src" />
+	<property name="builddir" value="./build" />
+	<property name="distdir" value="./lib" />
+	
+	<property name="external" location="external" />
+
+	<path id="default.classpath">
+		<fileset dir="${external}">
+			<include name="*.jar" />
+		</fileset>
+		<pathelement path="tmp" />
+	</path>
+
+	<!-- Internal target - Preparations for building. -->
+	<target name="prepare">
+		<mkdir dir="${distdir}" />
+		<mkdir dir="${builddir}" />
+		<mkdir dir="${builddir}/headers" />
+	</target>
+
+	<target name="compile" depends="prepare">
+		<javac classpathref="default.classpath" destdir="${builddir}" srcdir="${srcdir}" debug="true" includes="cesm/**/*.java,generator/**/*.java" />
+	</target>
+
+	<!-- Internal target - Builds the JAR file -->
+	<target name="jar" depends="compile">
+
+		<delete failonerror="false" file="${distdir}/${jar}" />
+
+		<jar jarfile="${distdir}/${jar}" basedir="${builddir}" includes="**">
+			<manifest>
+				<attribute name="Built-By" value="${user.name}" />
+			</manifest>
+		</jar>
+
+	</target>
+
+	<target name="all" depends="clean,prepare,compile,jar">
+	</target>
+
+	<!-- remove all generated code -->
+	<target name="clean" description="Removes the ${distdir} directory">
+		<delete failonerror="false" dir="${builddir}" />
+		<delete failonerror="false" dir="${distdir}" />
+	</target>
+
+	<target name="distclean" depends="clean">
+		<delete failonerror="false" dir="./build-eclipse" />
+		<delete failonerror="false" file="${version}.zip" />
+	</target>
+
+</project>
