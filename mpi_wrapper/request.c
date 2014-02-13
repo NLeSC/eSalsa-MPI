@@ -1,7 +1,5 @@
 #include "flags.h"
 
-#ifdef IBIS_INTERCEPT
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
@@ -20,26 +18,24 @@ int init_request()
 {
    int i;
 
-   FORTRAN_MPI_REQUEST_NULL = PMPI_Request_c2f(MPI_REQUEST_NULL);
-
    for (i=0;i<MAX_REQUESTS;i++) {
       reqs[i] = NULL;
    }
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
-static int is_special(int index)
-{
-   return (index == FORTRAN_MPI_REQUEST_NULL);
-}
+//static int is_special(int index)
+//{
+//   return (index == FORTRAN_MPI_REQUEST_NULL);
+//}
 
 static int add_request(request *req)
 {
    int i;
 
    for (i=0;i<MAX_REQUESTS;i++) {
-      if (!is_special(i) && reqs[i] == NULL) {
+      if (/*!is_special(i) &&*/ reqs[i] == NULL) {
          reqs[i] = req;
          return i;
       }
@@ -48,7 +44,7 @@ static int add_request(request *req)
    return -1;
 }
 
-request *create_request(int flags, void *buf, int count, MPI_Datatype datatype, int dest, int tag, communicator *c) {
+request *create_request(int flags, void *buf, int count, datatype *type, int dest, int tag, communicator *c) {
 
    request *r = malloc(sizeof(request));
 
@@ -59,16 +55,16 @@ request *create_request(int flags, void *buf, int count, MPI_Datatype datatype, 
 
    r->flags = flags;
    r->buf = buf;
-   r->type = datatype;
+   r->type = type;
    r->count = count;
    r->source_or_dest = dest;
    r->tag = tag;
    r->c = c;
    r->error = 0;
    r->req = MPI_REQUEST_NULL;
-   r->index = add_request(r);
+   r->handle = add_request(r);
 
-   if (r->index == -1) {
+   if (r->handle == -1) {
       ERROR(1, "Failed to store request!\n");
       free(r);
       return NULL;
@@ -81,45 +77,38 @@ void free_request(request *r)
 {
    if (r != NULL) {
       if (r->req != MPI_REQUEST_NULL) {
-          PMPI_Request_free(&(r->req));
+          MPI_Request_free(&(r->req));
       }
 
-      reqs[r->index] = NULL;
+      reqs[r->handle] = NULL;
 
       free(r);
    }
 }
 
-request *get_request(MPI_Request r)
+request *handle_to_request(EMPI_Request handle)
 {
-   request *res;
-
-   if (r == MPI_REQUEST_NULL) {
+   if (handle < 0 || handle >= MAX_REQUESTS) {
+      ERROR(1, "handle_to_request(handle=%d) handle out of bounds!", handle);
       return NULL;
    }
 
-   memcpy(&res, &r, sizeof(request *));
-   return res;
+   if (reqs[handle] == NULL) {
+//      ERROR(1, "handle_to_request(handle=%d) request not found!", handle);
+      return NULL;
+   }
+
+   return reqs[handle];
 }
 
-request *get_request_with_index(int index)
+EMPI_Request request_to_handle(request *r)
 {
-   if (index < 0 || index >= MAX_REQUESTS) {
-      ERROR(1, "Failed to find request %d (out of bounds)!\n", index);
-      return NULL;
+   if (r == NULL) {
+      ERROR(1, "request_to_handle(r=NULL) request is NULL!");
+      return -1;
    }
 
-   if (reqs[index] == NULL) {
-      ERROR(1, "Failed to find request %d (empty slot)!\n", index);
-      return NULL;
-   }
-
-   return reqs[index];
-}
-
-void set_request_ptr(MPI_Request *dst, request *src)
-{
-   memcpy(dst, &src, sizeof(request *));
+   return r->handle;
 }
 
 int request_active(request *r)
@@ -152,19 +141,20 @@ int request_completed(request *r)
    return (r->flags & REQUEST_FLAG_COMPLETED);
 }
 
-MPI_Comm request_get_mpi_comm(MPI_Request r, MPI_Comm def)
+EMPI_Comm request_get_comm(EMPI_Request *r, EMPI_Comm def)
 {
-   MPI_Comm tmp;
-
-   request *req = get_request(r);
-
-   if (req == NULL) {
-WARN(1, "req == NULL: Returning default comm!");
+   if (r == NULL) {
+      WARN(1, "request_get_comm(r=NULL, def=%d) Request is NULL returning default!", def);
       return def;
    }
 
-   set_communicator_ptr(&tmp, req->c);
-   return tmp;
+   request *req = handle_to_request(*r);
+
+   if (req == NULL) {
+      WARN(1, "request_get_comm(*r=%d, def=%d) Request not found, returning default!", *r, def);
+      return def;
+   }
+
+   return communicator_to_handle(req->c);
 }
 
-#endif // IBIS_INTERCEPT

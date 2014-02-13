@@ -2,10 +2,7 @@
 #define _MESSAGING_H_
 
 #include "flags.h"
-
-#ifdef IBIS_INTERCEPT
-
-#include "mpi.h"
+#include "empi.h"
 #include "types.h"
 #include <stdint.h>
 
@@ -140,12 +137,12 @@ struct s_msg_buffer {
 };
 
 // Send and receive messages (to any remote participant).
-int messaging_send(void* buf, int count, MPI_Datatype datatype, int dest, int tag, communicator* c);
-int messaging_receive(void *buf, int count, MPI_Datatype datatype, int source, int tag, MPI_Status *status, communicator* c);
+int messaging_send(void* buf, int count, datatype *t, int dest, int tag, communicator* c);
+int messaging_receive(void *buf, int count, datatype *t, int source, int tag, status *s, communicator* c);
 
 // Broadcast messages (to all cluster coordinators).
-int messaging_bcast(void* buf, int count, MPI_Datatype datatype, int root, communicator* c);
-int messaging_bcast_receive(void *buf, int count, MPI_Datatype datatype, int root, communicator* c);
+int messaging_bcast(void* buf, int count, datatype *t, int root, communicator* c);
+int messaging_bcast_receive(void *buf, int count, datatype *t, int root, communicator* c);
 
 //int messaging_allreduce(void* buf, int count, MPI_Datatype datatype, communicator* c);
 //int messaging_allreduce_receive(void *buf, int count, MPI_Datatype datatype, communicator* c);
@@ -154,7 +151,7 @@ int messaging_bcast_receive(void *buf, int count, MPI_Datatype datatype, int roo
 int messaging_probe_receive(request *r, int blocking);
 
 // Finalize a pending receive request.
-int messaging_finalize_receive(request *r, MPI_Status *status);
+int messaging_finalize_receive(request *r, status *s);
 
 // Send and receive functions used to implement an MPI_COMM_SPLIT
 int messaging_send_comm_request(communicator* c, int color, int key);
@@ -173,7 +170,5 @@ int messaging_send_terminate_request(communicator* c);
 
 // Profiling support
 int messaging_print_profile();
-
-#endif // IBIS_INTERCEPT
 
 #endif // _MESSAGING_H_

@@ -1,7 +1,4 @@
 #include "flags.h"
-
-#ifdef IBIS_INTERCEPT
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
@@ -22,6 +19,234 @@
 
 // The filedescriptor of the socket connected to the 'server'
 static int socketfd = 0;
+
+// The location of the server (hostname/ip and port)
+static char *server;
+static unsigned short port;
+
+// The name of this cluster (must be unique).
+static char *cluster_name;
+
+
+// The number of clusters and the rank of our cluster in this set.
+uint32_t cluster_count;
+uint32_t cluster_rank;
+
+// The size of each cluster, and the offset of each cluster in the
+// total set of machines.
+static int *cluster_sizes;
+static int *cluster_offsets;
+
+/*****************************************************************************/
+/*                      Initialization / Finalization                        */
+/*****************************************************************************/
+
+static int read_config_file()
+{
+   int  error;
+   char *file;
+   FILE *config;
+   int retval = 1;
+   char buffer[1024];
+
+   file = getenv("EMPI_CONFIG");
+
+   if (file == NULL) {
+      WARN(0, "EMPI_CONFIG not set");
+      // FIXME -- hardcoded path :-P
+      file = "/home/jason/empi.config";
+   } else {
+      retval = 0;
+   }
+
+   INFO(0, "looking for config file %s", file);
+
+   config = fopen(file, "r");
+
+   if (config == NULL) {
+      ERROR(1, "Failed to open config file %s", file);
+      return 0;
+   }
+
+   INFO(0, "config file %s opened.", file);
+
+   error = fscanf(config, "%s", buffer);
+
+   if (error == EOF || error == 0) {
+      fclose(config);
+      ERROR(1, "Failed to read server adres from %s", file);
+      return 0;
+   }
+
+   server = malloc(strlen(buffer+1));
+
+   if (server == NULL) {
+      fclose(config);
+      ERROR(1, "Failed to allocate space for server adres %s", buffer);
+      return 0;
+   }
+
+   strcpy(server, buffer);
+
+   error = fscanf(config, "%hu", &port);
+
+   if (error == EOF || error == 0) {
+      fclose(config);
+      ERROR(1, "Failed to read server port from %s", file);
+      return 0;
+   }
+
+   error = fscanf(config, "%s", buffer);
+
+   if (error == EOF || error == 0) {
+      fclose(config);
+      ERROR(1, "Failed to read cluster name from %s", file);
+      return 0;
+   }
+
+   cluster_name = malloc(strlen(buffer)+1);
+
+   if (cluster_name == NULL) {
+      fclose(config);
+      ERROR(1, "Failed to allocate space for cluster name %s", buffer);
+      return 0;
+   }
+
+   strcpy(cluster_name, buffer);
+
+   error = fscanf(config, "%d", &cluster_rank);
+
+   if (error == EOF || error == 0) {
+      fclose(config);
+      ERROR(1, "Failed to read cluster rank from %s", file);
+      return 0;
+   }
+
+   error = fscanf(config, "%d", &cluster_count);
+
+   if (error == EOF || error == 0) {
+      fclose(config);
+      ERROR(1, "Failed to read cluster rank from %s", file);
+      return 0;
+   }
+
+   fclose(config);
+   return 1;
+}
+
+static int init_cluster_info(int *argc, char ***argv)
+{
+   int i, changed, cnt, len;
+
+   server = NULL;
+   port = -1;
+
+   cluster_name = NULL;
+   cluster_count = 0;
+   cluster_rank = -1;
+
+   // First try to read the configuration from an input file whose location is set in the environment.
+   // This is needed since Fortran does not pass the command line arguments to the MPI library like C does.
+   if (read_config_file() != 1) {
+      return 0;
+   }
+
+   // Next, parse the command line (possibly overwriting the config).
+   i = 1;
+
+   while ( i < (*argc) ){
+      changed = 0;
+
+      if ( strcmp((*argv)[i],"--wa-server") == 0 ) {
+         if ( i+1 < *argc ){
+            server = malloc(strlen((*argv)[i+1])+1);
+            strcpy(server, (*argv)[i+1]);
+            DELETE_ARG;
+         } else {
+            ERROR(1, "Missing option for --wa-server");
+            return 0;
+         }
+         DELETE_ARG;
+
+      } else if ( strcmp((*argv)[i],"--wa-server-port") == 0 ) {
+         if ( i+1 < *argc ){
+            port = (unsigned short) atoi((*argv)[i+1]);
+            DELETE_ARG;
+         } else {
+            ERROR(1, "Missing option for --wa-server-port");
+            return 0;
+         }
+         DELETE_ARG;
+
+      } else if ( strcmp((*argv)[i],"--wa-cluster-name") == 0 ) {
+         if ( i+1 < *argc ){
+
+            len = strlen((*argv)[i+1]);
+
+            if (len >= MAX_LENGTH_CLUSTER_NAME) {
+               ERROR(1, "Cluster name too long (%d)", len);
+               return 0;
+            } else {
+               cluster_name = malloc(len+1);
+               strcpy(cluster_name, (*argv)[i+1]);
+            }
+         } else {
+            ERROR(1, 0, "Missing option for --wa-cluster-name");
+            return 0;
+         }
+         DELETE_ARG;
+
+      } else if ( strcmp((*argv)[i],"--wa-cluster-rank") == 0 ) {
+         if ( i+1 < *argc ){
+            cluster_rank = atoi((*argv)[i+1]);
+            DELETE_ARG;
+         } else {
+            ERROR(1, "Missing option for --wa-cluster-rank");
+            return 0;
+         }
+         DELETE_ARG;
+
+      } else if ( strcmp((*argv)[i],"--wa-cluster-count") == 0 ) {
+         if ( i+1 < *argc ){
+            cluster_count = atoi((*argv)[i+1]);
+            DELETE_ARG;
+         } else {
+            ERROR(1, 0, "Missing option for --wa-cluster-rank");
+            return 0;
+         }
+         DELETE_ARG;
+      }
+
+      if ( !changed ) i++;
+   }
+
+   if (server == NULL || port <= 0) {
+      ERROR(1, "WA server not (correctly) set (%s %d)!", server, port);
+      return 0;
+   }
+
+   INFO(1, "WA server at %s %d", server, port);
+
+   if (local_rank < 0 || local_count <= 0 || local_rank >= local_count) {
+      ERROR(1, "Local cluster info not set correctly (%d, %d)!", local_rank, local_count);
+      return 0;
+   }
+
+   if (cluster_name == NULL || cluster_rank < 0 || cluster_count <= 0 || cluster_rank >= cluster_count) {
+      ERROR(1, "Cluster info not set correctly (%s, %d, %d)!", cluster_name, cluster_rank, cluster_count);
+      return 0;
+   }
+
+   INFO(1, "I am %d of %d in cluster %s", local_rank, local_count, cluster_name);
+   INFO(1, "Cluster %s is %d of %d clusters", cluster_name, cluster_rank, cluster_count);
+
+   cluster_sizes = malloc(cluster_count * sizeof(int));
+   cluster_offsets = malloc((cluster_count+1) * sizeof(int));
+
+   my_pid = SET_PID(cluster_rank, local_rank);
+
+   return 1;
+}
 
 static int wa_connect(char *server, unsigned short port)
 {
@@ -75,42 +300,35 @@ static int wa_connect(char *server, unsigned short port)
    return CONNECT_OK;
 }
 
-int wa_sendfully(unsigned char *buffer, size_t len)
+// Init the wide area communication.
+int wa_init(int local_rank, int local_count, int *argc, char ***argv)
 {
-   size_t w = 0;
-   ssize_t tmp = 0;
+   int status;
 
-   while (w < len) {
-      tmp = write(socketfd, buffer+w, len-w);
+   status = init_cluster_info(argc, argv);
 
-      if (tmp < 0) {
-         ERROR(1, "wa_sendfully failed! (%s)", strerror(errno));
-         return CONNECT_ERROR_SEND_FAILED;
-      } else {
-         w += tmp;
-      }
+   if (status == 0) {
+      ERROR(1, "Failed to initialize WA sockets implementation!");
+      return EMPI_ERR_INTERN;
    }
 
-   return CONNECT_OK;
-}
+   status = wa_connect(server_name, port);
 
-int wa_receivefully(unsigned char *buffer, size_t len)
-{
-   size_t r = 0;
-   ssize_t tmp = 0;
-
-   while (r < len) {
-      tmp = read(socketfd, buffer+r, len-r);
-
-      if (tmp < 0) {
-         ERROR(1, "wa_receivefully failed! (%s)", strerror(errno));
-         return CONNECT_ERROR_RECEIVE_FAILED;
-      } else { 
-         r += tmp;
-      }
+   if (status != CONNECT_OK) {
+      ERROR(1, "Failed to connect to hub!");
+      return 0;
    }
 
-   return CONNECT_OK;
+   error = handshake(local_rank, local_count, cluster_rank, cluster_count,
+                      cluster_name, cluster_sizes, cluster_offsets);
+
+   if (error != CONNECT_OK) {
+      ERROR(1, "Failed to perform handshake with hub!");
+      close(socketfd);
+      return 0;
+   }
+
+   return 1;
 }
 
 static int handshake(int local_rank, int local_count, int cluster_rank, int cluster_count,
@@ -188,31 +406,80 @@ static int handshake(int local_rank, int local_count, int cluster_rank, int clus
    return CONNECT_OK;
 }
 
-int wa_init(char *server_name, unsigned short port,
-            int local_rank, int local_count,
-            char *cluster_name, int cluster_rank, int cluster_count,
-            int *cluster_sizes, int *cluster_offsets)
-{
-   int error = 0;
+int wa_finalize() {
+   int error;
 
-   error = wa_connect(server_name, port);
+   // Send a close link opcode before shutting down the socket.
+   int tmp = htonl(OPCODE_CLOSE_LINK);
 
-   if (error != CONNECT_OK) {
-      ERROR(1, "Failed to connect to hub!");
-      return 0;
+   error = wa_sendfully((unsigned char *) &tmp, 4);
+
+   if (error != 0) {
+      ERROR(1, "Failed to close link! %d", error);
+      return CONNECT_ERROR_CLOSE_FAILED;
    }
 
-   error = handshake(local_rank, local_count, cluster_rank, cluster_count,
-                      cluster_name, cluster_sizes, cluster_offsets);
+   error = shutdown(socketfd, SHUT_RDWR);
 
-   if (error != CONNECT_OK) {
-      ERROR(1, "Failed to perform handshake with hub!");
-      close(socketfd);
-      return 0;
+   if (error != 0) {
+      ERROR(1, "Failed to shutdown socket! %d", error);
+      return CONNECT_ERROR_CLOSE_FAILED;
    }
 
-   return 1;
+   error = close(socketfd);
+
+   if (error != 0) {
+      ERROR(1, "Failed to close socket! %d", error);
+      return CONNECT_ERROR_CLOSE_FAILED;
+   }
+
+   // TODO: cleanup communicators!
+
+   return CONNECT_OK;
 }
+
+/*****************************************************************************/
+/*                      Send / Receive operations                            */
+/*****************************************************************************/
+
+int wa_sendfully(unsigned char *buffer, size_t len)
+{
+   size_t w = 0;
+   ssize_t tmp = 0;
+
+   while (w < len) {
+      tmp = write(socketfd, buffer+w, len-w);
+
+      if (tmp < 0) {
+         ERROR(1, "wa_sendfully failed! (%s)", strerror(errno));
+         return CONNECT_ERROR_SEND_FAILED;
+      } else {
+         w += tmp;
+      }
+   }
+
+   return CONNECT_OK;
+}
+
+int wa_receivefully(unsigned char *buffer, size_t len)
+{
+   size_t r = 0;
+   ssize_t tmp = 0;
+
+   while (r < len) {
+      tmp = read(socketfd, buffer+r, len-r);
+
+      if (tmp < 0) {
+         ERROR(1, "wa_receivefully failed! (%s)", strerror(errno));
+         return CONNECT_ERROR_RECEIVE_FAILED;
+      } else {
+         r += tmp;
+      }
+   }
+
+   return CONNECT_OK;
+}
+
 
 int wa_wait_for_data(int blocking)
 {
@@ -253,7 +520,7 @@ int wa_wait_for_opcode(int blocking, int *opcode)
 
    DEBUG(1, "WA_WAIT_FOR_DATA: Waiting for data to appear on socket (blocking=%d)", blocking);
 
-   if (blocking == 0) { 
+   if (blocking == 0) {
 
       FD_ZERO(&select_set);
       max_sd = socketfd;
@@ -262,13 +529,13 @@ int wa_wait_for_opcode(int blocking, int *opcode)
       timeout.tv_usec = 0;
       result = select(max_sd + 1, &select_set, NULL, NULL, &timeout);
 
-      if (result <= 0) { 
+      if (result <= 0) {
          // If we don't have data, or gotten an error we return.
 	 return result;
-      } 
+      }
    }
-   
-   // If we want a blocking read, or our non-blocking select said we 
+
+   // If we want a blocking read, or our non-blocking select said we
    // had data, we read a full opcode using a blocking read.
    while (r < len) {
       tmp = read(socketfd, ((unsigned char *) opcode)+r, len-r);
@@ -279,41 +546,7 @@ int wa_wait_for_opcode(int blocking, int *opcode)
          r += tmp;
       }
    }
- 
+
    return 1;
 }
-
-int wa_finalize() {
-   int error;
-
-   // Send a close link opcode before shutting down the socket.
-   int tmp = htonl(OPCODE_CLOSE_LINK);
-
-   error = wa_sendfully((unsigned char *) &tmp, 4);
-
-   if (error != 0) {
-      ERROR(1, "Failed to close link! %d", error);
-      return CONNECT_ERROR_CLOSE_FAILED;
-   }
-
-   error = shutdown(socketfd, SHUT_RDWR);
-
-   if (error != 0) {
-      ERROR(1, "Failed to shutdown socket! %d", error);
-      return CONNECT_ERROR_CLOSE_FAILED;
-   }
-
-   error = close(socketfd);
-
-   if (error != 0) {
-      ERROR(1, "Failed to close socket! %d", error);
-      return CONNECT_ERROR_CLOSE_FAILED;
-   }
-
-   // TODO: cleanup communicators!
-
-   return CONNECT_OK;
-}
-
-#endif // IBIS_INTERCEPT
 

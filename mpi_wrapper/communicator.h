@@ -2,9 +2,6 @@
 #define _COMMUNICATOR_H_
 
 #include "flags.h"
-
-#ifdef IBIS_INTERCEPT
-
 #include "mpi.h"
 #include "types.h"
 #include "stdint.h"
@@ -20,7 +17,7 @@
 
 struct s_communicator {
 
-   int number;
+   int handle;
    int flags;
 
    MPI_Comm comm;
@@ -53,11 +50,10 @@ struct s_communicator {
 };
 
 // Communicator mapping
-
 int init_communicators(int cluster_rank, int cluster_count,
                        int* cluster_sizes, int *cluster_offsets);
 
-int create_communicator(MPI_Comm comm, int number,
+int create_communicator(int handle, MPI_Comm comm,
          int local_rank, int local_size, int global_rank, int global_size,
          int cluster_count, int *coordinators, int *cluster_sizes,
          int flags, uint32_t *members,
@@ -66,8 +62,11 @@ int create_communicator(MPI_Comm comm, int number,
 
 int free_communicator(communicator * c);
 
-communicator *get_communicator(MPI_Comm comm);
-communicator *get_communicator_with_index(int index);
+communicator *handle_to_communicator(int handle);
+int communicator_to_handle(communicator *c);
+
+//communicator *get_communicator(MPI_Comm comm);
+//communicator *get_communicator_with_index(int index);
 
 int comm_dup(communicator *in, communicator **out);
 
@@ -93,7 +92,5 @@ int get_local_rank(communicator *c, int rank);
 int get_cluster_rank(communicator *c, int rank);
 int get_global_rank(communicator *c, int cluster, int rank);
 
-
-#endif // IBIS_INTERCEPT
 
 #endif // _COMMUNICATOR_H_

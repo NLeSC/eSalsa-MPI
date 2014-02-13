@@ -1,19 +1,13 @@
 #include "flags.h"
 
-#ifdef ENABLE_INTERCEPT
-
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "mpi.h"
+#include "empi.h"
 
-#ifdef IBIS_INTERCEPT
+//#include "generated_header.h"
 
-#include "generated_header.h"
 #include "messaging.h"
-
-#endif // IBIS_INTERCEPT
-
 #include "logging.h"
 #include "profiling.h"
 
@@ -68,17 +62,17 @@ uint64_t current_start_ticks;
 
 uint32_t current_interval;
 
-static MPI_Comm profile_comm;
+//static EMPI_Comm profile_comm;
 
 void profile_init()
 {
-   int i, error;
+   int i; //, error;
 
-   error = MPI_Comm_dup(MPI_COMM_WORLD, &profile_comm);
+//   error = EMPI_Comm_dup(EMPI_COMM_WORLD, &profile_comm);
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to initialize profiling! (%d)", error);
-   }
+//   if (error != MPI_SUCCESS) {
+//      ERROR(1, "Failed to initialize profiling! (%d)", error);
+//   }
 
    for (i=0;i<MAX_COMMUNICATORS;i++) {
       total_use[i] = NULL;
@@ -92,7 +86,7 @@ void profile_init()
 
    start_ticks = current_start_ticks = profile_start_ticks();
 
-   printf("Profiling initialized! (MAX=%d, COMM=%d)", MAX_COMMUNICATORS, MPI_Comm_c2f(profile_comm));
+   printf("Profiling initialized! (MAX=%d)", MAX_COMMUNICATORS);
 }
 
 static void print_and_reset_current_interval()
@@ -143,7 +137,7 @@ void profile_finalize()
    uint64_t ticks = 0;
    uint32_t use = 0;
 
-   int rank, size;
+//   int rank, size;
 
    if (running != 1) {
       WARN(1, "Profiling not running!");
@@ -178,15 +172,15 @@ void profile_finalize()
 
    printf("Total profiled ticks in %d intervals - total: %ld mpi: %ld calls: %d\n", current_interval, end_ticks-start_ticks, ticks, use);
 
-   MPI_Comm_rank(profile_comm, &rank);
-   MPI_Comm_size(profile_comm, &size);
+//   EMPI_Comm_rank(profile_comm, &rank);
+//   EMPI_Comm_size(profile_comm, &size);
 
 //   GPTLpr(current_interval*size + rank);
 
    INFO(1, "Profiling done!");
 }
 
-void profile_add_statistics(MPI_Comm comm, int field, uint64_t ticks)
+void profile_add_statistics(EMPI_Comm comm, int field, uint64_t ticks)
 {
    int index;
 
@@ -195,7 +189,7 @@ void profile_add_statistics(MPI_Comm comm, int field, uint64_t ticks)
       return;
    }
 
-   index = MPI_Comm_c2f(comm);
+   index = comm;
 
    if (index < 0 || index >= MAX_COMMUNICATORS) {
       ERROR(1, "Communicator index out of bounds: %d", index);
@@ -457,4 +451,3 @@ void jason_stop_timer8_()
 }
 
 
-#endif

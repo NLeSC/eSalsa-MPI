@@ -1,12 +1,12 @@
 #ifndef _LOGGING_H_
 #define _LOGGING_H_
 
-#include "mpi.h"
+#include "empi.h"
 
 // VERBOSE must be defined and >= 0. Usual values are:
 //
 // 0 only print fatal
-// 1 print fatal and errors 
+// 1 print fatal and errors
 // 2 print fatal, errors and warnings
 // 3 print fatal, errors, warnings and info
 // 4+ print all
@@ -65,17 +65,17 @@
 
 void init_debug();
 
-char *comm_to_string(MPI_Comm comm);
-char *type_to_string(MPI_Datatype type);
-char *request_to_string(MPI_Request r);
-char *op_to_string(MPI_Op o);
-char *info_to_string(MPI_Info i);
-char *file_to_string(MPI_File f);
+char *comm_to_string(EMPI_Comm comm);
+char *type_to_string(EMPI_Datatype type);
+char *request_to_string(EMPI_Request r);
+char *op_to_string(EMPI_Op o);
+char *info_to_string(EMPI_Info i);
+char *file_to_string(EMPI_File f);
 
-char *win_to_string(MPI_Win w);
+char *win_to_string(EMPI_Win w);
 char *ranks_to_string(int *ranks, int n);
 char *ranges_to_string(int range[][3], int n);
-char *group_to_string(MPI_Group g);
+char *group_to_string(EMPI_Group g);
 
 // Should be replaced!!!
 //void DEBUG(int indent, const char *fmt, ...);

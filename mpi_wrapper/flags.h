@@ -4,13 +4,8 @@
 // These flags determine how much of the MPIbis library will be used.
 // Switch features off by commenting a define.
 
-#define ENABLE_INTERCEPT
-
 // Print every call ?
 // #define TRACE_CALLS
-
-// Intercept every call and forward it to MPIbis ?
-#define IBIS_INTERCEPT
 
 // Print error and terminate when an MPI_ERROR is caught ?
 #define TRACE_ERRORS
@@ -24,9 +19,12 @@
 // Switch on Macros used to check function parameters
 //#define CHECK_PARAMETERS
 
+// Is error code translation needed between EMPI and MPI calls ?
+//#ifdef NEED_ERROR_TRANSLATION
+
 // These constants determine various maxima used in the MPIbis library.
 
-// Maximum number of MPI processes allowed (2^24).
+// Maximum number of MPI processes allowed per cluster (2^24).
 #define MAX_PROCESSES_PER_CLUSTER 16777216
 
 // Maximum number of clusters allowed (2^8).

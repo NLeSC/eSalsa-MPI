@@ -1,7 +1,5 @@
 #include "flags.h"
 
-#ifdef IBIS_INTERCEPT
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -11,8 +9,13 @@
 #include <errno.h>
 #include <execinfo.h>
 
+#include "empi.h"
 #include "mpi.h"
-#include "generated_header.h"
+#include "error.h"
+#include "datatype.h"
+#include "status.h"
+
+//#include "generated_header.h"
 
 #include "logging.h"
 #include "types.h"
@@ -26,28 +29,27 @@
 #include "operation.h"
 #include "profiling.h"
 
-// The number of clusters and the rank of our cluster in this set.
-uint32_t cluster_count;
-uint32_t cluster_rank;
-
 // The number of processes in our cluster and our process' rank in this set.
 int local_count;
 int local_rank;
 
-// The pid of my machine.
-uint32_t my_pid;
+/* The following external fields are provided by the WA implementation */
 
-// The location of the server (hostname/ip and port)
-static char *server;
-static unsigned short port;
+// The number of clusters and the rank of our cluster in this set.
+extern uint32_t cluster_count;
+extern uint32_t cluster_rank;
+
+// The pid of my machine.
+extern uint32_t my_pid;
 
 // The name of this cluster (must be unique).
-static char *cluster_name;
+extern char *cluster_name;
 
 // The size of each cluster, and the offset of each cluster in the
 // total set of machines.
-static int *cluster_sizes;
-static int *cluster_offsets;
+extern int *cluster_sizes;
+extern int *cluster_offsets;
+
 
 // Value of various Fortan MPI constants.
 int FORTRAN_MPI_COMM_NULL;
@@ -61,248 +63,9 @@ int FORTRAN_MPI_OP_NULL;
 int FORTRAN_FALSE;
 int FORTRAN_TRUE;
 
-/*****************************************************************************/
-/*                      Initialization / Finalization                        */
-/*****************************************************************************/
-
-static int read_config_file()
-{
-   int  error;
-   char *file;
-   FILE *config;
-   int retval = 1;
-   char buffer[1024];
-
-   file = getenv("MPIBIS_CONFIG");
-
-   if (file == NULL) {
-      WARN(0, "MPIBIS_CONFIG not set");
-      file = "/home/jason/mpibis.config";
-   } else {
-      retval = 0;
-   }
-
-   INFO(0, "looking for config file %s", file);
-
-   config = fopen(file, "r");
-
-   if (config == NULL) {
-      ERROR(1, "Failed to open config file %s", file);
-      return 0;
-   }
-
-   INFO(0, "config file %s opened.", file);
-
-   error = fscanf(config, "%s", buffer);
-
-   if (error == EOF || error == 0) {
-      fclose(config);
-      ERROR(1, "Failed to read server adres from %s", file);
-      return 0;
-   }
-
-   server = malloc(strlen(buffer+1));
-
-   if (server == NULL) {
-      fclose(config);
-      ERROR(1, "Failed to allocate space for server adres %s", buffer);
-      return 0;
-   }
-
-   strcpy(server, buffer);
-
-   error = fscanf(config, "%hu", &port);
-
-   if (error == EOF || error == 0) {
-      fclose(config);
-      ERROR(1, "Failed to read server port from %s", file);
-      return 0;
-   }
-
-   error = fscanf(config, "%s", buffer);
-
-   if (error == EOF || error == 0) {
-      fclose(config);
-      ERROR(1, "Failed to read cluster name from %s", file);
-      return 0;
-   }
-
-   cluster_name = malloc(strlen(buffer)+1);
-
-   if (cluster_name == NULL) {
-      fclose(config);
-      ERROR(1, "Failed to allocate space for cluster name %s", buffer);
-      return 0;
-   }
-
-   strcpy(cluster_name, buffer);
-
-   error = fscanf(config, "%d", &cluster_rank);
-
-   if (error == EOF || error == 0) {
-      fclose(config);
-      ERROR(1, "Failed to read cluster rank from %s", file);
-      return 0;
-   }
-
-   error = fscanf(config, "%d", &cluster_count);
-
-   if (error == EOF || error == 0) {
-      fclose(config);
-      ERROR(1, "Failed to read cluster rank from %s", file);
-      return 0;
-   }
-
-   fclose(config);
-   return 1;
-}
-
-static int init_mpibis(int *argc, char ***argv)
-{
-   int i, changed, cnt, len;
-
-   server = NULL;
-   port = -1;
-
-   cluster_name = NULL;
-   cluster_count = 0;
-   cluster_rank = -1;
-
-   // Check sizes of opaque datatypes to make sure that we can replace them
-   if (sizeof(MPI_Comm) < sizeof(communicator *)) {
-      ERROR(0, "Cannot replace MPI_Comm, handle too small! (%lu < %lu)", sizeof(MPI_Comm), sizeof(communicator *));
-      return 0;
-   }
-
-   if (sizeof(MPI_Group) < sizeof(group *)) {
-      ERROR(0, "Cannot replace MPI_Group, handle too small! (%lu < %lu)", sizeof(MPI_Group), sizeof(group *));
-      return 0;
-   }
-
-   if (sizeof(MPI_Request) < sizeof(request *)) {
-      ERROR(0, "Cannot replace MPI_Request, handle too small! (%lu < %lu)", sizeof(MPI_Request), sizeof(request *));
-      return 0;
-   }
-
-   // Check the value of COMM_WORLD. This may be a pointer, index or
-   // something else. Whatever it is, we must make sure that its value
-   // cannot be confused with one of our indexes.
-   if (((long) MPI_COMM_WORLD >= 0) && ((long) MPI_COMM_WORLD < MAX_COMMUNICATORS)) {
-      ERROR(0, "Cannot detect MPI_COMM_WORLD, as it is within my communicator range (%lu 0-%d)",
-               (unsigned long)MPI_COMM_WORLD, MAX_COMMUNICATORS);
-      return 0;
-   }
-
-   INFO(1, "MPI_COMM_WORLD detectable: %lu",(unsigned long) MPI_COMM_WORLD);
-
-   // First try to read the configuration from an input file whose location is set in the environment.
-   // This is needed since Fortran does not pass the command line arguments to the MPI library like C does.
-   if (read_config_file() != 1) {
-      return 0;
-   }
-
-   INFO(1, "MPI SIZES %lu %lu %lu %lu %lu", sizeof(MPI_Comm), sizeof(MPI_Group), sizeof(MPI_Request), sizeof(MPI_Fint), sizeof(int));
-
-   // Next, parse the command line (possibly overwriting the config).
-   i = 1;
-
-   while ( i < (*argc) ){
-      changed = 0;
-
-      if ( strcmp((*argv)[i],"--wa-server") == 0 ) {
-         if ( i+1 < *argc ){
-            server = malloc(strlen((*argv)[i+1])+1);
-            strcpy(server, (*argv)[i+1]);
-            DELETE_ARG;
-         } else {
-            ERROR(1, "Missing option for --wa-server");
-            return 0;
-         }
-         DELETE_ARG;
-
-      } else if ( strcmp((*argv)[i],"--wa-server-port") == 0 ) {
-         if ( i+1 < *argc ){
-            port = (unsigned short) atoi((*argv)[i+1]);
-            DELETE_ARG;
-         } else {
-            ERROR(1, "Missing option for --wa-server-port");
-            return 0;
-         }
-         DELETE_ARG;
-
-      } else if ( strcmp((*argv)[i],"--wa-cluster-name") == 0 ) {
-         if ( i+1 < *argc ){
-
-            len = strlen((*argv)[i+1]);
-
-            if (len >= MAX_LENGTH_CLUSTER_NAME) {
-               ERROR(1, "Cluster name too long (%d)", len);
-               return 0;
-            } else {
-               cluster_name = malloc(len+1);
-               strcpy(cluster_name, (*argv)[i+1]);
-            }
-            DELETE_ARG;
-         } else {
-            ERROR(1, 0, "Missing option for --wa-cluster-name");
-            return 0;
-         }
-         DELETE_ARG;
-
-      } else if ( strcmp((*argv)[i],"--wa-cluster-rank") == 0 ) {
-         if ( i+1 < *argc ){
-            cluster_rank = atoi((*argv)[i+1]);
-            DELETE_ARG;
-         } else {
-            ERROR(1, "Missing option for --wa-cluster-rank");
-            return 0;
-         }
-         DELETE_ARG;
-
-      } else if ( strcmp((*argv)[i],"--wa-cluster-count") == 0 ) {
-         if ( i+1 < *argc ){
-            cluster_count = atoi((*argv)[i+1]);
-            DELETE_ARG;
-         } else {
-            ERROR(1, 0, "Missing option for --wa-cluster-rank");
-            return 0;
-         }
-         DELETE_ARG;
-      }
-
-      if ( !changed ) i++;
-   }
-
-   if (server == NULL || port <= 0) {
-      ERROR(1, "WA server not (correctly) set (%s %d)!", server, port);
-      return 0;
-   }
-
-   INFO(1, "WA server at %s %d", server, port);
-
-   if (local_rank < 0 || local_count <= 0 || local_rank >= local_count) {
-      ERROR(1, "Local cluster info not set correctly (%d, %d)!", local_rank, local_count);
-      return 0;
-   }
-
-   if (cluster_name == NULL || cluster_rank < 0 || cluster_count <= 0 || cluster_rank >= cluster_count) {
-      ERROR(1, "Cluster info not set correctly (%s, %d, %d)!", cluster_name, cluster_rank, cluster_count);
-      return 0;
-   }
-
-   INFO(1, "I am %d of %d in cluster %s", local_rank, local_count, cluster_name);
-   INFO(1, "Cluster %s is %d of %d clusters", cluster_name, cluster_rank, cluster_count);
-
-   cluster_sizes = malloc(cluster_count * sizeof(int));
-   cluster_offsets = malloc((cluster_count+1) * sizeof(int));
-
-   my_pid = SET_PID(cluster_rank, local_rank);
-
-   return 1;
-}
-
 static void init_constants()
 {
+   // FIXME: do we need these?
    FORTRAN_MPI_COMM_NULL = PMPI_Comm_c2f(MPI_COMM_NULL);
    FORTRAN_MPI_COMM_WORLD = PMPI_Comm_c2f(MPI_COMM_WORLD);
    FORTRAN_MPI_COMM_SELF = PMPI_Comm_c2f(MPI_COMM_SELF);
@@ -327,174 +90,222 @@ static void init_constants()
    INFO(1, "FORTRAN_FALSE    = %d", FORTRAN_FALSE);
 }
 
-#define __IMPI_Init
-int IMPI_Init(int *argc, char **argv[])
+#define __xEMPI_Init
+int xEMPI_Init(int *argc, char **argv[])
 {
    int i=0;
 
    INFO(0, "Init MPI...");
 
-   int status = PMPI_Init(argc, argv);
+   int status = MPI_Init(argc, argv);
 
-   if (status == MPI_SUCCESS) {
-      PMPI_Comm_rank(MPI_COMM_WORLD, &local_rank);
-      PMPI_Comm_size(MPI_COMM_WORLD, &local_count);
-
-      INFO(1, "START MPI WRAPPER on %d of %d", local_rank, local_count);
-
-      for (i=0;i<*argc;i++) {
-         INFO(4, "argv[%d] = %s", i, (*argv)[i]);
-      }
-
-      init_constants();
-
-      status = init_groups();
-
-      if (status != MPI_SUCCESS) {
-         PMPI_Finalize();
-         ERROR(1, "Failed to initialize groups! (error=%d)", status);
-         return status;
-      }
-
-      status = init_request();
-
-      if (status != MPI_SUCCESS) {
-         PMPI_Finalize();
-         ERROR(1, "Failed to initialize requests! (error=%d)", status);
-         return status;
-
-      }
-
-      status = init_operations();
-
-      if (status != MPI_SUCCESS) {
-         PMPI_Finalize();
-         ERROR(1, "Failed to initialize operations! (error=%d)", status);
-         return status;
-      }
-
-      status = init_mpibis(argc, argv);
-
-      if (status == 0) {
-         PMPI_Finalize();
-         ERROR(1, "Failed to initialize mpibis!");
-         return MPI_ERR_INTERN;
-      }
-
-      status = wa_init(server, port, local_rank, local_count,
-                   cluster_name, cluster_rank, cluster_count,
-                   cluster_sizes, cluster_offsets);
-
-      if (status == 0) {
-         PMPI_Finalize();
-         ERROR(1, "Failed to initialize wide area communication!");
-         return MPI_ERR_INTERN;
-      }
-
-      status = init_communicators(cluster_rank, cluster_count,
-                                  cluster_sizes, cluster_offsets);
-
-      if (status != MPI_SUCCESS) {
-         wa_finalize();
-         PMPI_Finalize();
-         ERROR(1, "Failed to initialize communicators! (error=%d)", status);
-         return status;
-      }
+   if (status != MPI_SUCCESS) {
+       ERROR(1, "Failed to initialize MPI (error=%d)", status);
+       return EMPI_ERR_INTERN;
    }
 
-   return MPI_SUCCESS;
+   MPI_Comm_rank(MPI_COMM_WORLD, &local_rank);
+   MPI_Comm_size(MPI_COMM_WORLD, &local_count);
+
+   INFO(1, "START EMPI on %d of %d", local_rank, local_count);
+
+   for (i=0;i<*argc;i++) {
+      INFO(4, "argv[%d] = %s", i, (*argv)[i]);
+   }
+
+   init_constants();
+
+   status = init_groups();
+
+   if (status != EMPI_SUCCESS) {
+      MPI_Finalize();
+      ERROR(1, "Failed to initialize groups! (error=%d)", status);
+      return status;
+   }
+
+   status = init_request();
+
+   if (status != EMPI_SUCCESS) {
+      MPI_Finalize();
+      ERROR(1, "Failed to initialize requests! (error=%d)", status);
+      return status;
+   }
+
+   status = init_datatypes();
+
+   if (status != EMPI_SUCCESS) {
+      MPI_Finalize();
+      ERROR(1, "Failed to initialize datatypes! (error=%d)", status);
+      return status;
+   }
+
+   status = init_operations();
+
+   if (status != EMPI_SUCCESS) {
+      MPI_Finalize();
+      ERROR(1, "Failed to initialize operations! (error=%d)", status);
+      return status;
+   }
+
+   status = wa_init(local_rank, local_count, argc, argv);
+
+   if (status != EMPI_SUCCESS) {
+      MPI_Finalize();
+      ERROR(1, "Failed to initialize WA link!");
+      return EMPI_ERR_INTERN;
+   }
+
+   status = init_communicators(cluster_rank, cluster_count,
+                                  cluster_sizes, cluster_offsets);
+
+   if (status != EMPI_SUCCESS) {
+      wa_finalize();
+      MPI_Finalize();
+      ERROR(1, "Failed to initialize communicators! (error=%d)", status);
+      return status;
+   }
+
+   return EMPI_SUCCESS;
 }
 
-#define __IMPI_Finalize
-int IMPI_Finalize(void)
+#define __xEMPI_Finalize
+int xEMPI_Finalize(void)
 {
    int error;
 
-   // We tell the system to shut down by terminating MPI_COMM_WORLD.
-   error = messaging_send_terminate_request(get_communicator(MPI_COMM_WORLD));
+   // We tell the system to shut down by terminating EMPI_COMM_WORLD.
+   error = messaging_send_terminate_request(handle_to_communicator(EMPI_COMM_WORLD));
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to terminate MPI_COMM_WORLD! (error=%d)", error);
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to terminate EMPI_COMM_WORLD! (error=%d)", error);
       return error;
    }
 
    wa_finalize();
 
-   return PMPI_Finalize();
+   return MPI_Finalize();
 }
 
-#define __IMPI_Abort
-int IMPI_Abort(MPI_Comm comm, int errorcode)
+#define __xEMPI_Abort
+int xEMPI_Abort(EMPI_Comm comm, int errorcode)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
-   return PMPI_Abort(c->comm, errorcode);
+   return TRANSLATE_ERROR(MPI_Abort(c->comm, errorcode));
 }
 
 /*****************************************************************************/
 /*                             Send / Receive                                */
 /*****************************************************************************/
 
-static int do_send(void* buf, int count, MPI_Datatype datatype, int dest, int tag, communicator *c)
+static int do_send(void* buf, int count, datatype *t, int dest, int tag, communicator *c)
 {
    int error;
 
    if (rank_is_local(c, dest)) {
-      error = PMPI_Send(buf, count, datatype, get_local_rank(c, dest), tag, c->comm);
+      error = TRANSLATE_ERROR(MPI_Send(buf, count, t->type, get_local_rank(c, dest), tag, c->comm));
    } else {
-      error = messaging_send(buf, count, datatype, dest, tag, c);
+      error = messaging_send(buf, count, t, dest, tag, c);
    }
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Rank %d (in cluster %d) failed to send data to %d (in cluster %d) (comm=%d, error=%d)!\n", c->global_rank, cluster_rank, dest, get_cluster_rank(c, dest), c->number, error);
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Rank %d (in cluster %d) failed to send data to %d (in cluster %d) (comm=%d, error=%d)!\n",
+         c->global_rank, cluster_rank, dest, get_cluster_rank(c, dest), c->number, error);
    }
 
    return error;
 }
 
+/*
+static void clear_status(MPI_Status *status)
+{
+   if (status != MPI_STATUS_IGNORE) {
+      status->MPI_SOURCE = MPI_ANY_SOURCE;
+      status->MPI_TAG = MPI_ANY_TAG;
+      status->MPI_ERROR = 0;
+
+      // FIXME: What datatype must we use in an empty status ?
+      // The standard doesn't say!
+      MPI_Status_set_elements(status, MPI_BYTE, 0);
+   }
+}
+*/
+
+static int translate_status(communicator *c, datatype *t, MPI_Status *mstatus, status *s)
+{
+    int error;
+
+    if (s == NULL) {
+       return EMPI_SUCCESS;
+    }
+
+    if (mstatus == NULL) {
+       return clear_status(s);
+    }
+
+    status->MPI_SOURCE = get_global_rank(c, cluster_rank, mstatus->MPI_SOURCE);
+    status->MPI_TAG = mstatus->MPI_TAG;
+    status->MPI_ERROR = mstatus->MPI_ERROR;
+
+    error = MPI_Get_count(mstatus, t->type, &(status->count));
+
+    if (error != MPI_SUCCESS) {
+       return translate_error(error);
+    }
+
+    error = MPI_Test_cancelled(mstatus, &(status->canceled));
+
+    if (error != MPI_SUCCESS) {
+       return translate_error(error);
+    }
+
+    return EMPI_SUCCESS;
+}
+
 // FIXME: assumes source != MPI_ANY_SOURCE ?
-static int do_recv(void *buf, int count, MPI_Datatype datatype, int source, int tag, MPI_Status *status, communicator *c)
+static int do_recv(void *buf, int count, datatype *t, int source, int tag, status *s, communicator *c)
 {
    int error;
+   MPI_Status mstatus;
 
-   if (source == MPI_ANY_SOURCE) {
-      FATAL("do_recv from MPI_ANY_SOURCE not supported yet!");
-      return MPI_ERR_INTERN;
+   if (source == EMPI_ANY_SOURCE) {
+      FATAL("do_recv from EMPI_ANY_SOURCE not supported yet!");
+      return EMPI_ERR_INTERN;
    }
 
    if (rank_is_local(c, source)) {
       // local recv
-      error = PMPI_Recv(buf, count, datatype, get_local_rank(c, source), tag, c->comm, status);
+      error = TRANSLATE_ERROR(MPI_Recv(buf, count, t->type, get_local_rank(c, source), tag, c->comm, &mstatus));
 
-      if (error == MPI_SUCCESS && status != MPI_STATUS_IGNORE) {
-            status->MPI_SOURCE = get_global_rank(c, cluster_rank, status->MPI_SOURCE);
+      if (error == EMPI_SUCCESS) {
+         error = translate_status(c, t, s, &mstatus);
       }
    } else {
       // remote recv
-      error = messaging_receive(buf, count, datatype, source, tag, status, c);
+      error = messaging_receive(buf, count, datatype, source, tag, s, c);
    }
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       ERROR(1, "Rank %d (in cluster %d) failed to receive data from %d (in cluster %d) (comm=%d, error=%d)!\n", c->global_rank, cluster_rank, source, get_cluster_rank(c, source), c->number, error);
    }
 
    return error;
 }
 
-#define __IMPI_Send
-int IMPI_Send(void* buf, int count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm)
+#define __xEMPI_Send
+int xEMPI_Send(void* buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *t = handle_to_datatype(type);
 
    CHECK_COUNT(count);
    CHECK_DESTINATION(c, dest);
 
-   return do_send(buf, count, datatype, dest, tag, c);
+   return do_send(buf, count, t, dest, tag, c);
 }
 
-#define __IMPI_Rsend
-int IMPI_Rsend(void* buf, int count, MPI_Datatype datatype,
-               int dest, int tag, MPI_Comm comm)
+#define __xEMPI_Rsend
+int xEMPI_Rsend(void* buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm)
 {
    // In rsend, it is the users responsibility to ensure that the
    // matching receive has already been posted -before- this rsend
@@ -505,17 +316,17 @@ int IMPI_Rsend(void* buf, int count, MPI_Datatype datatype,
    //
    // In this implementation we simply replace rsend by ssend, which
    // offers a stricter (less efficient) contract.
-   return IMPI_Ssend(buf, count, datatype, dest, tag, comm);
+   return xEMPI_Ssend(buf, count, type, dest, tag, comm);
 }
 
-#define __IMPI_Isend
-int IMPI_Isend(void *buf, int count, MPI_Datatype datatype,
-               int dest, int tag, MPI_Comm comm, MPI_Request *req)
+#define __xEMPI_Isend
+int xEMPI_Isend(void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *req)
 {
    int error, local, flags = REQUEST_FLAG_SEND;
    request *r;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *t = handle_to_datatype(type);
 
    CHECK_COUNT(count);
    CHECK_DESTINATION(c, dest);
@@ -526,30 +337,22 @@ int IMPI_Isend(void *buf, int count, MPI_Datatype datatype,
       flags |= REQUEST_FLAG_LOCAL;
    }
 
-   r = create_request(flags, buf, count, datatype, dest, tag, c);
+   r = create_request(flags, buf, count, t, dest, tag, c);
 
    if (r == NULL) {
       FATAL("Failed to create request!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
-
-//INFO(3, "Isend local ? %d", local);
 
    if (local) {
-
-//INFO(3, "Isend local buf=%p count=%d <type> dest=%d/%d tag=%d comm=%d", buf, count, dest, get_local_rank(c, dest), tag, c->number);
-
-      error = PMPI_Isend(buf, count, datatype, get_local_rank(c, dest), tag, c->comm, &(r->req));
-
-//INFO(3, "Isend local req=%p", r->req);
-
+      error = TRANSLATE_ERROR(MPI_Isend(buf, count, t->type, get_local_rank(c, dest), tag, c->comm, &(r->req)));
    } else {
-      error = messaging_send(buf, count, datatype, dest, tag, c);
+      error = messaging_send(buf, count, t, dest, tag, c);
    }
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       free_request(r);
-      *req = MPI_REQUEST_NULL;
+      *req = EMPI_REQUEST_NULL;
       ERROR(1, "Failed to send data! (comm=%d, error=%d)", c->number, error);
       return error;
    }
@@ -557,38 +360,37 @@ int IMPI_Isend(void *buf, int count, MPI_Datatype datatype,
    // We stuff our own data into the users request pointer here...
    set_request_ptr(req, r);
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
-#define __IMPI_Irsend
-int IMPI_Irsend(void *buf, int count, MPI_Datatype datatype,
-                int dest, int tag, MPI_Comm comm, MPI_Request *req)
+#define __xEMPI_Irsend
+int xEMPI_Irsend(void *buf, int count, EMPI_Datatype type,
+                int dest, int tag, EMPI_Comm comm, EMPI_Request *req)
 {
    // As with rsend, we can simply replace this call with a normal isend.
-   return IMPI_Isend(buf, count, datatype, dest, tag, comm, req);
+   return xEMPI_Isend(buf, count, type, dest, tag, comm, req);
 }
 
-#define __IMPI_Irecv
-int IMPI_Irecv(void *buf, int count, MPI_Datatype datatype,
-               int source, int tag, MPI_Comm comm, MPI_Request *req)
+#define __xEMPI_Irecv
+int xEMPI_Irecv(void *buf, int count, EMPI_Datatype type,
+               int source, int tag, EMPI_Comm comm, EMPI_Request *req)
 {
    int error, local, flags = REQUEST_FLAG_RECEIVE, local_source;
    request *r;
 
    // We first unpack the communicator.
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *t = handlet_to_datatype(type);
 
    CHECK_COUNT(count);
    CHECK_SOURCE(c, source);
 
    // Next, we check if the source is local or not.
-   if (source == MPI_ANY_SOURCE) {
+   if (source == EMPI_ANY_SOURCE) {
       // if source is any, the local flag is determined by the distribution of the communicator.
       local = comm_is_local(c);
-//INFO(3, "Irec local ? %d (because comm is local)", local);
    } else {
       local = rank_is_local(c, source);
-//INFO(3, "Irec local ? %d (because source is local)", local);
    }
 
    // Next, we create the request struct.
@@ -596,35 +398,31 @@ int IMPI_Irecv(void *buf, int count, MPI_Datatype datatype,
       flags |= REQUEST_FLAG_LOCAL;
    }
 
-   r = create_request(flags, buf, count, datatype, source, tag, c);
+   r = create_request(flags, buf, count, t, source, tag, c);
 
    if (r == NULL) {
       IERROR(1, "Failed to create request!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
-
-//INFO(3, "Created request %p", r);
 
    // Post the ireceive if it is local
    if (local == 1) {
 
-      if (source == MPI_ANY_SOURCE) {
-         local_source = MPI_ANY_SOURCE;
+      if (source == EMPI_ANY_SOURCE) {
+         local_source = EMPI_ANY_SOURCE;
       } else {
          local_source = get_local_rank(c, source);
       }
 
       // If the source is guarenteed to be local, we directly use MPI.
-      error = PMPI_Irecv(buf, count, datatype, local_source, tag, c->comm, &(r->req));
+      error = TRANSLATE_ERROR(MPI_Irecv(buf, count, t->type, local_source, tag, c->comm, &(r->req)));
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          ERROR(1, "IRecv failed! (comm=%d,error=%d)", c->number, error);
          free_request(r);
-         *req = MPI_REQUEST_NULL;
+         *req = EMPI_REQUEST_NULL;
          return error;
       }
-
-//INFO(3, "Irec local request %p", r->req);
    }
 
 /****
@@ -656,21 +454,23 @@ int IMPI_Irecv(void *buf, int count, MPI_Datatype datatype,
 ***/
 
    // We stuff our own data into the users request pointer here...
-   set_request_ptr(req, r);
-   return MPI_SUCCESS;
+   *req = request_to_handle(r);
+   return EMPI_SUCCESS;
 }
 
-#define __IMPI_Recv
-int IMPI_Recv(void *buf, int count, MPI_Datatype datatype, int source, int tag, MPI_Comm comm, MPI_Status *status)
+#define __xEMPI_Recv
+int xEMPI_Recv(void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Status *status)
 {
    int local, error;
+   MPI_Status mstatus;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *t = handle_to_type(type);
 
    CHECK_COUNT(count);
    CHECK_SOURCE(c, source);
 
-   if (source == MPI_ANY_SOURCE) {
+   if (source == EMPI_ANY_SOURCE) {
       // if source is any, the local flag is determined by the distribution of the communicator.
       local = comm_is_local(c);
    } else {
@@ -678,34 +478,41 @@ int IMPI_Recv(void *buf, int count, MPI_Datatype datatype, int source, int tag, 
    }
 
    if (local == 1) {
-      error = PMPI_Recv(buf, count, datatype, source, tag, c->comm, status);
+      error = TRANSLATE_ERROR(MPI_Recv(buf, count, t->type, source, tag, c->comm, &mstatus));
 
-      if (error == MPI_SUCCESS && status != MPI_STATUS_IGNORE) {
-         status->MPI_SOURCE = get_global_rank(c, cluster_rank, status->MPI_SOURCE);
+      if (error == EMPI_SUCCESS && status != EMPI_STATUS_IGNORE) {
+         error = translate_status(c, t, s, &mstatus);
       }
 
       return error;
    } else {
+
 // FIXME: messaging_receive will block on the WA, which is NOT what we want!
 
-      if (source == MPI_ANY_SOURCE) {
+      if (source == EMPI_ANY_SOURCE) {
          IERROR(0, "MPI_Recv from MIXED MPI_ANY_SOURCE not implemented yet (buggerit!)");
-         return MPI_ERR_RANK;
+         return EMPI_ERR_RANK;
       }
 
-      return messaging_receive(buf, count, datatype, source, tag, status, c);
+      return messaging_receive(buf, count, t, source, tag, status, c);
    }
 }
 
 
-#define __IMPI_Sendrecv
-int IMPI_Sendrecv(void *sendbuf, int sendcount, MPI_Datatype sendtype, int dest, int sendtag,
-                  void *recvbuf, int recvcount, MPI_Datatype recvtype, int source, int recvtag,
-                  MPI_Comm comm, MPI_Status *status)
+#define __xEMPI_Sendrecv
+int xEMPI_Sendrecv(void *sendbuf, int sendcount, EMPI_Datatype sendtype, int dest, int sendtag,
+                  void *recvbuf, int recvcount, EMPI_Datatype recvtype, int source, int recvtag,
+                  EMPI_Comm comm, EMPI_Status *status)
 {
+   // FIXME: This implementation id BS!!
+   // Reimplement using isend/irecv/wait!
    int error;
 
-   communicator *c = get_communicator(comm);
+   MPI_Status mstatus;
+
+   datatype *stype = handle_to_datatype(sendtype);
+   datatype *rtype = handle_to_datatype(recvtype);
+   communicator *c = handle_to_communicator(comm);
 
    CHECK_COUNT(sendcount);
    CHECK_DESTINATION(c, dest);
@@ -715,68 +522,83 @@ int IMPI_Sendrecv(void *sendbuf, int sendcount, MPI_Datatype sendtype, int dest,
 
    if (comm_is_local(c)) {
      // simply perform a sendrecv in local cluster
-     return PMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, status);
+     error = TRANSLATE_ERROR(MPI_Sendrecv(sendbuf, sendcount, stype->type, dest, sendtag, recvbuf, recvcount, rtype->type, source, recvtag, c->comm, &mstatus));
+
+     if (error == MPI_SUCCESS && status != EMPI_STATUS_IGNORE) {
+        error = translate_status(c, rtype, s, &mstatus);
+     }
+
+     return error;
    }
 
    // FIXME: Does this work if source == MPI_ANY_SOURCE ?
+   // FIXME: Is this correct ???
+   // FIXME: Shouldn't we just translate this to a isend / irecv / wait ?
 
-   // We need to perform a WA sendrecv. NOTE: It is still possble that both the send
-   // and recv operations are local. We cannot directly use PMPI_Sendrecv, however, as
+   // We need to perform a WA sendrecv. NOTE: It is still possible that both the send
+   // and recv operations are local. We cannot directly use MPI_Sendrecv, however, as
    // the dest and source ranks may be invalid locally.
 
    // Reverse the send and receive order on even and odd processors.
+   // FIXME: -- WHY ?
+
+// FIXME: THIS CANNOT BE RIGHT!!
+
+   IERROR(0, "MPI_Sendrecv WA not implemented yet (buggerit!)");
+
    if ((c->global_rank % 2) == 0) {
 
-      error = do_send(sendbuf, sendcount, sendtype, dest, sendtag, c);
+      error = do_send(sendbuf, sendcount, stype, dest, sendtag, c);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          return error;
       }
 
-      error = do_recv(recvbuf, recvcount, recvtype, source, recvtag, status, c);
+      error = do_recv(recvbuf, recvcount, rtype, source, recvtag, status, c);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          return error;
       }
 
    } else {
 
-      error = do_recv(recvbuf, recvcount, recvtype, source, recvtag, status, c);
+      error = do_recv(recvbuf, recvcount, rtype, source, recvtag, status, c);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          return error;
       }
 
-      error = do_send(sendbuf, sendcount, sendtype, dest, sendtag, c);
+      error = do_send(sendbuf, sendcount, stype, dest, sendtag, c);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          return error;
       }
    }
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
-#define __IMPI_Ssend
-int IMPI_Ssend ( void *buf, int count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm )
+#define __xEMPI_Ssend
+int xEMPI_Ssend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm )
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *t = handle_to_datatype(datatype);
 
    CHECK_COUNT(count);
    CHECK_DESTINATION(c, dest);
 
    if (comm_is_local(c)) {
      // simply perform a ssend in local cluster
-     return PMPI_Ssend(buf, count, datatype, dest, tag, c->comm);
+     return TRANSLATE_ERROR(MPI_Ssend(buf, count, t->type, dest, tag, c->comm));
    }
 
    if (rank_is_local(c, dest)) {
       // local send
-     return PMPI_Ssend(buf, count, datatype, get_local_rank(c, dest), tag, c->comm);
+     return TRANSLATE_ERROR(MPI_Ssend(buf, count, t->type, get_local_rank(c, dest), tag, c->comm));
    } else {
      // remote send
      WARN(1, "Incorrect WA ssend implementation (in communicator %d)!", c->number);
-     return messaging_send(buf, count, datatype, dest, tag, c);
+     return messaging_send(buf, count, t, dest, tag, c);
    }
 }
 
@@ -784,25 +606,13 @@ int IMPI_Ssend ( void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 /*                             Waits / Polling                               */
 /*****************************************************************************/
 
-static void clear_status(MPI_Status *status)
+static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status *status)
 {
-   if (status != MPI_STATUS_IGNORE) {
-      status->MPI_SOURCE = MPI_ANY_SOURCE;
-      status->MPI_TAG = MPI_ANY_TAG;
-      status->MPI_ERROR = 0;
-
-      // FIXME: What datatype must we use in an empty status ?
-      // The standard doesn't say!
-      MPI_Status_set_elements(status, MPI_BYTE, 0);
-   }
-}
-
-static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *status)
-{
-   int error = MPI_SUCCESS;
+   int error = EMPI_SUCCESS;
    MPI_Aint extent;
+   MPI_Status mstatus;
 
-   request *r = get_request(*req);
+   request *r = handle_to_request(*req);
 
    if (r == NULL) {
 
@@ -810,7 +620,7 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
 
       clear_status(status);
       *flag = 1;
-      return MPI_SUCCESS;
+      return EMPI_SUCCESS;
    }
 
 /*
@@ -840,7 +650,7 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
       free_request(r);
       *flag = 1;
       *req = MPI_REQUEST_NULL;
-      return MPI_ERR_REQUEST;
+      return EMPI_ERR_REQUEST;
 
    } else if (request_local(r)) {
       // Pure local request, so we ask MPI.
@@ -848,18 +658,16 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
       INFO(2, "request=LOCAL blocking=%d %p", blocking, r->req);
 
       if (blocking) {
-         r->error = PMPI_Wait(&(r->req), status);
+         r->error = TRANSLATE_ERROR(MPI_Wait(&(r->req), &mstatus));
          *flag = 1;
       } else {
-         r->error = PMPI_Test(&(r->req), flag, status);
+         r->error = TRANSLATE_ERROR(MPI_Test(&(r->req), flag, &mstatus));
       }
 
       if (*flag == 1) {
          // We must translate local source rank to global rank.
-
-      INFO(2, "translate local rank=%d to global rank", status->MPI_SOURCE);
-
-         status->MPI_SOURCE = get_global_rank(r->c, cluster_rank, status->MPI_SOURCE);
+         INFO(2, "translate local rank=%d to global rank", status->MPI_SOURCE);
+         error = translate_status(c, t, s, &mstatus);
       }
 
    } else if (request_send(r)) {
@@ -870,7 +678,7 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
       status->MPI_SOURCE = r->source_or_dest;
       status->MPI_TAG = r->tag;
       status->MPI_ERROR = MPI_SUCCESS;
-      r->error = MPI_SUCCESS;
+      r->error = EMPI_SUCCESS;
       *flag = 1;
 
    } else if (r->source_or_dest != MPI_ANY_SOURCE) {
@@ -883,7 +691,7 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
 
       if (request_completed(r)) {
          *flag = 1;
-         if (r->error == MPI_SUCCESS) {
+         if (r->error == EMPI_SUCCESS) {
             r->error = messaging_finalize_receive(r, status);
          } else {
             status->MPI_SOURCE = r->source_or_dest;
@@ -906,11 +714,11 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
             // Probe locally first
             DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
 
-            r->error = PMPI_Iprobe(MPI_ANY_SOURCE, r->tag, r->c->comm, flag, MPI_STATUS_IGNORE);
+            r->error = TRANSLATE_ERROR(MPI_Iprobe(MPI_ANY_SOURCE, r->tag, r->c->comm, flag, MPI_STATUS_IGNORE));
 
-            if (r->error != MPI_SUCCESS) {
+            if (r->error != EMPI_SUCCESS) {
                IERROR(1, "IProbe from MPI_ANY_SOURCE failed! ()");
-               return MPI_ERR_INTERN;
+               return EMPI_ERR_INTERN;
             }
 
             if (*flag) {
@@ -918,11 +726,11 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
                DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL receive");
 
                // A message is available locally, so receiving it!
-               r->error = PMPI_Recv(r->buf, r->count, r->type, MPI_ANY_SOURCE, r->tag, r->c->comm, status);
+               r->error = TRANSLATE_ERROR(MPI_Recv(r->buf, r->count, r->type, MPI_ANY_SOURCE, r->tag, r->c->comm, &mstatus));
                r->flags |= REQUEST_FLAG_COMPLETED;
 
                // We must translate local source rank to global rank.
-               status->MPI_SOURCE = get_global_rank(r->c, cluster_rank, status->MPI_SOURCE);
+               error = translate_status(c, t, s, &mstatus);
 
             } else {
 
@@ -936,7 +744,7 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
                if (request_completed(r)) {
                   DEBUG(3, "request=WA_RECEIVE_ANY performed WA receive");
 
-                  if (r->error == MPI_SUCCESS) {
+                  if (r->error == EMPI_SUCCESS) {
                      r->error = messaging_finalize_receive(r, status);
                   } else {
                      status->MPI_SOURCE = r->source_or_dest;
@@ -947,17 +755,17 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
                }
             }
 
-         } while (blocking && (*flag == 0) && (r->error == MPI_SUCCESS));
+         } while (blocking && (*flag == 0) && (r->error == EMPI_SUCCESS));
       }
    }
 
    if (*flag == 1) {
 
-   DEBUG(1, "received data %d", ((int *)r->buf)[0]);
+      DEBUG(1, "received data %d", ((int *)r->buf)[0]);
 
       error = r->error;
       free_request(r);
-      *req = MPI_REQUEST_NULL;
+      *req = EMPI_REQUEST_NULL;
    }
 
    DEBUG(1, "done error=%d");
@@ -965,34 +773,34 @@ static int probe_request(MPI_Request *req, int blocking, int *flag, MPI_Status *
    return error;
 }
 
-#define __IMPI_Test
-int IMPI_Test(MPI_Request *req, int *flag, MPI_Status *status)
+#define __xEMPI_Test
+int xEMPI_Test(EMPI_Request *req, int *flag, EMPI_Status *status)
 {
    int error = probe_request(req, 0, flag, status);
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       IERROR(1, "Probe request failed!");
    }
 
    return error;
 }
 
-#define __IMPI_Wait
-int IMPI_Wait(MPI_Request *req, MPI_Status *status)
+#define __xEMPI_Wait
+int xEMPI_Wait(EMPI_Request *req, EMPI_Status *status)
 {
    int flag = 0;
 
    int error = probe_request(req, 1, &flag, status);
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       IERROR(1, "Probe request failed!");
    }
 
    return error;
 }
 
-#define __IMPI_Waitany
-int IMPI_Waitany(int count, MPI_Request *array_of_requests, int *index, MPI_Status *status)
+#define __xEMPI_Waitany
+int xEMPI_Waitany(int count, EMPI_Request *array_of_requests, int *index, EMPI_Status *status)
 {
    int i;
    int error;
@@ -1004,17 +812,17 @@ int IMPI_Waitany(int count, MPI_Request *array_of_requests, int *index, MPI_Stat
       undef = 0;
 
       for (i=0;i<count;i++) {
-         if (array_of_requests[i] != MPI_REQUEST_NULL) {
-            error = IMPI_Test(&array_of_requests[i], &flag, status);
+         if (array_of_requests[i] != EMPI_REQUEST_NULL) {
+            error = xEMPI_Test(&array_of_requests[i], &flag, status);
 
-            if (error != MPI_SUCCESS) {
+            if (error != EMPI_SUCCESS) {
                *index = i;
-               return MPI_ERR_IN_STATUS;
+               return EMPI_ERR_IN_STATUS;
             }
 
             if (flag) {
                *index = i;
-               return MPI_SUCCESS;
+               return EMPI_SUCCESS;
             }
 
          } else {
@@ -1024,39 +832,47 @@ int IMPI_Waitany(int count, MPI_Request *array_of_requests, int *index, MPI_Stat
 
       if (undef == count) {
          // All requests where MPI_REQUEST_NULL
-         *index = MPI_UNDEFINED;
+         *index = EMPI_UNDEFINED;
          clear_status(status);
-         return MPI_SUCCESS;
+         return EMPI_SUCCESS;
       }
    }
 
    // unreachable!
-   return MPI_ERR_INTERN;
+   return EMPI_ERR_INTERN;
 }
 
-#define __IMPI_Waitall
-/*
-int IMPI_Waitall(int count, MPI_Request *array_of_requests, MPI_Status *array_of_statuses)
+#define __xEMPI_Waitall
+int xEMPI_Waitall(int count, EMPI_Request *array_of_requests, EMPI_Status *array_of_statuses)
 {
    int i, error;
    int errors = 0;
+   int done = 0;
+   int flag;
 
-   DEBUG(0, "Wating for %d requests", count);
+   while (done < count) {
 
-   for (i=0;i<count;i++) {
-      if (array_of_requests[i] != MPI_REQUEST_NULL) {
+      DEBUG(0, "Waiting for %d of %d requests", count-done, count);
 
-         DEBUG(1, "checking %d of %d request=%s", i, count, request_to_string(array_of_requests[i]));
+      for (i=0;i<count;i++) {
+         if (array_of_requests[i] != EMPI_REQUEST_NULL) {
 
-         error = IMPI_Wait(&array_of_requests[i], &array_of_statuses[i]);
+            DEBUG(1, "checking %d of %d request=%s", i, count, request_to_string(array_of_requests[i]));
 
-         // NOTE: fall back to MPI_Wait for profiling purposes!
-//         error = MPI_Wait(&array_of_requests[i], &array_of_statuses[i]);
+            flag = 0;
 
-         DEBUG(1, "done %d of %d request=%s -> error=%d", i, count, request_to_string(array_of_requests[i]), error);
+            error = xEMPI_Test(&array_of_requests[i], &flag, &array_of_statuses[i]);
 
-         if (error != MPI_SUCCESS) {
-            errors++;
+            DEBUG(1, "test %d of %d request=%s -> flag=%d error=%d", i, count, request_to_string(array_of_requests[i]), flag, error);
+
+            if (flag == 1) {
+              done++;
+              array_of_requests[i] = EMPI_REQUEST_NULL;
+            }
+
+            if (error != EMPI_SUCCESS) {
+               errors++;
+            }
          }
       }
    }
@@ -1064,104 +880,61 @@ int IMPI_Waitall(int count, MPI_Request *array_of_requests, MPI_Status *array_of
    DEBUG(0, "count=%d error=%d", count, errors);
 
    if (errors != 0) {
-      return MPI_ERR_IN_STATUS;
+      return EMPI_ERR_IN_STATUS;
    }
 
-   return MPI_SUCCESS;;
-}
-*/
-
-int IMPI_Waitall(int count, MPI_Request *array_of_requests, MPI_Status *array_of_statuses)
-{
-   int i, error;
-   int errors = 0;
-   int done = 0;
-   int flag;
-
-   while (done < count) { 
-
-      DEBUG(0, "Waiting for %d of %d requests", count-done, count);
-
-      for (i=0;i<count;i++) {
-         if (array_of_requests[i] != MPI_REQUEST_NULL) {
-
-            DEBUG(1, "checking %d of %d request=%s", i, count, request_to_string(array_of_requests[i]));
-
-            flag = 0;
-
-            error = IMPI_Test(&array_of_requests[i], &flag, &array_of_statuses[i]);
-
-            DEBUG(1, "test %d of %d request=%s -> flag=%d error=%d", i, count, request_to_string(array_of_requests[i]), flag, error);
-
-            if (flag == 1) { 
-              done++;
-              array_of_requests[i] = MPI_REQUEST_NULL;
-            }
-
-            if (error != MPI_SUCCESS) {
-               errors++;
-            }
-
-         } 
-      }
-   }
-
-   DEBUG(0, "count=%d error=%d", count, errors);
-
-   if (errors != 0) {
-      return MPI_ERR_IN_STATUS;
-   }
-
-   return MPI_SUCCESS;;
+   return EMPI_SUCCESS;
 }
 
 
-#define __IMPI_Request_free
-int IMPI_Request_free(MPI_Request *r)
+#define __xEMPI_Request_free
+int xEMPI_Request_free(EMPI_Request *r)
 {
-   int error = MPI_SUCCESS;
+   int error = EMPI_SUCCESS;
    request *req = NULL;
 
-//INFO(2, "Free request %p", r);
-
-   if (r == NULL || *r == MPI_REQUEST_NULL) {
-      return MPI_SUCCESS;
+   // Check for special values of *r and r.
+   if (r == NULL || *r == EMPI_REQUEST_NULL) {
+      return EMPI_SUCCESS;
    }
 
-   req = get_request(*r);
+   // Retrieve the request struct using the handle.
+   req = handle_to_request(*r);
 
    if (req == NULL) {
       IERROR(0, "Request not found!\n");
-      return MPI_ERR_REQUEST;
+      return EMPI_ERR_REQUEST;
    }
 
-//INFO(2, "req->req %p", req->req);
-
-   if (req->req != MPI_REQUEST_NULL) {
-
-//INFO(2, "Forwarding request free!");
-
-      error = PMPI_Request_free(&(req->req));
+   // Also free the assosiated MPI_Request
+   if (req->req != EMPI_REQUEST_NULL) {
+      error = TRANSLATE_ERROR(MPI_Request_free(&(req->req)));
    }
-
-//INFO(2, "Free request struct");
 
    free_request(req);
-   *r = MPI_REQUEST_NULL;
+   *r = EMPI_REQUEST_NULL;
 
    return error;
 }
 
-#define __IMPI_Request_get_status
-int IMPI_Request_get_status(MPI_Request req, int *flag, MPI_Status *status )
+#define __xEMPI_Request_get_status
+int xEMPI_Request_get_status(EMPI_Request req, int *flag, EMPI_Status *status)
 {
-   int error = MPI_SUCCESS;
-   request *r = get_request(req);
+   int error = EMPI_SUCCESS;
+   MPI_Status mstatus;
+
+   if (req == EMPI_REQUEST_NULL) {
+      clear_status(status);
+      *flag = 1;
+      return EMPI_SUCCESS;
+   }
+
+   request *r = handle_to_request(req);
 
    if (r == NULL) {
       clear_status(status);
       *flag = 1;
-      return MPI_SUCCESS;
+      return EMPI_SUCCESS;
    }
 
    // We don't support persistent request yet!
@@ -1169,15 +942,19 @@ int IMPI_Request_get_status(MPI_Request req, int *flag, MPI_Status *status )
       IERROR(0, "persistent requests not supported yet! (MPI_Test)");
       clear_status(status);
       *flag = 1;
-      return MPI_ERR_REQUEST;
+      return EMPI_ERR_REQUEST;
    }
 
    if (request_local(r)) {
       // Pure local request, so we ask MPI.
-      error = PMPI_Request_get_status(r->req, flag, status);
+      if (status == EMPI_STATUS_IGNORE) {
+         mstatus = EMPI_STATUS_IGNORE;
+      }
 
-      if (error == MPI_SUCCESS && status != MPI_STATUS_IGNORE) {
-         status->MPI_SOURCE = get_global_rank(r->c, cluster_rank, status->MPI_SOURCE);
+      error = TRANSLATE_ERROR(MPI_Request_get_status(r->req, flag, &mstatus));
+
+      if (error == EMPI_SUCCESS && status != EMPI_STATUS_IGNORE) {
+         error = translate_status(c, t, s, &mstatus);
       }
 
       return error;
@@ -1188,9 +965,9 @@ int IMPI_Request_get_status(MPI_Request req, int *flag, MPI_Status *status )
    if (request_send(r)) {
       status->MPI_SOURCE = r->source_or_dest;
       status->MPI_TAG = r->tag;
-      status->MPI_ERROR = MPI_SUCCESS;
+      status->MPI_ERROR = EMPI_SUCCESS;
       *flag = 1;
-      return MPI_SUCCESS;
+      return EMPI_SUCCESS;
    }
 
    // Non-persistent receive may not have completed yet.
@@ -1203,7 +980,7 @@ int IMPI_Request_get_status(MPI_Request req, int *flag, MPI_Status *status )
 
    if (request_completed(r)) {
       *flag = 1;
-      if (r->error == MPI_SUCCESS) {
+      if (r->error == EMPI_SUCCESS) {
          r->error = messaging_finalize_receive(r, status);
       } else {
          status->MPI_SOURCE = r->source_or_dest;
@@ -1223,17 +1000,17 @@ int IMPI_Request_get_status(MPI_Request req, int *flag, MPI_Status *status )
 /*                              Collectives                                  */
 /*****************************************************************************/
 
-#define __IMPI_Barrier
-int IMPI_Barrier(MPI_Comm comm)
+#define __xEMPI_Barrier
+int xEMPI_Barrier(EMPI_Comm comm)
 {
    int error, i;
    char buffer = 42;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    if (comm_is_local(c)) {
      // simply perform a barrier in local cluster
-     return PMPI_Barrier(c->comm);
+     return TRANSLATE_ERROR(MPI_Barrier(c->comm));
    }
 
    // We need to perform a WA barrier. This consists of three steps:
@@ -1250,39 +1027,39 @@ int IMPI_Barrier(MPI_Comm comm)
 
 //INFO(1, "LOCAL BARRIER(1)");
 
-   error = PMPI_Barrier(c->comm);
+   error = TRANSLATE_ERROR(MPI_Barrier(c->comm));
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       ERROR(1, "Local barrier failed! (comm=%d, error=%d)", c->number, error);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    // Perform the WA barrier (coordinators only)
    if (c->global_rank == c->coordinators[0]) {
 
-//INFO(1, "IMPI_Barrier WA BARRIER", "I am coord[0]");
+//INFO(1, "xEMPI_Barrier WA BARRIER", "I am coord[0]");
 
       // Coordinator 0 first receives from all others....
       for (i=1;i<c->cluster_count;i++) {
 
-//INFO(1, "IMPI_Barrier WA BARRIER", "Receiving from coord[i]=%d", c->coordinators[i]);
+//INFO(1, "xEMPI_Barrier WA BARRIER", "Receiving from coord[i]=%d", c->coordinators[i]);
 
-         error = messaging_receive(&buffer, 1, MPI_BYTE, c->coordinators[i], BARRIER_TAG, MPI_STATUS_IGNORE, c);
+         error = messaging_receive(&buffer, 1, EMPI_BYTE, c->coordinators[i], BARRIER_TAG, EMPI_STATUS_IGNORE, c);
 
-         if (error != MPI_SUCCESS) {
+         if (error != EMPI_SUCCESS) {
             ERROR(1, "WA receive failed! (comm=%d, error=%d)", c->number, error);
-            return MPI_ERR_INTERN;
+            return EMPI_ERR_INTERN;
          }
       }
 
-//INFO(1, "IMPI_Barrier WA BARRIER", "Bcast result from coord[0]");
+//INFO(1, "xEMPI_Barrier WA BARRIER", "Bcast result from coord[0]");
 
       // ... then bcasts reply.
-      error = messaging_bcast(&buffer, 1, MPI_BYTE, c->coordinators[0], c);
+      error = messaging_bcast(&buffer, 1, EMPI_BYTE, c->coordinators[0], c);
 
-      if (error != MPI_SUCCESS) {
-         ERROR(1, "IMPI_Barrier: WA bcast failed! (comm=%d, error=%d)", c->number, error);
-         return MPI_ERR_INTERN;
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "xEMPI_Barrier: WA bcast failed! (comm=%d, error=%d)", c->number, error);
+         return EMPI_ERR_INTERN;
       }
 
    } else {
@@ -1290,60 +1067,61 @@ int IMPI_Barrier(MPI_Comm comm)
       for (i=1;i<c->cluster_count;i++) {
          if (c->global_rank == c->coordinators[i]) {
 
-//INFO(1, "IMPI_Barrier WA BARRIER", "I am coord[%d]=%d", i, c->coordinators[i]);
+//INFO(1, "xEMPI_Barrier WA BARRIER", "I am coord[%d]=%d", i, c->coordinators[i]);
 
             // All other coordinators first send to coordinator 0...
 
-//INFO(1, "IMPI_Barrier WA BARRIER", "Sending to coord[0]");
+//INFO(1, "xEMPI_Barrier WA BARRIER", "Sending to coord[0]");
 
-            error = messaging_send(&buffer, 1, MPI_BYTE, c->coordinators[0], BARRIER_TAG, c);
+            error = messaging_send(&buffer, 1, EMPI_BYTE, c->coordinators[0], BARRIER_TAG, c);
 
-            if (error != MPI_SUCCESS) {
-               ERROR(1, "IMPI_Barrier: WA send failed! (comm=%d, error=%d)", c->number, error);
-               return MPI_ERR_INTERN;
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "xEMPI_Barrier: WA send failed! (comm=%d, error=%d)", c->number, error);
+               return EMPI_ERR_INTERN;
             }
 
-///INFO(1, "IMPI_Barrier WA BARRIER", "Receiving BCAST");
+///INFO(1, "xEMPI_Barrier WA BARRIER", "Receiving BCAST");
 
             // Then wait for reply.
-            error = messaging_bcast_receive(&buffer, 1, MPI_BYTE, c->coordinators[0], c);
+            error = messaging_bcast_receive(&buffer, 1, EMPI_BYTE, c->coordinators[0], c);
 
-            if (error != MPI_SUCCESS) {
-               ERROR(1, "IMPI_Barrier: WA bcast receive failed (error=%d)!", error);
-               return MPI_ERR_INTERN;
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "xEMPI_Barrier: WA bcast receive failed (error=%d)!", error);
+               return EMPI_ERR_INTERN;
             }
          }
       }
    }
 
-//INFO(1, "IMPI_Barrier WA BARRIER", "LOCAL BARRIER(2)");
+//INFO(1, "xEMPI_Barrier WA BARRIER", "LOCAL BARRIER(2)");
 
    // Perform the second local barrier
-   error = PMPI_Barrier(c->comm);
+   error = TRANSLATE_ERROR(MPI_Barrier(c->comm));
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "IMPI_Barrier: local barrier failed! (2) (comm=%d, error=%d)", c->number, error);
-      return MPI_ERR_INTERN;
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "xEMPI_Barrier: local barrier failed! (2) (comm=%d, error=%d)", c->number, error);
+      return EMPI_ERR_INTERN;
    }
 
-// INFO(1, "IMPI_Barrier WA BARRIER", "DONE!");
+// INFO(1, "xEMPI_Barrier WA BARRIER", "DONE!");
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
-#define __IMPI_Bcast
-int IMPI_Bcast(void* buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm)
+#define __xEMPI_Bcast
+int xEMPI_Bcast(void* buffer, int count, EMPI_Datatype type, int root, EMPI_Comm comm)
 {
    int error;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *t = handle_to_datatype(type);
 
    if (comm_is_local(c)) {
 
 DEBUG(1, "Local BCAST");
 
      // simply perform a bcast in local cluster
-     return PMPI_Bcast(buffer, count, datatype, root, c->comm);
+     return TRANSLATE_ERROR(MPI_Bcast(buffer, count, t->type, root, c->comm));
    }
 
    // We need to perform a WA BCAST.
@@ -1355,16 +1133,15 @@ DEBUG(1, "WA BCAST root=%d grank=%d gsize=%d lrank=%d lsize=%d", root, c->global
 
 DEBUG(1, "WA BCAST I am root");
 
-      error = messaging_bcast(buffer, count, datatype, root, c);
+      error = messaging_bcast(buffer, count, t, root, c);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          ERROR(1, "Root %d failed to broadcast! (comm=%d, error=%d)", root, c->number, error);
          return error;
       }
 
-      return PMPI_Bcast(buffer, count, datatype, c->local_rank, c->comm);
+      return TRANSLATE_ERROR(MPI_Bcast(buffer, count, t->type, c->local_rank, c->comm));
    }
-
 
 DEBUG(1, "WA BCAST I am NOT root");
 
@@ -1373,7 +1150,7 @@ DEBUG(1, "WA BCAST I am NOT root");
 
 DEBUG(1, "WA BCAST Root is local (grank=%d lrank=%d)", root, get_local_rank(c, root));
 
-      return PMPI_Bcast(buffer, count, datatype, get_local_rank(c, root), c->comm);
+      return TRANSLATE_ERROR(MPI_Bcast(buffer, count, t->type, get_local_rank(c, root), c->comm));
    }
 
 DEBUG(1, "WA BCAST Root is remote (%d)", root);
@@ -1384,9 +1161,9 @@ DEBUG(1, "WA BCAST Root is remote (%d)", root);
 
 DEBUG(1, "WA BCAST I am coordinator (grank=%d lrank=%d) -- doing receive", c->global_rank, c->my_coordinator);
 
-      error = messaging_bcast_receive(buffer, count, datatype, root, c);
+      error = messaging_bcast_receive(buffer, count, t, root, c);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          ERROR(1, "Local root failed to receive broadcast! (comm=%d, error=%d)", c->number, root);
          return error;
       }
@@ -1394,12 +1171,12 @@ DEBUG(1, "WA BCAST I am coordinator (grank=%d lrank=%d) -- doing receive", c->gl
 
 DEBUG(1, "WA BCAST Local bcast to finish up (coordinator grank=%d lrank=%d)", c->my_coordinator, get_local_rank(c, c->my_coordinator));
 
-   return PMPI_Bcast(buffer, count, datatype, get_local_rank(c, c->my_coordinator), c->comm);
+   return TRANSLATE_ERROR(MPI_Bcast(buffer, count, t->type, get_local_rank(c, c->my_coordinator), c->comm));
 }
 
 
-static int WA_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                      void *recvbuf, int *recvcounts, int *displs, MPI_Datatype recvtype,
+static int WA_Gatherv(void *sendbuf, int sendcount, datatype* sendtype,
+                      void *recvbuf, int *recvcounts, int *displs, datatype *recvtype,
                       int root, communicator *c)
 {
    int error, i;
@@ -1411,10 +1188,10 @@ static int WA_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
    if (c->global_rank == root) {
 
-      error = PMPI_Type_extent(recvtype, &extent);
+      error = TRANSLATE_ERROR(MPI_Type_extent(recvtype->type, &extent));
 
-      if (error != MPI_SUCCESS) {
-         ERROR(1, "Failed to retrieve data size! (comm=%d, error=%d)", c->number, error);
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed to retrieve data size! (comm=%d, error=%d)", c->handle, error);
          return error;
       }
 
@@ -1422,9 +1199,9 @@ static int WA_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
          if (i == root) {
             memcpy(recvbuf + (displs[i] * extent), sendbuf, (recvcounts[i]*extent));
          } else {
-            error = do_recv(recvbuf + (displs[i] * extent), recvcounts[i], recvtype, i, GATHERV_TAG, MPI_STATUS_IGNORE, c);
+            error = do_recv(recvbuf + (displs[i] * extent), recvcounts[i], recvtype, i, GATHERV_TAG, EMPI_STATUS_IGNORE, c);
 
-            if (error != MPI_SUCCESS) {
+            if (error != EMPI_SUCCESS) {
                ERROR(1, "Failed to receive data from %d for gather! (comm=%d, error=%d)", i, c->number, error);
                return error;
             }
@@ -1434,47 +1211,51 @@ static int WA_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
    } else {
       error = do_send(sendbuf, sendcount, sendtype, root, GATHERV_TAG, c);
 
-      if (error != MPI_SUCCESS) {
-         ERROR(1, "Failed to send data from %d to root for gatherv! (comm=%d, error=%)", c->global_rank, c->number, error);
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed to send data from %d to root for gatherv! (comm=%d, error=%)", c->global_rank, c->handle, error);
          return error;
       }
    }
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
 
-#define __IMPI_Gatherv
-int IMPI_Gatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
-                 void *recvbuf, int *recvcounts, int *displs, MPI_Datatype recvtype,
-                 int root, MPI_Comm comm)
+#define __xEMPI_Gatherv
+int xEMPI_Gatherv(void *sendbuf, int sendcount, EMPI_Datatype sendtype,
+                 void *recvbuf, int *recvcounts, int *displs, EMPI_Datatype recvtype,
+                 int root, EMPI_Comm comm)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *stype = handle_to_datatype(sendtype);
+   datatype *rtype = handle_to_datatype(recvtype);
 
    CHECK_COUNT(sendcount);
 
    if (comm_is_local(c)) {
      // simply perform a gatherv in local cluster
-     return PMPI_Gatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, c->comm);
+     return TRANSLATE_ERROR(MPI_Gatherv(sendbuf, sendcount, stype->type), recvbuf, recvcounts, displs, rtype->type, root, c->comm));
    }
 
-   return WA_Gatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, root, c);
+   return WA_Gatherv(sendbuf, sendcount, stype, recvbuf, recvcounts, displs, rype, root, c);
 }
 
-#define __IMPI_Gather
-int IMPI_Gather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
-                void* recvbuf, int recvcount, MPI_Datatype recvtype,
+#define __xEMPI_Gather
+int xEMPI_Gather(void* sendbuf, int sendcount, EMPI_Datatype sendtype,
+                void* recvbuf, int recvcount, EMPI_Datatype recvtype,
                 int root, MPI_Comm comm)
 {
    int i, error;
    int *displs = NULL;
    int *counts = NULL;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *stype = handle_to_datatype(sendtype);
+   datatype *rtype = handle_to_datatype(recvtype);
 
    if (comm_is_local(c)) {
      // simply perform a gatherv in local cluster
-     return PMPI_Gather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, root, c->comm);
+     return TRANSLATE_ERROR(MPI_Gather(sendbuf, sendcount, stype->type, recvbuf, recvcount, rtype->type, root, c->comm));
    }
 
    // We implement a WA Gather using Gatherv
@@ -1486,7 +1267,7 @@ int IMPI_Gather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 
       if (displs == NULL) {
          ERROR(0, "Failed to allocate local buffer! (comm=%d)", c->number);
-         return MPI_ERR_INTERN;
+         return EMPI_ERR_INTERN;
       }
 
       counts = malloc(c->global_size * sizeof(int));
@@ -1494,7 +1275,7 @@ int IMPI_Gather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
       if (counts == NULL) {
          ERROR(0, "Failed to allocate local buffer! (comm=%d)", c->number);
          free(displs);
-         return MPI_ERR_INTERN;
+         return EMPI_ERR_INTERN;
       }
 
       for (i=0;i<c->global_size;i++) {
@@ -1503,7 +1284,7 @@ int IMPI_Gather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
       }
    }
 
-   error = WA_Gatherv(sendbuf, sendcount, sendtype, recvbuf, counts, displs, recvtype, root, c);
+   error = WA_Gatherv(sendbuf, sendcount, stype, recvbuf, counts, displs, rtype, root, c);
 
    if (c->global_rank == root) {
       free(displs);
@@ -1514,47 +1295,50 @@ int IMPI_Gather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
 }
 
 
-#define __IMPI_Allgather
-int IMPI_Allgather(void* sendbuf, int sendcount, MPI_Datatype sendtype,
-                   void* recvbuf, int recvcount, MPI_Datatype recvtype,
-                   MPI_Comm comm)
+#define __xEMPI_Allgather
+int xEMPI_Allgather(void* sendbuf, int sendcount, EMPI_Datatype sendtype,
+                   void* recvbuf, int recvcount, EMPI_Datatype recvtype,
+                   EMPI_Comm comm)
 {
    int *displs;
    int *recvcounts;
    int i, error;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *stype = handle_to_datatype(sendtype);
+   datatype *rtype = handle_to_datatype(recvtype);
 
    if (comm_is_local(c)) {
      // simply perform an allgather in local cluster
-     return PMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, c->comm);
+     return TRANSLATE_ERROR(MPI_Allgather(sendbuf, sendcount, stype->type, recvbuf, recvcount, rtype->type, c->comm));
    }
 
 INFO(1, "sendcount=%d recvcount=%d", sendcount, recvcount);
 
-   // We implements a Allgather on top of a Allgatherv.
+   // We implement an Allgather on top of an Allgatherv.
    displs = malloc(c->global_size * sizeof(int));
 
    if (displs == NULL) {
-      ERROR(0, "Failed to allocate local buffer! (comm=%d)", c->number);
-      return MPI_ERR_INTERN;
+      ERROR(0, "Failed to allocate local buffer! (comm=%d)", c->handle);
+      return EMPI_ERR_INTERN;
    }
 
    recvcounts = malloc(c->global_size * sizeof(int));
 
    if (recvcounts == NULL) {
-      ERROR(0, "Failed to allocate local buffer! (comm=%d)", c->number);
+      ERROR(0, "Failed to allocate local buffer! (comm=%d)", c->handle);
       free(displs);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    for (i=0;i<c->global_size;i++) {
       displs[i] = i*recvcount;
       recvcounts[i] = recvcount;
-INFO(1, "displs[%d]=%d recvcounts[%d]=%d", i, displs[i], i, recvcounts[i]);
+      INFO(1, "displs[%d]=%d recvcounts[%d]=%d", i, displs[i], i, recvcounts[i]);
    }
 
-   error = IMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
+//   error = WA_Gatherv(sendbuf, sendcount, stype, recvbuf, recvcounts, displs, rtype, root, c);
+   error = xEMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
 
    free(displs);
    free(recvcounts);
@@ -1584,8 +1368,8 @@ static int get_count_sums(communicator *c, int *recvcounts, int *sums, int *offs
    return sum;
 }
 
-#define __IMPI_Allgatherv
-int IMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+#define __xEMPI_Allgatherv
+int xEMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                     void *recvbuf, int *recvcounts,
                     int *displs, MPI_Datatype recvtype, MPI_Comm comm)
 {
@@ -1596,23 +1380,24 @@ int IMPI_Allgatherv(void *sendbuf, int sendcount, MPI_Datatype sendtype,
 
    MPI_Aint extent;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
+   datatype *stype = handle_to_datatype(sendtype);
+   datatype *rtype = handle_to_datatype(recvtype);
 
    if (comm_is_local(c)) {
      // simply perform an allgatherv in local cluster
-     return PMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, c->comm);
+     return TRANSLATE_ERROR(MPI_Allgatherv(sendbuf, sendcount, stype->type, recvbuf, recvcounts, displs, rtype->type, c->comm));
    }
 
    // We need to perform a WA Allgatherv.
+   error = TRANSLATE_ERROR(MPI_Type_extent(rtype->type, &extent));
 
-   error = PMPI_Type_extent(recvtype, &extent);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to retrieve data size! (comm=%d, error=%d)", c->number, error);
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to retrieve data size! (comm=%d, error=%d)", c->handle, error);
       return error;
    }
 
-INFO(2, "Performing WA allgatherv");
+   INFO(2, "Performing WA allgatherv");
 
    // First retrieve the data element size
    // FIXME: use size?
@@ -1621,15 +1406,15 @@ INFO(2, "Performing WA allgatherv");
    sums = malloc(c->cluster_count * sizeof(int));
 
    if (sums == NULL) {
-      ERROR(1, "Failed to allocated space for local sums! (comm=%d)", c->number);
-      return MPI_ERR_INTERN;
+      ERROR(1, "Failed to allocated space for local sums! (comm=%d)", c->handle);
+      return EMPI_ERR_INTERN;
    }
 
    offsets = malloc(c->cluster_count * sizeof(int));
 
    if (offsets == NULL) {
-      ERROR(1, "Failed to allocated space for local offsets! (comm=%d)", c->number);
-      return MPI_ERR_INTERN;
+      ERROR(1, "Failed to allocated space for local offsets! (comm=%d)", c->handle);
+      return EMPI_ERR_INTERN;
    }
 
    sum = get_count_sums(c, recvcounts, sums, offsets);
@@ -1645,7 +1430,7 @@ for (i=0;i<c->cluster_count;i++) {
 
    if (buffer == NULL) {
       ERROR(1, "Failed to allocated space for local buffer! (comm=%d)", c->number);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    if (c->global_rank == c->my_coordinator) {
@@ -1665,10 +1450,10 @@ INFO(2, "LOCAL COPY: offset=%d extent=%d count=%d", offset, extent, recvcounts[i
             } else {
 INFO(2, "LOCAL RECEIVE: offset=%d extent=%d count=%d", offset, extent, recvcounts[i]);
 
-               error = PMPI_Recv(buffer + (offset * extent), recvcounts[i], recvtype, get_local_rank(c, i), ALLGATHERV_TAG, c->comm, MPI_STATUS_IGNORE);
+               error = TRANSLATE_ERROR(MPI_Recv(buffer + (offset * extent), recvcounts[i], rtype->type, get_local_rank(c, i), ALLGATHERV_TAG, c->comm, MPI_STATUS_IGNORE));
 
-               if (error != MPI_SUCCESS) {
-                  ERROR(1, "Failed to receive data from %d for gather! (comm=%d, error=%d)", i, c->number, error);
+               if (error != EMPI_SUCCESS) {
+                  ERROR(1, "Failed to receive data from %d for gather! (comm=%d, error=%d)", i, c->handle, error);
                   return error;
                }
             }
@@ -1684,17 +1469,17 @@ INFO(2, "LOCAL RECEIVE: DONE  offset=%d");
 
          if (c->coordinators[i] == c->global_rank) {
             // bcast the local result to all other coordinators
-            error = messaging_bcast(buffer + (offsets[i]*extent), sums[i], recvtype, c->global_rank, c);
+            error = messaging_bcast(buffer + (offsets[i]*extent), sums[i], rtype, c->global_rank, c);
 
-            if (error != MPI_SUCCESS) {
-               ERROR(1, "Failed to send bcast from %d for gather! (comm=%d, error=%d)", c->global_rank, c->number, error);
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "Failed to send bcast from %d for gather! (comm=%d, error=%d)", c->global_rank, c->handle, error);
                return error;
             }
          } else {
-            error = messaging_bcast_receive(buffer + (offsets[i]*extent), sums[i], recvtype, c->coordinators[i], c);
+            error = messaging_bcast_receive(buffer + (offsets[i]*extent), sums[i], rtype, c->coordinators[i], c);
 
-            if (error != MPI_SUCCESS) {
-               ERROR(1, "Failed to receive bcast on %d for gather! (comm=%d, error=%d)", c->global_rank, c->number, error);
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "Failed to receive bcast on %d for gather! (comm=%d, error=%d)", c->global_rank, c->handle, error);
                return error;
             }
          }
@@ -1706,20 +1491,20 @@ INFO(2, "LOCAL RECEIVE: DONE  offset=%d");
 
       INFO(2, "LOCAL SEND: count=%d", sendcount);
 
-      error = PMPI_Send(sendbuf, sendcount, sendtype, get_local_rank(c, c->my_coordinator), ALLGATHERV_TAG, c->comm);
+      error = TRANSLATE_ERROR(MPI_Send(sendbuf, sendcount, stype->type, get_local_rank(c, c->my_coordinator), ALLGATHERV_TAG, c->comm));
 
-      if (error != MPI_SUCCESS) {
-         ERROR(1, "Failed to send data from %d to local root for gatherv! (comm=%d, error=%d)", c->global_rank, c->number, error);
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed to send data from %d to local root for gatherv! (comm=%d, error=%d)", c->global_rank, c->handle, error);
          return error;
       }
 
    }
 
    // Bcast the resulting data locally
-   error = PMPI_Bcast(buffer, sum, recvtype, get_local_rank(c, c->my_coordinator), c->comm);
+   error = TRANSLATE_ERROR(MPI_Bcast(buffer, sum, rtype->type, get_local_rank(c, c->my_coordinator), c->comm));
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Local broadcast of result failed! (comm=%d, error=%d)", c->number, error);
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Local broadcast of result failed! (comm=%d, error=%d)", c->handle, error);
       return error;
    }
 
@@ -1736,13 +1521,12 @@ INFO(2, "LOCAL RECEIVE: DONE  offset=%d");
    free(offsets);
    free(sums);
    free(buffer);
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
 
-static int WA_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
-                       void *recvbuf, int recvcount, MPI_Datatype recvtype,
-                       int root, communicator *c)
+static int WA_Scatterv(void *sendbuf, int *sendcounts, int *displs, datatype* sendtype,
+                       void *recvbuf, int recvcount, datatype *recvtype, int root, communicator *c)
 {
    int i, error;
    MPI_Aint extent;
@@ -1754,10 +1538,10 @@ static int WA_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype
 
       // First retrieve the data element size
       // FIXME: use size?
-      error = PMPI_Type_extent(sendtype, &extent);
+      error = TRANSLATE_ERROR(MPI_Type_extent(sendtype->type, &extent));
 
-      if (error != MPI_SUCCESS) {
-         ERROR(1, "Failed to retrieve data size! (comm=%d, error=%d)", c->number, error);
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed to retrieve data size! (comm=%d, error=%d)", c->handle, error);
          return error;
       }
 
@@ -1771,7 +1555,7 @@ static int WA_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype
             error = do_send(sendbuf + (displs[i]*extent), sendcounts[i], sendtype, i, SCATTERV_TAG, c);
 //INFO(1, "DONE send to %d", i);
 
-            if (error != MPI_SUCCESS) {
+            if (error != EMPI_SUCCESS) {
                ERROR(1, "WA_Scatterv: Root %d (in cluster %d) failed to send data to %d (in cluster %d) (in communicator %d)!\n", root, get_cluster_rank(c, root), i, get_cluster_rank(c, i), c->number);
                return error;
             }
@@ -1786,18 +1570,24 @@ static int WA_Scatterv(void *sendbuf, int *sendcounts, int *displs, MPI_Datatype
 
 //INFO(1, "DONE receive from %d", root);
 
-      if (error != MPI_SUCCESS) {
+      if (error != EMPI_SUCCESS) {
          ERROR(1, "WA_Scatterv: Process %d (in cluster %d) failed to receive data from root %d (in cluster %d) (in communicator %d)!\n", c->global_rank, cluster_rank, root, get_cluster_rank(c, root), c->number);
          return error;
       }
    }
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
+HIERO!!
+HIERO!!
+HIERO!!
+HIERO!!
+HIERO!!
 
-#define __IMPI_Scatter
-int IMPI_Scatter(void* sendbuf, int sendcount, MPI_Datatype sendtype,
+
+#define __xEMPI_Scatter
+int xEMPI_Scatter(void* sendbuf, int sendcount, MPI_Datatype sendtype,
                  void* recvbuf, int recvcount, MPI_Datatype recvtype,
                  int root, MPI_Comm comm)
 {
@@ -1805,7 +1595,7 @@ int IMPI_Scatter(void* sendbuf, int sendcount, MPI_Datatype sendtype,
    int *displs = NULL;
    int *sendcounts = NULL;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    if (comm_is_local(c)) {
 
@@ -1851,12 +1641,12 @@ int IMPI_Scatter(void* sendbuf, int sendcount, MPI_Datatype sendtype,
    return error;
 }
 
-#define __IMPI_Scatterv
-int IMPI_Scatterv(void* sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
+#define __xEMPI_Scatterv
+int xEMPI_Scatterv(void* sendbuf, int *sendcounts, int *displs, MPI_Datatype sendtype,
                   void* recvbuf, int recvcount, MPI_Datatype recvtype,
                   int root, MPI_Comm comm)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    if (comm_is_local(c)) {
      // simply perform a scatterv in local cluster
@@ -1866,14 +1656,14 @@ int IMPI_Scatterv(void* sendbuf, int *sendcounts, int *displs, MPI_Datatype send
    return WA_Scatterv(sendbuf, sendcounts, displs, sendtype, recvbuf, recvcount, recvtype, root, c);
 }
 
-#define __IMPI_Reduce
-int IMPI_Reduce(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm)
+#define __xEMPI_Reduce
+int xEMPI_Reduce(void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm)
 {
    int local_root, root_in_cluster, i, error;
    unsigned char *buffer = NULL;
    MPI_Aint extent;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    operation *o = get_operation(op);
 
@@ -1928,7 +1718,7 @@ INFO(2, "I am root or coordinator (rank=%d root=%d coordinator=%d)", c->global_r
 INFO(2, "I am NOT root NOR coordinator (rank=%d root=%d coordinator=%d)", c->global_rank, root, c->my_coordinator);
    }
 
-//INFO(1, "JASON IMPI_REDUCE", "START LOCAL REDUCE root=%d lroot=%d grank=%d lrank=%d count=%d sbuf[0]=%d rbuf[0]=%d\n",
+//INFO(1, "JASON xEMPI_REDUCE", "START LOCAL REDUCE root=%d lroot=%d grank=%d lrank=%d count=%d sbuf[0]=%d rbuf[0]=%d\n",
 //                       root, local_root, c->global_rank, c->local_rank, count, ((int *)sendbuf)[0], ((int *)recvbuf)[0]);
 
 
@@ -1988,8 +1778,8 @@ INFO(2, "MPI_Reduce DONE");
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Accumulate
-int IMPI_Accumulate (void *origin_addr, int origin_count, MPI_Datatype origin_datatype,
+#define __xEMPI_Accumulate
+int xEMPI_Accumulate (void *origin_addr, int origin_count, MPI_Datatype origin_datatype,
                      int target_rank, MPI_Aint target_disp, int target_count, MPI_Datatype target_datatype,
                      MPI_Op op, MPI_Win win)
 {
@@ -2005,8 +1795,8 @@ int IMPI_Accumulate (void *origin_addr, int origin_count, MPI_Datatype origin_da
                           o->op, win);
 }
 
-#define __IMPI_Allreduce
-int IMPI_Allreduce(void* sendbuf, void* recvbuf, int count,
+#define __xEMPI_Allreduce
+int xEMPI_Allreduce(void* sendbuf, void* recvbuf, int count,
                          MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
    // FIXME: Assumes operation is commutative!
@@ -2014,7 +1804,7 @@ int IMPI_Allreduce(void* sendbuf, void* recvbuf, int count,
    MPI_Aint extent;
    char *buffer;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    operation *o = get_operation(op);
 
@@ -2106,15 +1896,15 @@ int IMPI_Allreduce(void* sendbuf, void* recvbuf, int count,
    return PMPI_Bcast(recvbuf, count, datatype, 0, c->comm);
 }
 
-#define __IMPI_Scan
-int IMPI_Scan(void* sendbuf, void* recvbuf, int count,
+#define __xEMPI_Scan
+int xEMPI_Scan(void* sendbuf, void* recvbuf, int count,
               MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
    int i, tmp_cluster, error;
    MPI_Aint extent;
    unsigned char *buffer;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
    operation *o = get_operation(op);
 
    if (o == NULL) {
@@ -2254,8 +2044,8 @@ INFO(1, "send index=%d displ=%d, count=%d", i, sdispls[i], sendcounts[i]);
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Alltoall
-int IMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
+#define __xEMPI_Alltoall
+int xEMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
                   void *recvbuf, int recvcount, MPI_Datatype recvtype,
                   MPI_Comm comm)
 {
@@ -2265,7 +2055,7 @@ int IMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
    int *recvdispls;
    int *recvcounts;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    if (comm_is_local(c)) {
      // simply perform an all-to-all in local cluster
@@ -2325,12 +2115,12 @@ int IMPI_Alltoall(void *sendbuf, int sendcount, MPI_Datatype sendtype,
    return error;
 }
 
-#define __IMPI_Alltoallv
-int IMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype sendtype,
+#define __xEMPI_Alltoallv
+int xEMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype sendtype,
                    void *recvbuf, int *recvcounts, int *rdispls, MPI_Datatype recvtype,
                    MPI_Comm comm)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    if (comm_is_local(c)) {
      // simply perform an all-to-all in local cluster
@@ -2344,10 +2134,10 @@ int IMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls, MPI_Datatype se
 /*                         Communicators and Groups                          */
 /*****************************************************************************/
 
-#define __IMPI_Comm_size
-int IMPI_Comm_size(MPI_Comm comm, int *size)
+#define __xEMPI_Comm_size
+int xEMPI_Comm_size(MPI_Comm comm, int *size)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
 //   INFO(1, "MPI_Comm_size", "Retrieve size from %d: local(%d %d) | global(%d %d)", c->number, c->local_rank, c->local_size, c->global_rank, c->global_size);
 
@@ -2356,10 +2146,10 @@ int IMPI_Comm_size(MPI_Comm comm, int *size)
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Comm_rank
-int IMPI_Comm_rank(MPI_Comm comm, int *rank)
+#define __xEMPI_Comm_rank
+int xEMPI_Comm_rank(MPI_Comm comm, int *rank)
 {
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
 //   INFO(1, "MPI_Comm_rank", "Retrieve rank from %d: local(%d %d) | global(%d %d)", c->number, c->local_rank, c->local_size, c->global_rank, c->global_size);
 
@@ -2379,8 +2169,8 @@ static int *copy_int_array(int *src, int size)
    return memcpy(tmp, src, size * sizeof(int));
 }
 
-#define __IMPI_Comm_dup
-int IMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
+#define __xEMPI_Comm_dup
+int xEMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 {
    int error;
    dup_reply reply;
@@ -2394,7 +2184,7 @@ int IMPI_Comm_dup(MPI_Comm comm, MPI_Comm *newcomm)
 
    communicator *dup;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    error = messaging_send_dup_request(c);
 
@@ -2531,7 +2321,7 @@ static int local_comm_create(communicator *c, group *g, MPI_Comm *newcomm)
    // Since we known the local ranks relative to WORLD, we'll use that
    // communicator as a basis.
 
-   world = get_communicator_with_index(FORTRAN_MPI_COMM_WORLD);
+   world = handle_to_communicator(EMPI_COMM_WORLD);
 
    error = PMPI_Comm_group(world->comm, &orig_group);
 
@@ -2567,8 +2357,8 @@ static int local_comm_create(communicator *c, group *g, MPI_Comm *newcomm)
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Comm_create
-int IMPI_Comm_create(MPI_Comm mc, MPI_Group mg, MPI_Comm *newcomm)
+#define __xEMPI_Comm_create
+int xEMPI_Comm_create(MPI_Comm mc, MPI_Group mg, MPI_Comm *newcomm)
 {
    int error, local_rank, local_size;
    group_reply reply;
@@ -2576,7 +2366,7 @@ int IMPI_Comm_create(MPI_Comm mc, MPI_Group mg, MPI_Comm *newcomm)
    communicator *result;
 
    // Retrieve our communicator.
-   communicator *c = get_communicator(mc);
+   communicator *c = handle_to_communicator(mc);
 
    // Retrieve our group.
    group *g = get_group(mg);
@@ -2644,8 +2434,8 @@ int IMPI_Comm_create(MPI_Comm mc, MPI_Group mg, MPI_Comm *newcomm)
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Comm_split
-int IMPI_Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm)
+#define __xEMPI_Comm_split
+int xEMPI_Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm)
 {
    int error, local_rank, local_size;
    MPI_Comm tmp;
@@ -2654,7 +2444,7 @@ int IMPI_Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm)
 
    // We first forward the split request to the server to split the
    // virtual communicator.
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    // Translate the color from MPI_UNDEFINED to -1 if needed.
    if (color == MPI_UNDEFINED) {
@@ -2721,13 +2511,13 @@ int IMPI_Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm)
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Comm_group
-int IMPI_Comm_group(MPI_Comm comm, MPI_Group *g)
+#define __xEMPI_Comm_group
+int xEMPI_Comm_group(MPI_Comm comm, MPI_Group *g)
 {
    int error;
    group *res;
 
-   communicator *c = get_communicator(comm);
+   communicator *c = handle_to_communicator(comm);
 
    error = group_comm_group(c, &res);
 
@@ -2740,8 +2530,8 @@ int IMPI_Comm_group(MPI_Comm comm, MPI_Group *g)
    return error;
 }
 
-#define __IMPI_Comm_free
-int IMPI_Comm_free ( MPI_Comm *comm )
+#define __xEMPI_Comm_free
+int xEMPI_Comm_free ( MPI_Comm *comm )
 {
    if (*comm == MPI_COMM_WORLD) {
       // ignored
@@ -2753,7 +2543,7 @@ int IMPI_Comm_free ( MPI_Comm *comm )
       return MPI_ERR_COMM;
    }
 
-   communicator *c = get_communicator(*comm);
+   communicator *c = handle_to_communicator(*comm);
 
 /*
    Ignored for now, as the spec implies that this is an asynchronous operation!
@@ -2770,20 +2560,20 @@ int IMPI_Comm_free ( MPI_Comm *comm )
    return MPI_SUCCESS;
 }
 
-#define __IMPI_Group_rank
-int IMPI_Group_rank(MPI_Group g, int *rank)
+#define __xEMPI_Group_rank
+int xEMPI_Group_rank(MPI_Group g, int *rank)
 {
    return group_rank(get_group(g), rank);
 }
 
-#define __IMPI_Group_size
-int IMPI_Group_size(MPI_Group g, int *size)
+#define __xEMPI_Group_size
+int xEMPI_Group_size(MPI_Group g, int *size)
 {
    return group_size(get_group(g), size);
 }
 
-#define __IMPI_Group_incl
-int IMPI_Group_incl(MPI_Group g, int n, int *ranks, MPI_Group *newgroup)
+#define __xEMPI_Group_incl
+int xEMPI_Group_incl(MPI_Group g, int n, int *ranks, MPI_Group *newgroup)
 {
    group *res;
 
@@ -2798,8 +2588,8 @@ int IMPI_Group_incl(MPI_Group g, int n, int *ranks, MPI_Group *newgroup)
    return error;
 }
 
-#define __IMPI_Group_range_incl
-int IMPI_Group_range_incl(MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup)
+#define __xEMPI_Group_range_incl
+int xEMPI_Group_range_incl(MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup)
 {
    group *res;
 
@@ -2814,8 +2604,8 @@ int IMPI_Group_range_incl(MPI_Group g, int n, int ranges[][3], MPI_Group *newgro
    return error;
 }
 
-#define __IMPI_Group_union
-int IMPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
+#define __xEMPI_Group_union
+int xEMPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
 {
    int error;
    group *in1;
@@ -2841,8 +2631,8 @@ int IMPI_Group_union(MPI_Group group1, MPI_Group group2, MPI_Group *newgroup)
    return error;
 }
 
-#define __IMPI_Group_translate_ranks
-int IMPI_Group_translate_ranks(MPI_Group group1, int n, int *ranks1,
+#define __xEMPI_Group_translate_ranks
+int xEMPI_Group_translate_ranks(MPI_Group group1, int n, int *ranks1,
                                      MPI_Group group2, int *ranks2)
 {
    int i, j, pid, rank;
@@ -2852,7 +2642,7 @@ int IMPI_Group_translate_ranks(MPI_Group group1, int n, int *ranks1,
    in1 = get_group(group1);
    in2 = get_group(group2);
 
-//INFO(1, "IMPI_Group_translate_ranks DEBUG", "group1 %d group2 %d", in1->size, in2->size);
+//INFO(1, "xEMPI_Group_translate_ranks DEBUG", "group1 %d group2 %d", in1->size, in2->size);
 
    if (in1 == NULL || in2 == NULL) {
       ERROR(1, "Group not found!");
@@ -2870,14 +2660,14 @@ int IMPI_Group_translate_ranks(MPI_Group group1, int n, int *ranks1,
 
       pid = in1->members[rank];
 
-//INFO(1, "IMPI_Group_translate_ranks DEBUG", "rank %d pid %d", rank, pid);
+//INFO(1, "xEMPI_Group_translate_ranks DEBUG", "rank %d pid %d", rank, pid);
 
       ranks2[i] = MPI_UNDEFINED;
 
       for (j=0;i<in2->size;j++) {
          if (in2->members[j] == pid) {
 
-//INFO(1, "IMPI_Group_translate_ranks DEBUG", "found pid %d at %d", pid, j);
+//INFO(1, "xEMPI_Group_translate_ranks DEBUG", "found pid %d at %d", pid, j);
 
             ranks2[i] = j;
             break;
@@ -2894,8 +2684,8 @@ int IMPI_Group_translate_ranks(MPI_Group group1, int n, int *ranks1,
 
 /* ========== C <-> Fortran conversions ============ */
 
-#define __IMPI_Comm_f2c
-MPI_Comm IMPI_Comm_f2c(MPI_Fint comm)
+#define __xEMPI_Comm_f2c
+MPI_Comm xEMPI_Comm_f2c(MPI_Fint comm)
 {
    MPI_Comm res;
 
@@ -2911,13 +2701,15 @@ MPI_Comm IMPI_Comm_f2c(MPI_Fint comm)
       return MPI_COMM_NULL;
    }
 
-   communicator *tmp = get_communicator_with_index(comm);
+FIXME!!
+
+   communicator *tmp = handle_to_communicator(comm);
    set_communicator_ptr(&res, tmp);
    return res;
 }
 
-#define __IMPI_Comm_c2f
-MPI_Fint IMPI_Comm_c2f(MPI_Comm comm)
+#define __xEMPI_Comm_c2f
+MPI_Fint xEMPI_Comm_c2f(MPI_Comm comm)
 {
    if (comm == MPI_COMM_WORLD) {
       return FORTRAN_MPI_COMM_WORLD;
@@ -2931,12 +2723,12 @@ MPI_Fint IMPI_Comm_c2f(MPI_Comm comm)
       return FORTRAN_MPI_COMM_NULL;
    }
 
-   communicator *tmp = get_communicator(comm);
+   communicator *tmp = handle_to_communicator(comm);
    return tmp->number;
 }
 
-#define __IMPI_Group_f2c
-MPI_Group IMPI_Group_f2c(MPI_Fint g)
+#define __xEMPI_Group_f2c
+MPI_Group xEMPI_Group_f2c(MPI_Fint g)
 {
    MPI_Group res;
 
@@ -2959,8 +2751,8 @@ MPI_Group IMPI_Group_f2c(MPI_Fint g)
    return res;
 }
 
-#define __IMPI_Group_c2f
-MPI_Fint IMPI_Group_c2f(MPI_Group g)
+#define __xEMPI_Group_c2f
+MPI_Fint xEMPI_Group_c2f(MPI_Group g)
 {
    if (g == MPI_GROUP_NULL) {
       return FORTRAN_MPI_GROUP_NULL;
@@ -2980,8 +2772,8 @@ MPI_Fint IMPI_Group_c2f(MPI_Group g)
    return tmp->index;
 }
 
-#define __IMPI_Request_f2c
-MPI_Request IMPI_Request_f2c(MPI_Fint req)
+#define __xEMPI_Request_f2c
+MPI_Request xEMPI_Request_f2c(MPI_Fint req)
 {
    MPI_Request r;
 
@@ -3000,8 +2792,8 @@ MPI_Request IMPI_Request_f2c(MPI_Fint req)
    return r;
 }
 
-#define __IMPI_Request_c2f
-MPI_Fint IMPI_Request_c2f(MPI_Request req)
+#define __xEMPI_Request_c2f
+MPI_Fint xEMPI_Request_c2f(MPI_Request req)
 {
    if (req == MPI_REQUEST_NULL) {
       return FORTRAN_MPI_REQUEST_NULL;
@@ -3020,8 +2812,8 @@ MPI_Fint IMPI_Request_c2f(MPI_Request req)
 /*
 // We don't need these if we don't support user defines ops yet!
 
-#define __IMPI_Op_f2c
-MPI_Op IMPI_Op_f2c(MPI_Fint op)
+#define __xEMPI_Op_f2c
+MPI_Op xEMPI_Op_f2c(MPI_Fint op)
 {
    MPI_Op o;
 
@@ -3041,8 +2833,8 @@ MPI_Op IMPI_Op_f2c(MPI_Fint op)
 }
 
 
-#define __IMPI_Op_c2f
-MPI_Fint IMPI_Op_c2f(MPI_Op op) 
+#define __xEMPI_Op_c2f
+MPI_Fint xEMPI_Op_c2f(MPI_Op op) 
 {
    operation *tmp = get_operation(op);
 
@@ -3059,7 +2851,6 @@ MPI_Fint IMPI_Op_c2f(MPI_Op op)
 // default implementations for all MPI calls.
 #include "generated_impi.c"
 
-#endif // IBIS_INTERCEPT
 
 
 

@@ -2,11 +2,8 @@
 #define _GPOUP_H_
 
 #include "flags.h"
-
-#ifdef IBIS_INTERCEPT
-
-#include "mpi.h"
 #include "types.h"
+#include "empi.h"
 
 #define GROUP_TYPE_ACTIVE     0
 #define GROUP_TYPE_SEPERATIST 1
@@ -75,16 +72,11 @@ int group_range_incl(group *in, int n, int ranges[][3], group **out);
 // triplet (i,i,1) in the argument ranges.
 int group_range_excl(group *in, int n, int ranges[][3], group **out);
 
-// Utility function to set group ptr.
-void set_group_ptr(MPI_Group *dst, group *src);
-
-// Utility functions to convert C or Fortran MPI_Groups to a group ptr.
-group *get_group(MPI_Group src);
-group* get_group_with_index(int f);
+// Utility functions to convert handles to group ptr and vice-versa..
+group *handle_to_group(EMPI_Group src);
+EMPI_Group group_to_handle(group *src);
 
 // Utility function to print group.
-void print_group(MPI_Group g);
-
-#endif // IBIS_INTERCEPT
+// void print_group(MPI_Group g);
 
 #endif // _GROUP_H_

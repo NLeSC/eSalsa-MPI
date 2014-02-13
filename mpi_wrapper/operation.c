@@ -1,7 +1,5 @@
 #include "flags.h"
 
-#ifdef IBIS_INTERCEPT
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
@@ -18,37 +16,34 @@
 static operation *ops[MAX_OPERATIONS];
 static int next_operation = 0;
 
-static int init_operation(MPI_Op op, MPI_User_function *function, int commute)
+static int init_operation(EMPI_Op handle, EMPI_User_function *function, int commute)
 {
-   int index = PMPI_Op_c2f(op);
-
-   if (index < 0 || index > MAX_OPERATIONS) {
-      IERROR(1, "Failed to initialize operations -- index %d out of bounds!\n", index);
-      return MPI_ERR_INTERN;
+   if (handle < 0 || handle > MAX_OPERATIONS) {
+      IERROR(1, "Failed to initialize operations -- handle %d out of bounds!\n", handle);
+      return EMPI_ERR_INTERN;
    }
 
-   if (ops[index] != NULL) {
-      IERROR(1, "Failed to initialize operations -- index %d already in use!\n", index);
-      return MPI_ERR_INTERN;
+   if (ops[handle] != NULL) {
+      IERROR(1, "Failed to initialize operations -- handle %d already in use!\n", handle);
+      return EMPI_ERR_INTERN;
    }
 
-   ops[index] = malloc(sizeof(operation));
+   ops[handle] = malloc(sizeof(operation));
 
-   if (ops[index] == NULL) {
-      IERROR(1, "Failed to initialize operations -- cannot allocate operation %d!\n", index);
-      return MPI_ERR_INTERN;
+   if (ops[handle] == NULL) {
+      IERROR(1, "Failed to initialize operations -- cannot allocate operation %d!\n", handle);
+      return EMPI_ERR_INTERN;
    }
 
-   ops[index]->function = function;
-   ops[index]->commute = commute;
-   ops[index]->index = index;
-   ops[index]->op = op;
+   ops[handle]->function = function;
+   ops[handle]->commute = commute;
+   ops[handle]->handle = handle;
 
-   if (index >= next_operation) {
-      next_operation = index+1;
+   if (handle >= next_operation) {
+      next_operation = handle+1;
    }
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
 int init_operations()
@@ -59,136 +54,65 @@ int init_operations()
       ops[i] = NULL;
    }
 
-   error = init_operation(MPI_OP_NULL, NULL, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_OP_NULL, NULL, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_MAX, MAGPIE_MAX, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_MAX, MAGPIE_MAX, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_MIN, MAGPIE_MIN, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_MIN, MAGPIE_MIN, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_SUM, MAGPIE_SUM, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_SUM, MAGPIE_SUM, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_PROD, MAGPIE_PROD, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_PROD, MAGPIE_PROD, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_MAXLOC, MAGPIE_MAXLOC, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_MAXLOC, MAGPIE_MAXLOC, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_MINLOC, MAGPIE_MINLOC, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_MINLOC, MAGPIE_MINLOC, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_BOR, MAGPIE_BOR, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_BOR, MAGPIE_BOR, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_BAND, MAGPIE_BAND, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_BAND, MAGPIE_BAND, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_BXOR, MAGPIE_BXOR, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_BXOR, MAGPIE_BXOR, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_LOR, MAGPIE_LOR, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_LOR, MAGPIE_LOR, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_LAND, MAGPIE_LAND, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_LAND, MAGPIE_LAND, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(MPI_LXOR, MAGPIE_LXOR, 1);
-   if (error != MPI_SUCCESS) return error;
+   error = init_operation(EMPI_LXOR, MAGPIE_LXOR, 1);
+   if (error != EMPI_SUCCESS) return error;
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
-operation *get_operation(MPI_Op op)
+operation *handle_to_operation(EMPI_Op handle)
 {
-   return get_operation_with_index(PMPI_Op_c2f(op));
-/* --
-   operation *res;
-
-   if (op == MPI_OP_NULL) {
+   if (handle < 0 || handle >= MAX_OPERATIONS) {
+      ERROR(1, "handle_to_operation(handle=%d) Handle out of bounds!\n", handle);
       return NULL;
    }
 
-EEEP!--  This can't be right ????
-
-    memcpy(&res, &op, sizeof(operation *));
-   return res;
-*/
+   return ops[handle];
 }
 
-
-operation *get_operation_with_index(int index)
+EMPI_Op operation_to_handle(operation *o)
 {
-   if (index < 0 || index >= MAX_OPERATIONS) {
-      ERROR(1, "Failed to retrieve operation, index %d out of bounds\n", index);
-      return NULL;
+   if (o == NULL) {
+      ERROR(1, "operation_to_handle(o=NULL) Operation is NULL!\n");
+      return -1;
    }
 
-   return ops[index];
+   return o->handle;
 }
 
-/*
-void set_operation_ptr(MPI_Op *dst, operation *src)
-{
-   memcpy(dst, &src, sizeof(operation *));
-}
-
-operation *create_operation(MPI_User_function *function, int commute)
-{
-   int error;
-   MPI_Op op;
-   operation *result;
-
-   if (next_operation >= MAX_OPERATIONS) {
-      IERROR(1, "Failed to create operation -- max operations %d reached!\n", MAX_OPERATIONS);
-      return NULL;
-   }
-
-   if (ops[next_operation] != NULL) {
-      IERROR(1, "Failed to create operation -- index %d already in use!\n", next_operation);
-      return NULL;
-   }
-
-   error = PMPI_Op_create(function, commute, &op);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to create operation -- cannot create MPI operation!\n");
-      return NULL;
-   }
-
-   result = malloc(sizeof(operation));
-
-   if (result == NULL) {
-      IERROR(1, "Failed to create operation -- cannot allocate operation %d!\n", next_operation);
-      return NULL;
-   }
-
-   result->function = function;
-   result->commute = commute;
-   result->index = next_operation;
-   result->op = op;
-
-   ops[next_operation++] = result;
-
-   return result;
-}
-
-void free_operation(operation *op)
-{
-   int index = op->index;
-
-   if (ops[index] == NULL) {
-      return;
-   }
-
-   PMPI_Op_free(&ops[index]->op);
-
-   free(ops[index]);
-
-   ops[index] = NULL;
-}
-*/
-
-#endif // IBIS_INTERCEPT

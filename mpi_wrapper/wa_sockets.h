@@ -2,10 +2,6 @@
 #define _WA_SOCKETS_H_
 
 #include "flags.h"
-
-#ifdef IBIS_INTERCEPT
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <netdb.h>
@@ -66,7 +62,5 @@ int wa_receivefully(unsigned char *buffer, size_t len);
 
 //int wa_wait_for_data(int blocking);
 int wa_wait_for_opcode(int blocking, int *opcode);
-
-#endif // IBIS_INTERCEPT
 
 #endif // _WA_SOCKETS_H_

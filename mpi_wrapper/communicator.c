@@ -1,25 +1,25 @@
 #include "flags.h"
 
-#ifdef IBIS_INTERCEPT
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "shared.h"
 
-#include "mpi.h"
+#include "empi.h"
 
 #include "types.h"
 #include "communicator.h"
 #include "messaging.h"
 #include "logging.h"
 
+#include "mpi.h"
+
 extern uint32_t cluster_rank;
 
 static communicator *comms[MAX_COMMUNICATORS];
 
-static int add_communicator(MPI_Comm comm, int number, int initial,
+static int add_communicator(int handle, MPI_Comm comm, int initial,
                            int local_rank, int local_size, int global_rank, int global_size,
                            int cluster_count, int *coordinators, int *cluster_sizes,
                            int flags, uint32_t *members,
@@ -28,32 +28,32 @@ static int add_communicator(MPI_Comm comm, int number, int initial,
 {
    int i; //, start, end, local, remote;
 
-   if (number < 0 || number >= MAX_COMMUNICATORS) {
-      ERROR(1, "Ran out of communicator storage (%d)!", number);
+   if (handle < 0 || handle >= MAX_COMMUNICATORS) {
+      ERROR(1, "Ran out of communicator storage (%d)!", handle);
       return MPI_ERR_INTERN;
    }
 
-   if (initial == 0 && number < 3) {
-      ERROR(1, "Attempting to overwrite reserved communicator (%d)!", number);
+   if (initial == 0 && handle < 3) {
+      ERROR(1, "Attempting to overwrite reserved communicator (%d)!", handle);
       return MPI_ERR_INTERN;
    }
 
-   if (comms[number] != NULL) {
-      ERROR(1, "Attempting to overwrite existing communicator (%d)!", number);
+   if (comms[handle] != NULL) {
+      ERROR(1, "Attempting to overwrite existing communicator (%d)!", handle);
       return MPI_ERR_INTERN;
    }
 
    INFO(0, "Creating communicator %d : local(%d %d) | global(%d %d)",
-           number, local_rank, local_size, global_rank, global_size);
+           handle, local_rank, local_size, global_rank, global_size);
 
    communicator *c = malloc(sizeof(communicator));
 
    if (c == NULL) {
-      ERROR(1, "Failed to allocate space for communicator (%d)!", number);
+      ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
       return MPI_ERR_INTERN;
    }
 
-   c->number = number;
+   c->handle = handle;
    c->flags = flags;
    c->comm = comm;
    c->local_rank = local_rank;
@@ -75,7 +75,7 @@ static int add_communicator(MPI_Comm comm, int number, int initial,
       c->cluster_ranks = malloc(c->cluster_count * sizeof(unsigned char));
 
       if (c->cluster_ranks == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", number);
+         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
          return MPI_ERR_INTERN;
       }
 */
@@ -98,21 +98,21 @@ static int add_communicator(MPI_Comm comm, int number, int initial,
       c->member_cluster_index = malloc(c->global_size * sizeof(uint8_t));
 
       if (c->member_cluster_index == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", number);
+         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
          return MPI_ERR_INTERN;
       }
 
       c->local_ranks = malloc(c->global_size * sizeof(uint32_t));
 
       if (c->local_ranks == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", number);
+         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
          return MPI_ERR_INTERN;
       }
 
       tmp = malloc(c->cluster_count * sizeof(int));
 
       if (tmp == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", number);
+         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
          return MPI_ERR_INTERN;
       }
 
@@ -130,11 +130,11 @@ static int add_communicator(MPI_Comm comm, int number, int initial,
    }
 */
 
-   comms[number] = c;
+   comms[handle] = c;
 
 #if GATHER_STATISTICS
    for (i=0;i<STATS_TOTAL;i++) {
-      comms[number]->counters[i] = 0L;
+      comms[handle]->counters[i] = 0L;
    }
 #endif
 
@@ -149,7 +149,7 @@ int init_communicators(int cluster_rank, int cluster_count,
                        int *cluster_sizes, int *cluster_offsets)
 {
    // We create three special communicators here for
-   // MPI_COMM_WORLD, MPI_COMM_SELF and MPI_COMM_NULL.
+   // EMPI_COMM_WORLD, EMPI_COMM_SELF and EMPI_COMM_NULL.
    int global_rank, global_count, tmp_process_rank, tmp_cluster_rank;
    int i, error, flags;
 
@@ -160,7 +160,7 @@ int init_communicators(int cluster_rank, int cluster_count,
    uint32_t *member_cluster_index;
    uint32_t *local_ranks;
 
-   // Create MPI_COMM_WORLD
+   // Create EMPI_COMM_WORLD
    global_rank = cluster_offsets[cluster_rank]+local_rank;
    global_count = cluster_offsets[cluster_count];
 
@@ -245,7 +245,7 @@ int init_communicators(int cluster_rank, int cluster_count,
    }
 
    // FIXME: this will fail hopelessly if FORTRAN_MPI_COMM_WORLD has a weird value!
-   error = add_communicator(MPI_COMM_WORLD, FORTRAN_MPI_COMM_WORLD, 1,
+   error = add_communicator(EMPI_COMM_WORLD, MPI_COMM_WORLD, 1,
                             local_rank, local_count, global_rank, global_count,
                             cluster_count, coordinators, cluster_sizes,
                             flags, members,
@@ -303,7 +303,7 @@ int init_communicators(int cluster_rank, int cluster_count,
    flags = COMM_FLAG_SELF | COMM_FLAG_LOCAL;
 
    // FIXME: this will fail hopelessly if FORTRAN_MPI_COMM_SELF has a weird value!
-   error = add_communicator(MPI_COMM_SELF, FORTRAN_MPI_COMM_SELF, 1,
+   error = add_communicator(EMPI_COMM_SELF, MPI_COMM_SELF, 1,
                             0, 1, 0, 1, 1, coordinators, cluster_sizes, flags, members,
                             cluster_ranks, member_cluster_index, local_ranks, NULL);
 
@@ -313,7 +313,7 @@ int init_communicators(int cluster_rank, int cluster_count,
    }
 
    // FIXME: this will fail hopelessly if FORTRAN_MPI_COMM_NULL has a weird value!
-   error = add_communicator(MPI_COMM_NULL, FORTRAN_MPI_COMM_NULL, 1,
+   error = add_communicator(EMPI_COMM_NULL, MPI_COMM_NULL, 1,
                             0, 0, 0, 0, 0, NULL, NULL, 0, NULL,
                             NULL, NULL, NULL, NULL);
 
@@ -324,14 +324,14 @@ int init_communicators(int cluster_rank, int cluster_count,
    return error;
 }
 
-int create_communicator(MPI_Comm comm, int number,
+int create_communicator(int handle, MPI_Comm comm,
          int local_rank, int local_size, int global_rank, int global_size,
          int cluster_count, int *coordinators, int *cluster_sizes,
          int flags, uint32_t *members,
          int *cluster_ranks, uint32_t *member_cluster_index, uint32_t *local_ranks,
          communicator **out)
 {
-   return add_communicator(comm, number, 0,
+   return add_communicator(handle, comm, 0,
                     local_rank, local_size, global_rank, global_size,
                     cluster_count, coordinators, cluster_sizes,
                     flags, members,
@@ -347,7 +347,7 @@ int free_communicator(communicator * c)
 
    error = PMPI_Comm_free(&comm);
 
-   comms[c->number] = NULL;
+   comms[c->handle] = NULL;
 
    free(c->coordinators);
    free(c->cluster_sizes);
@@ -357,33 +357,31 @@ int free_communicator(communicator * c)
    return error;
 }
 
-communicator* get_communicator(MPI_Comm comm)
+communicator *handle_to_communicator(int handle)
 {
-   if (comm == MPI_COMM_WORLD) {
-      return comms[FORTRAN_MPI_COMM_WORLD];
-   } else if (comm == MPI_COMM_SELF) {
-      return comms[FORTRAN_MPI_COMM_SELF];
-   } else if (comm == MPI_COMM_NULL) {
-      return comms[FORTRAN_MPI_COMM_NULL];
-   }
-
-   return (communicator *) comm;
-}
-
-communicator *get_communicator_with_index(int index)
-{
-   if (index < 0 || index >= MAX_COMMUNICATORS) {
-      ERROR(1, "get_communicator_with_index(index=%d) index out of bounds!", index);
+   if (handle < 0 || handle >= MAX_COMMUNICATORS) {
+      ERROR(1, "handle_to_communicator(handle=%d) handle out of bounds!", handle);
       return NULL;
    }
 
-   if (comms[index] == NULL) {
-      ERROR(1, "get_communicator_with_index(index=%d) communicator not found!", index);
+   if (comms[handle] == NULL) {
+      ERROR(1, "handle_to_communicator(handle=%d) communicator not found!", handle);
       return NULL;
    }
 
-   return comms[index];
+   return comms[handle];
 }
+
+int communicator_to_handle(communicator *c)
+{
+   if (c == NULL) {
+      ERROR(1, "communicator_to_handle(c=NULL) communicator is NULL!");
+      return -1;
+   }
+
+   return c->handle;
+}
+
 
 int comm_cluster_rank_to_cluster_index(communicator *c, int cluster_rank)
 {
@@ -399,10 +397,10 @@ int comm_cluster_rank_to_cluster_index(communicator *c, int cluster_rank)
    return -1;
 }
 
-void set_communicator_ptr(MPI_Comm *dst, communicator *src)
-{
-   memcpy(dst, &src, sizeof(communicator *));
-}
+//void set_communicator_ptr(MPI_Comm *dst, communicator *src)
+//{
+//   memcpy(dst, &src, sizeof(communicator *));
+//}
 
 int comm_is_world(communicator* c)
 {
@@ -485,8 +483,7 @@ void store_message(message_buffer *m)
    communicator* c = comms[m->header.comm];
 
    if (c == NULL) {
-      ERROR(1, "Failed to find communicator %d in store_message!",
-		m->header.comm);
+      ERROR(1, "Failed to find communicator %d in store_message!", m->header.comm);
       ERROR(1, "Dropping message!");
       return;
    }
@@ -495,7 +492,7 @@ void store_message(message_buffer *m)
 
    if (c->queue_head == NULL) {
       c->queue_head = c->queue_tail = m;
-   } else { 
+   } else {
       c->queue_tail->next = m;
       c->queue_tail = m;
    }
@@ -518,7 +515,7 @@ message_buffer *find_pending_message(communicator *c, int source, int tag)
 {
    message_buffer *curr, *prev;
 
-   DEBUG(4, "FIND_PENDING_MESSAGE: Checking for pending messages in comm=%d from source=%d tag=%d", c->number, source, tag);
+   DEBUG(4, "FIND_PENDING_MESSAGE: Checking for pending messages in comm=%d from source=%d tag=%d", c->handle, source, tag);
 
    if (c->queue_head == NULL) {
       DEBUG(4, "FIND_PENDING_MESSAGE: No pending messages");
@@ -530,7 +527,7 @@ message_buffer *find_pending_message(communicator *c, int source, int tag)
 
    while (curr != NULL) {
 
-      if (match_message(curr, c->number, source, tag)) {
+      if (match_message(curr, c->handle, source, tag)) {
           if (curr == c->queue_head) {
               // delete head. check if list empty
               if (c->queue_head == c->queue_tail) {
@@ -593,5 +590,3 @@ fprintf(stderr, "   FOUND MATCHING COMM!\n");
    return MPI_COMM_NULL;
 }
 */
-
-#endif // IBIS_INTERCEPT

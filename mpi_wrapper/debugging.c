@@ -7,13 +7,9 @@
 
 #include "flags.h"
 
-#ifdef ENABLE_INTERCEPT
-
 #include "mpi.h"
 #include "debugging.h"
 #include "logging.h"
-
-#ifdef IBIS_INTERCEPT
 
 #include "communicator.h"
 
@@ -59,7 +55,8 @@ static MPI_Datatype primitive_types[PRIMITIVE_TYPES] = {
    MPI_REAL4,
    MPI_REAL8,
    MPI_LONG_LONG_INT,
-   MPI_INTEGER8 };
+   MPI_INTEGER8
+};
 
 void catch_derived_datatype(MPI_Datatype datatype)
 {
@@ -101,6 +98,3 @@ void check_destination(communicator *c, int dest)
 
 #endif // CHECK_PARAMETERS
 
-#endif // IBIS_INTERCEPT
-
-#endif // ENABLE_INTERCEPT
