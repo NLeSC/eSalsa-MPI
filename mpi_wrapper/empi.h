@@ -157,8 +157,9 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 /* Source / tags */
 #define EMPI_ANY_SOURCE (-1)
 #define EMPI_ANY_TAG    (-1)
-#define EMPI_TAG_LB     (0)     // not officially defined in MPI standard (but value is set in standard)
-#define EMPI_TAG_UB     (32767) // minimum as defined by MPI standard
+#define EMPI_TAG_LB     (0)      // not officially defined in MPI standard (but value is set in standard)
+#define EMPI_TAG_UB     (32767)  // minimum as defined by MPI standard
+#define EMPI_UNDEFINED  (-32766) // borrowed from openmpi
 
 /*
  * Error codes borrowed from OpenMPI.

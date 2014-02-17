@@ -78,8 +78,6 @@ void store_message(message_buffer *m);
 message_buffer *find_pending_message(communicator *c, int source, int tag);
 int match_message(message_buffer *m, int comm, int source, int tag);
 
-// FIXME: These are all one-liners that should be inlined ?
-void set_communicator_ptr(MPI_Comm *dst, communicator *src);
 int comm_is_world(communicator* c);
 int comm_is_self(communicator* c);
 int comm_is_local(communicator* c);

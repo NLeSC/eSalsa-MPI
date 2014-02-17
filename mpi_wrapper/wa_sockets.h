@@ -50,10 +50,13 @@
 #define MAX_COMMUNICATOR_BYTES             1
 #define MAX_REQUEST_BYTES   (sizeof (int *))
 
+/*
 int wa_init(char *server_name, unsigned short port,
             int local_rank, int local_count,
             char *cluster_name, int cluster_rank, int cluster_count,
             int *cluster_sizes, int *cluster_offsets);
+*/
+int wa_init(int local_rank, int local_count, int *argc, char ***argv);
 
 int wa_finalize();
 

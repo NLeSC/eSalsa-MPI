@@ -167,7 +167,7 @@ static void delete_group(group *group)
    free(group);
 }
 
-// Returns in group a handle to the group of comm.
+// Convert a communicator to a group.
 int group_comm_group(communicator *in, group **out)
 {
    // TODO: makes sense to cache some of these groups!
