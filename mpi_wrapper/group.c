@@ -13,7 +13,7 @@
 
 
 static group *groups[MAX_GROUPS];
-static int next_group   = 0;
+static int next_group = 2;
 
 // A group is an ordered set of process identifiers (henceforth processes); processes are implementation-dependent
 // objects. Each process in a group is associated with an integer rank. Ranks are contiguous and start from zero.
@@ -28,24 +28,32 @@ int init_groups()
 {
    int i;
 
-   for (i=0;i<MAX_GROUPS;i++) {
+   groups[EMPI_GROUP_NULL] = NULL;
+   groups[EMPI_GROUP_EMPTY] = malloc(sizeof(group));
+
+   if (groups[EMPI_GROUP_EMPTY] == NULL) {
+      ERROR(1, "Failed to initialize groups!");
+      return EMPI_ERR_INTERN;
+   }
+
+   groups[EMPI_GROUP_EMPTY]->size = 0;
+   groups[EMPI_GROUP_EMPTY]->rank = -1;
+   groups[EMPI_GROUP_EMPTY]->members = NULL;
+
+   for (i=2;i<MAX_GROUPS;i++) {
       groups[i] = NULL;
    }
 
    return EMPI_SUCCESS;
 }
 
-static int is_special(int index)
-{
-   return (index == FORTRAN_MPI_GROUP_NULL || index == FORTRAN_MPI_GROUP_EMPTY);
-}
+//static int is_special(int index)
+//{
+//   return (index == EMPI_GROUP_NULL || index == EMPI_GROUP_EMPTY);
+//}
 
 static int add_group(group *g)
 {
-   while (is_special(next_group) && next_group < MAX_GROUPS) {
-      next_group++;
-   }
-
    if (next_group >= MAX_GROUPS) {
       ERROR(1, "MAX_GROUPS reached!");
       return -1;
@@ -53,6 +61,25 @@ static int add_group(group *g)
 
    groups[next_group++] = g;
    return (next_group-1);
+}
+
+group *handle_to_group(EMPI_Group handle)
+{
+   if (handle < 0 || handle >= MAX_GROUPS) {
+      ERROR(1, "Group handle %d out of bounds!", handle);
+      return NULL;
+   }
+
+   return groups[handle];
+}
+
+EMPI_Group group_to_handle(group *g)
+{
+   if (g == NULL) {
+      return EMPI_GROUP_NULL;
+   }
+
+   return g->handle;
 }
 
 
@@ -78,6 +105,7 @@ void print_group(MPI_Group g)
 */
 
 // Utility function to get a group value.
+/*
 group *get_group(EMPI_Group src)
 {
   group *res;
@@ -109,26 +137,37 @@ group* get_group_with_index(int f)
 
    return groups[f];
 }
-
+*/
 // Utility function to set group ptr.
-void set_group_ptr(EMPI_Group *dst, group *src)
-{
-   memcpy(dst, &src, sizeof(group *));
-}
+//void set_group_ptr(EMPI_Group *dst, group *src)
+//{
+//   memcpy(dst, &src, sizeof(group *));
+//}
+
 
 static group *create_group(int members)
 {
    DEBUG(1, "Creating group of size %d", members);
 
+   if (members < 0) {
+      ERROR(1, "Invalid group size %d!", members);
+      return NULL;
+   }
+
+   if (members == 0) {
+      return groups[EMPI_GROUP_EMPTY];
+   }
+
    group *res = malloc(sizeof(group));
 
    if (res == NULL) {
-      ERROR(1, "Failed to allocate group struct!");
+      ERROR(1, "Failed to allocate group!");
       return NULL;
    }
 
    DEBUG(1, "allocating members array for %d members", members);
 
+   // NOTE: this may alloc an array of length 0!
    res->members = malloc(members * sizeof(uint32_t));
 
    if (res->members == NULL) {
@@ -137,13 +176,15 @@ static group *create_group(int members)
       return NULL;
    }
 
-   res->index = add_group(res);
+   res->handle = add_group(res);
 
    DEBUG(1, "index of group is %d", res->index);
 
-   if (res->index == -1) {
+   if (res->handle == -1) {
       ERROR(1, "Failed to store group!");
-      free(res->members);
+      if (res->members != NULL) {
+         free(res->members);
+      }
       free(res);
       return NULL;
    }
@@ -155,15 +196,18 @@ static group *create_group(int members)
 
 static void delete_group(group *group)
 {
-   if (group == NULL) { 
+   if (group == NULL || (group == groups[EMPI_GROUP_EMPTY])) {
       return;
    }
 
-   groups[group->index] = NULL;
+   DEBUG(1, "deleting group %d of size %d", group->handle, group->size);
 
-   DEBUG(1, "deleting group %d of size %d", group->index, group->size);
+   groups[group->handle] = NULL;
 
-   free(group->members);
+   if (group->members != NULL) {
+      free(group->members);
+   }
+
    free(group);
 }
 
@@ -239,41 +283,47 @@ int group_union(group *in1, group *in2, group **out)
 
 //fprintf(stderr, "   JASON: Group union size %d %d %d", in1->size, in2->size, size);
 
-   members = malloc(size * sizeof(uint32_t));
-
-   if (members == NULL) {
-      ERROR(1, "Failed to allocate temporary group!");
-      return EMPI_ERR_INTERN;
-   }
-
    index = 0;
 
-   for (i=0;i<in1->size;i++) {
-      members[index++] = in1->members[i];
-   }
+   if (size > 0) {
+
+      members = malloc(size * sizeof(uint32_t));
+
+      if (members == NULL) {
+         ERROR(1, "Failed to allocate temporary group!");
+         return EMPI_ERR_INTERN;
+      }
+
+      for (i=0;i<in1->size;i++) {
+         members[index++] = in1->members[i];
+      }
 
 //fprintf(stderr, "   JASON: Group union group 1 copied");
 
-   for (i=0;i<in2->size;i++) {
+      for (i=0;i<in2->size;i++) {
 
-      found = 0;
+         found = 0;
 
-      current = in2->members[i];
+         current = in2->members[i];
 
-      for (j=0;j<in1->size;j++) {
-         if (current == in1->members[j]) {
-            found = 1;
-            break;
+         for (j=0;j<in1->size;j++) {
+            if (current == in1->members[j]) {
+               found = 1;
+               break;
+           }
+         }
+
+         if (found == 0) {
+            if (current == my_pid) {
+               rank = index;
+            }
+
+            members[index++] = current;
          }
       }
 
-      if (found == 0) {
-         if (current == my_pid) {
-            rank = index;
-         }
-
-         members[index++] = current;
-      }
+   } else {
+      members = NULL;
    }
 
 //fprintf(stderr, "   JASON: Group union create_group APP %d", index);
@@ -282,6 +332,11 @@ int group_union(group *in1, group *in2, group **out)
 
    if (res == NULL) {
       ERROR(1, "Failed to create group!");
+
+      if (members != NULL) {
+         free(members);
+      }
+
       return EMPI_ERR_INTERN;
    }
 
@@ -299,16 +354,17 @@ int group_union(group *in1, group *in2, group **out)
 
 //fprintf(stderr, "   JASON: Group union copy to group");
 
-   for (i=0;i<index;i++) {
-      res->members[i] = members[i];
-   }
+   if (members != NULL) {
+      for (i=0;i<index;i++) {
+         res->members[i] = members[i];
+      }
 
-   free(members);
+      free(members);
+   }
 
 //fprintf(stderr, "   JASON: Group union done %p %p!", out, res);
 
    *out = res;
-
    return EMPI_SUCCESS;
 }
 
@@ -409,7 +465,7 @@ static int get_range(group *in, int *dst, int *next, int first, int last, int st
       for (i=first;(i<in->size && i<=last);i+=stride) {
 
          if (index >= in->size) {
- 
+
             ERROR(2, "GET_RANGE: Illegal arg (1) index=%d first=%d last=%d stride=%d in->size=%d)!",
                                  index, first, last, stride, in->size);
 
@@ -424,7 +480,7 @@ static int get_range(group *in, int *dst, int *next, int first, int last, int st
       for (i=first;(i>=0 && i>=last);i+=stride) {
 
          if (index >= in->size) {
- 
+
             ERROR(2, "GET_RANGE: Illegal arg (2) index=%d first=%d last=%d stride=%d in->size=%d)!",
                                  index, first, last, stride, in->size);
 
@@ -434,7 +490,7 @@ static int get_range(group *in, int *dst, int *next, int first, int last, int st
          dst[index++] = in->members[i];
       }
 
-   } else { 
+   } else {
       ERROR(2, "GET_RANGE: Illegal request first=%d last=%d stride=%d in->size=%d)!",
                                  first, last, stride, in->size);
 
@@ -461,7 +517,13 @@ int group_range_incl(group *in, int n, int ranges[][3], group **out)
       return EMPI_ERR_GROUP;
    }
 
-//   fprintf(stderr, "   *group_range_incl called. (%d %d %d) %d", in->rank, in->pid, in->size, n);
+   // If the input group is empty, the result will be EMPI_GROUP_EMPTY
+   if (in->size == 0) {
+      *out = groups[EMPI_GROUP_EMPTY];
+      return EMPI_SUCCESS;
+   }
+
+   next = 0;
 
    tmp = malloc(in->size * sizeof(int));
 
@@ -470,14 +532,12 @@ int group_range_incl(group *in, int n, int ranges[][3], group **out)
       return EMPI_ERR_INTERN;
    }
 
-   next = 0;
-
    for (i=0;i<n;i++) {
       error = get_range(in, tmp, &next, ranges[i][0], ranges[i][1], ranges[i][2]);
 
       if (error != EMPI_SUCCESS) {
          ERROR(1, "Failed to retrieve range %d (%d,%d,%d)!",
-				i, ranges[i][0], ranges[i][1], ranges[i][2]);
+  			i, ranges[i][0], ranges[i][1], ranges[i][2]);
          free(tmp);
          return error;
       }
@@ -503,7 +563,6 @@ int group_range_incl(group *in, int n, int ranges[][3], group **out)
    }
 
    free(tmp);
-
    *out = res;
 
    return EMPI_SUCCESS;

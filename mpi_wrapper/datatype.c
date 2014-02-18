@@ -233,6 +233,8 @@ int init_datatypes()
       return error;
    }
 
+
+
 #ifdef HAVE_MPI_2_2
 
    error = add_datatype(EMPI_C_BOOL, sizeof(_Bool), MPI_C_BOOL);
@@ -374,6 +376,20 @@ int init_datatypes()
 
    if (error != EMPI_SUCCESS) {
       ERROR(1, "init_datatypes() Failed to init type EMPI_LONG_DOUBLE_INT!");
+      return error;
+   }
+
+   error = add_datatype(EMPI_COMPLEX, sizeof(f_complex), MPI_COMPLEX);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "init_datatypes() Failed to init type EMPI_COMPLEX!");
+      return error;
+   }
+
+   error = add_datatype(EMPI_DOUBLE_COMPLEX, sizeof(d_complex), MPI_DOUBLE_COMPLEX);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "init_datatypes() Failed to init type EMPI_DOUBLE_COMPLEX!");
       return error;
    }
 

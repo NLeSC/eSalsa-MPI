@@ -78,7 +78,7 @@ static message_buffer *probe_wa(communicator *c, int source, int tag, int blocki
 }
 
 static int unpack_message(void *buf, int count, datatype *t, communicator *c,
-                           message_buffer *m, EMPI_Status *status)
+                           message_buffer *m, EMPI_Status *s)
 {
   int error = 0;
   int position = 0;
@@ -101,12 +101,8 @@ static int unpack_message(void *buf, int count, datatype *t, communicator *c,
    error = TRANSLATE_ERROR(MPI_Unpack(m->data_buffer, m->header.bytes, &position, buf,
                         count, t->type, c->comm));
 
-   if (error == EMPI_SUCCESS && status != NULL) {
-      status->MPI_SOURCE = m->header.source;
-      status->MPI_TAG = m->header.tag;
-      status->MPI_ERROR = error;
-      status->count = count;
-      status->cancelled = 0;
+   if (error == EMPI_SUCCESS) {
+      set_status(s, m->header.source, m->header.tag, error, t, count, FALSE);
    }
 
    free_message(m);

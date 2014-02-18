@@ -145,8 +145,8 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
    return MPI_SUCCESS;
 }
 
-int init_communicators(int cluster_rank, int cluster_count,
-                       int *cluster_sizes, int *cluster_offsets)
+
+int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes, int *cluster_offsets)
 {
    // We create three special communicators here for
    // EMPI_COMM_WORLD, EMPI_COMM_SELF and EMPI_COMM_NULL.

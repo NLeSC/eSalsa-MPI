@@ -10,11 +10,17 @@
 #define GROUP_TYPE_IDLE       2
 
 struct s_group {
-   int index;
 
+   /* The handle of this group [2-MAX_GROUPS] */
+   int handle;
+
+   /* The rank of this process in this group, or -1 if this process is not part of this group */
    int rank;
+
+   /* The size of this group, 0 if group equals EMPI_GROUP_EMPTY */
    int size;
 
+   /* The PIDs of the members of this group */
    uint32_t *members;
 };
 
@@ -35,7 +41,7 @@ int group_rank(group *g, int *rank);
 int group_size(group *g, int *size);
 
 
-// Returns in group a handle to the group of comm.
+// Returns a group representing the members of comm.
 int group_comm_group(communicator *in, group **out);
 
 // Returns all elements of the first group ( group1), followed by all elements of second group ( group2) not in first.

@@ -3,9 +3,11 @@
 
 #include "types.h"
 
+// FIXME: do we need this ?
+#define FALSE 0
+#define TRUE  1
+
 typedef int EMPI_Comm;
-
-
 
 typedef status EMPI_Status;
 
@@ -26,7 +28,7 @@ typedef int EMPI_Errhandler;
 
 typedef int EMPI_Handler_function;
 typedef int EMPI_File_errhandler_fn;
-typedef int MPIO_Request;
+typedef int EMPI_Request;
 typedef int EMPI_Grequest_query_function;
 typedef int EMPI_Grequest_free_function;
 typedef int EMPI_Grequest_cancel_function;
@@ -85,6 +87,10 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 #define EMPI_C_DOUBLE_COMPLEX      (26)
 #define EMPI_C_LONG_DOUBLE_COMPLEX (27)
 
+#define EMPI_COMPLEX8              (EMPI_C_FLOAT_COMPLEX)
+#define EMPI_COMPLEX16             (EMPI_C_DOUBLE_COMPLEX)
+#define EMPI_COMPLEX32             (EMPI_C_LONG_DOUBLE_COMPLEX)
+
 #endif
 
 #define EMPI_BYTE                  (28)
@@ -100,39 +106,35 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 #define EMPI_SHORT_INT             (34)
 #define EMPI_LONG_DOUBLE_INT       (35)
 
-/* BASIC Fortran Datatypes -- as defined in MPI 2.2 standard. */
+/* BASIC Fortran Datatypes -- as defined in MPI 2.1 standard. */
 
 #define EMPI_INTEGER               (EMPI_INT)
 #define EMPI_REAL                  (EMPI_FLOAT)
 #define EMPI_DOUBLE_PRECISION      (EMPI_DOUBLE)
-#define EMPI_COMPLEX               (EMPI_C_COMPLEX)
-#define EMPI_DOUBLE_COMPLEX        (EMPI_C_DOUBLE_COMPLEX)
 #define EMPI_LOGICAL               (EMPI_INT) // FIXME -- check!
 #define EMPI_CHARACTER             (EMPI_CHAR)
+#define EMPI_COMPLEX               (36)
+#define EMPI_DOUBLE_COMPLEX        (37)
 
-#define EMPI_INTEGER1              (EMPI_INT8_T)
-#define EMPI_INTEGER2              (EMPI_INT16_T)
-#define EMPI_INTEGER4              (EMPI_INT32_T)
-#define EMPI_INTEGER8              (EMPI_INT64_T)
+#define EMPI_INTEGER1              (EMPI_SIGNED_CHAR)
+#define EMPI_INTEGER2              (EMPI_SHORT)
+#define EMPI_INTEGER4              (EMPI_INT)
+#define EMPI_INTEGER8              (EMPI_LONG_LONG_INT)
 
-#define EMPI_UNSIGNED_INTEGER1     (EMPI_UINT8_T)
-#define EMPI_UNSIGNED_INTEGER2     (EMPI_UINT16_T)
-#define EMPI_UNSIGNED_INTEGER4     (EMPI_UINT32_T)
-#define EMPI_UNSIGNED_INTEGER8     (EMPI_UINT64_T)
+#define EMPI_UNSIGNED_INTEGER1     (EMPI_UNSIGNED_CHAR)
+#define EMPI_UNSIGNED_INTEGER2     (EMPI_UNSIGNED_SHORT)
+#define EMPI_UNSIGNED_INTEGER4     (EMPI_UNSIGNED)
+#define EMPI_UNSIGNED_INTEGER8     (EMPI_UNSIGNED_LONG_LONG)
 
 #define EMPI_REAL4                 (EMPI_FLOAT)
 #define EMPI_REAL8                 (EMPI_DOUBLE)
 #define EMPI_REAL16                (EMPI_LONG_DOUBLE)
 
-#define EMPI_COMPLEX8              (EMPI_C_FLOAT_COMPLEX)
-#define EMPI_COMPLEX16             (EMPI_C_DOUBLE_COMPLEX)
-#define EMPI_COMPLEX32             (EMPI_C_LONG_DOUBLE_COMPLEX)
-
-#define EMPI_2REAL                 (36)
-#define EMPI_2DOUBLE_PRECISION     (37)
+#define EMPI_2REAL                 (38)
+#define EMPI_2DOUBLE_PRECISION     (39)
 #define EMPI_2INTEGER              (EMPI_2INT)
 
-#define EMPI_DEFINED_DATATYPES     (38)
+#define EMPI_DEFINED_DATATYPES     (40)
 
 /* Communicators */
 
@@ -151,8 +153,8 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 // FIXME: check!
 #define EMPI_REQUEST_NULL -1
 
-#define EMPI_STATUS_IGNORE ((EMPI_Status *) 0)
-#define EMPI_STATUSES_IGNORE ((EMPI_Status *) 0)
+#define EMPI_STATUS_IGNORE ((EMPI_Status *) NULL)
+#define EMPI_STATUSES_IGNORE ((EMPI_Status *) NULL)
 
 /* Source / tags */
 #define EMPI_ANY_SOURCE (-1)
@@ -248,7 +250,6 @@ double EMPI_Wtime(void);
 
 // Datatypes
 int EMPI_Type_get_name ( EMPI_Datatype datatype, char *type_name, int *resultlen );
-
 
 /*
 int EMPI_Type_create_f90_complex ( int p, int r, EMPI_Datatype *newtype );

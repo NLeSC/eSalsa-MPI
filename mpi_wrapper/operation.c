@@ -16,7 +16,7 @@
 static operation *ops[MAX_OPERATIONS];
 static int next_operation = 0;
 
-static int init_operation(EMPI_Op handle, EMPI_User_function *function, int commute)
+static int init_operation(EMPI_Op handle, EMPI_User_function *function, MPI_Op op, int commute)
 {
    if (handle < 0 || handle > MAX_OPERATIONS) {
       IERROR(1, "Failed to initialize operations -- handle %d out of bounds!\n", handle);
@@ -38,6 +38,7 @@ static int init_operation(EMPI_Op handle, EMPI_User_function *function, int comm
    ops[handle]->function = function;
    ops[handle]->commute = commute;
    ops[handle]->handle = handle;
+   ops[handle]->op = op;
 
    if (handle >= next_operation) {
       next_operation = handle+1;
@@ -54,43 +55,43 @@ int init_operations()
       ops[i] = NULL;
    }
 
-   error = init_operation(EMPI_OP_NULL, NULL, 1);
+   error = init_operation(EMPI_OP_NULL, NULL, MPI_OP_NULL, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_MAX, MAGPIE_MAX, 1);
+   error = init_operation(EMPI_MAX, MAGPIE_MAX, MPI_MAX, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_MIN, MAGPIE_MIN, 1);
+   error = init_operation(EMPI_MIN, MAGPIE_MIN, MPI_MIN, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_SUM, MAGPIE_SUM, 1);
+   error = init_operation(EMPI_SUM, MAGPIE_SUM, MPI_SUM, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_PROD, MAGPIE_PROD, 1);
+   error = init_operation(EMPI_PROD, MAGPIE_PROD, MPI_PROD, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_MAXLOC, MAGPIE_MAXLOC, 1);
+   error = init_operation(EMPI_MAXLOC, MAGPIE_MAXLOC, MPI_MAXLOC, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_MINLOC, MAGPIE_MINLOC, 1);
+   error = init_operation(EMPI_MINLOC, MAGPIE_MINLOC, MPI_MINLOC, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_BOR, MAGPIE_BOR, 1);
+   error = init_operation(EMPI_BOR, MAGPIE_BOR, MPI_BOR, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_BAND, MAGPIE_BAND, 1);
+   error = init_operation(EMPI_BAND, MAGPIE_BAND, MPI_BAND, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_BXOR, MAGPIE_BXOR, 1);
+   error = init_operation(EMPI_BXOR, MAGPIE_BXOR, MPI_BXOR, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_LOR, MAGPIE_LOR, 1);
+   error = init_operation(EMPI_LOR, MAGPIE_LOR, MPI_LOR, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_LAND, MAGPIE_LAND, 1);
+   error = init_operation(EMPI_LAND, MAGPIE_LAND, MPI_LAND, 1);
    if (error != EMPI_SUCCESS) return error;
 
-   error = init_operation(EMPI_LXOR, MAGPIE_LXOR, 1);
+   error = init_operation(EMPI_LXOR, MAGPIE_LXOR, MPI_LXOR, 1);
    if (error != EMPI_SUCCESS) return error;
 
    return EMPI_SUCCESS;

@@ -27,10 +27,10 @@ static unsigned short port;
 // The name of this cluster (must be unique).
 static char *cluster_name;
 
-
 // The number of clusters and the rank of our cluster in this set.
 uint32_t cluster_count;
 uint32_t cluster_rank;
+uint32_t my_pid;
 
 // The size of each cluster, and the offset of each cluster in the
 // total set of machines.
@@ -46,7 +46,6 @@ static int read_config_file()
    int  error;
    char *file;
    FILE *config;
-   int retval = 1;
    char buffer[1024];
 
    file = getenv("EMPI_CONFIG");
@@ -55,9 +54,8 @@ static int read_config_file()
       WARN(0, "EMPI_CONFIG not set");
       // FIXME -- hardcoded path :-P
       file = "/home/jason/empi.config";
-   } else {
-      retval = 0;
    }
+
 
    INFO(0, "looking for config file %s", file);
 
@@ -227,23 +225,18 @@ static int init_cluster_info(int *argc, char ***argv)
 
    INFO(1, "WA server at %s %d", server, port);
 
-   if (local_rank < 0 || local_count <= 0 || local_rank >= local_count) {
-      ERROR(1, "Local cluster info not set correctly (%d, %d)!", local_rank, local_count);
-      return 0;
-   }
+//   if (local_rank < 0 || local_count <= 0 || local_rank >= local_count) {
+//      ERROR(1, "Local cluster info not set correctly (%d, %d)!", local_rank, local_count);
+//      return 0;
+//   }
 
    if (cluster_name == NULL || cluster_rank < 0 || cluster_count <= 0 || cluster_rank >= cluster_count) {
       ERROR(1, "Cluster info not set correctly (%s, %d, %d)!", cluster_name, cluster_rank, cluster_count);
       return 0;
    }
 
-   INFO(1, "I am %d of %d in cluster %s", local_rank, local_count, cluster_name);
-   INFO(1, "Cluster %s is %d of %d clusters", cluster_name, cluster_rank, cluster_count);
-
    cluster_sizes = malloc(cluster_count * sizeof(int));
    cluster_offsets = malloc((cluster_count+1) * sizeof(int));
-
-   my_pid = SET_PID(cluster_rank, local_rank);
 
    return 1;
 }
@@ -298,37 +291,6 @@ static int wa_connect(char *server, unsigned short port)
    freeaddrinfo(result);
 
    return CONNECT_OK;
-}
-
-// Init the wide area communication.
-int wa_init(int local_rank, int local_count, int *argc, char ***argv)
-{
-   int status;
-
-   status = init_cluster_info(argc, argv);
-
-   if (status == 0) {
-      ERROR(1, "Failed to initialize WA sockets implementation!");
-      return EMPI_ERR_INTERN;
-   }
-
-   status = wa_connect(server_name, port);
-
-   if (status != CONNECT_OK) {
-      ERROR(1, "Failed to connect to hub!");
-      return 0;
-   }
-
-   error = handshake(local_rank, local_count, cluster_rank, cluster_count,
-                      cluster_name, cluster_sizes, cluster_offsets);
-
-   if (error != CONNECT_OK) {
-      ERROR(1, "Failed to perform handshake with hub!");
-      close(socketfd);
-      return 0;
-   }
-
-   return 1;
 }
 
 static int handshake(int local_rank, int local_count, int cluster_rank, int cluster_count,
@@ -404,6 +366,42 @@ static int handshake(int local_rank, int local_count, int cluster_rank, int clus
    }
 
    return CONNECT_OK;
+}
+
+// Init the wide area communication.
+int wa_init(int local_rank, int local_count, int *argc, char ***argv)
+{
+   int status, error;
+
+   status = init_cluster_info(argc, argv);
+
+   if (status == 0) {
+      ERROR(1, "Failed to initialize WA sockets implementation!");
+      return EMPI_ERR_INTERN;
+   }
+
+   INFO(1, "I am %d of %d in cluster %s", local_rank, local_count, cluster_name);
+   INFO(1, "Cluster %s is %d of %d clusters", cluster_name, cluster_rank, cluster_count);
+
+   my_pid = SET_PID(cluster_rank, local_rank);
+
+   status = wa_connect(server, port);
+
+   if (status != CONNECT_OK) {
+      ERROR(1, "Failed to connect to hub!");
+      return 0;
+   }
+
+   error = handshake(local_rank, local_count, cluster_rank, cluster_count,
+                      cluster_name, cluster_sizes, cluster_offsets);
+
+   if (error != CONNECT_OK) {
+      ERROR(1, "Failed to perform handshake with hub!");
+      close(socketfd);
+      return 0;
+   }
+
+   return 1;
 }
 
 int wa_finalize() {

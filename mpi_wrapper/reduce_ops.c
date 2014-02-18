@@ -60,14 +60,7 @@ INFO(2, "MAGPIE_MAX invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_MAX(b[i],a[i]);
     return;
   }
-  else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
-    long long *a = (long long *)inoutvec;
-    long long *b = (long long *)invec;
-    for ( i=0; i < *len; i++ )
-      a[i] = MACRO_MAX(b[i],a[i]);
-    return;
-  }
-  if ( *type == EMPI_SHORT ){
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -109,6 +102,17 @@ INFO(2, "MAGPIE_MAX invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_MAX(b[i],a[i]);
     return;
   }
+
+#ifdef HAVE_MPI_2_2
+  else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
+    long long *a = (long long *)inoutvec;
+    long long *b = (long long *)invec;
+    for ( i=0; i < *len; i++ )
+      a[i] = MACRO_MAX(b[i],a[i]);
+    return;
+  }
+#endif
+
 #ifdef MAGPIE_HAS_LONG_DOUBLE
   else if ( *type == EMPI_LONG_DOUBLE ){
     long double *a = (long double *)inoutvec;
@@ -161,6 +165,7 @@ INFO(2, "MAGPIE_MIN invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_MIN(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -168,7 +173,8 @@ INFO(2, "MAGPIE_MIN invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_MIN(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -269,6 +275,7 @@ void MAGPIE_SUM(void *invec, void *inoutvec, int *len, EMPI_Datatype *type){
       a[i] = MACRO_SUM(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -276,7 +283,8 @@ void MAGPIE_SUM(void *invec, void *inoutvec, int *len, EMPI_Datatype *type){
       a[i] = MACRO_SUM(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -391,6 +399,7 @@ INFO(2, "MAGPIE_PROD invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_PROD(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -398,7 +407,8 @@ INFO(2, "MAGPIE_PROD invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_PROD(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -517,6 +527,7 @@ INFO(2, "MAGPIE_LAND invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_LAND(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -524,7 +535,8 @@ INFO(2, "MAGPIE_LAND invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_LAND(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -629,6 +641,7 @@ INFO(2, "MAGPIE_LOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_LOR(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -636,7 +649,8 @@ INFO(2, "MAGPIE_LOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_LOR(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -741,6 +755,7 @@ INFO(2, "MAGPIE_LXOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_LXOR(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -748,7 +763,8 @@ INFO(2, "MAGPIE_LXOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_LXOR(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -852,6 +868,7 @@ INFO(2, "MAGPIE_BAND invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_BAND(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -859,7 +876,8 @@ INFO(2, "MAGPIE_BAND invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_BAND(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -939,6 +957,7 @@ INFO(2, "MAGPIE_BOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_BOR(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -946,7 +965,8 @@ INFO(2, "MAGPIE_BOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], ((
       a[i] = MACRO_BOR(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)
@@ -1025,6 +1045,7 @@ INFO(2, "MAGPIE_BXOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_BXOR(b[i],a[i]);
     return;
   }
+#ifdef HAVE_MPI_2_2
   else if ( *type == EMPI_LONG_LONG_INT || *type == EMPI_INTEGER8 ){
     long long *a = (long long *)inoutvec; 
     long long *b = (long long *)invec;
@@ -1032,7 +1053,8 @@ INFO(2, "MAGPIE_BXOR invec=%d inoutvec=%d len=%d type=%s\n", ((int*)invec)[0], (
       a[i] = MACRO_BXOR(b[i],a[i]);
     return;
   }
-  if ( *type == EMPI_SHORT ){
+#endif
+  else if ( *type == EMPI_SHORT ){
     short *a = (short*)inoutvec;
     short *b = (short*)invec;
     for (i=0; i < *len; i++)

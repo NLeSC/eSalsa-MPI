@@ -17,35 +17,59 @@
 
 struct s_communicator {
 
+   /* The handle of this communicator. */
    int handle;
+
+   /* DO WE NEED THESE ?? */
    int flags;
 
+   /* The MPI handle for the local part of the communicator. */
    MPI_Comm comm;
 
+   /* Our rank in the local communicator */
    int local_rank;
+
+   /* The size of the local communicator */
    int local_size;
 
+   /* Our rank in the global communicator */
    int global_rank;
+
+   /* The size of the global communicator */
    int global_size;
 
+   /* The global rank of the coordinator of my cluster. */
    int my_coordinator;
+
+   /* The global ranks of all cluster coordinators (one per cluster, with local rank 0). */
    int *coordinators;
 
+   /* The number of clusters participating in this communicator. */
    int cluster_count;
 
    // FIXME: Merge cluster ranks + sizes into single cluster info field ?
+
+   /* The ranks of each of the participating clusters. */
    int *cluster_ranks;
+
+   /* The size of each local communicator on the participating clusters. */
    int *cluster_sizes;
 
+   /* The PID of all (read: global) members of this communicator. */
    uint32_t *members;
 
    // FIXME: Merge member_cluster_index + local_ranks into single local pid array ?
+
+   /* The cluster index for each of the global members. REPLACE WITH GET_CLUSTER_RANK(members[i]). */
    uint32_t *member_cluster_index;
+
+   /* The local rank for each of the global members. REPLACE WITH GET_PROCESS_RANK(members[i]). */
    uint32_t *local_ranks;
 
-//   unsigned char *bitmap;
-
+   /* Head of the message queue. */
    message_buffer *queue_head;
+
+   /* Tail of the message queue. */
    message_buffer *queue_tail;
 };
 

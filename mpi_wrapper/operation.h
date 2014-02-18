@@ -2,15 +2,15 @@
 #define _OPERATION_H_
 
 #include "flags.h"
-#include "empi.h"
 #include "types.h"
-
 #include "empi.h"
+#include <mpi.h>
 
 struct s_operation {
      EMPI_User_function *function;
      int commute;
      EMPI_Op handle;
+     MPI_Op op;
 };
 
 int init_operations();
