@@ -8,7 +8,7 @@
 // #define TRACE_CALLS
 
 // Print error and terminate when an MPI_ERROR is caught ?
-#define TRACE_ERRORS
+// #define TRACE_ERRORS
 
 // Profiling level 0 = no profiling, 1 = course grained, 2 = fine grained
 #define PROFILE_LEVEL 0

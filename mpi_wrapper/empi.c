@@ -2,9 +2,11 @@
 #include "profiling.h"
 #include "logging.h"
 #include "debugging.h"
-//#include "generated_header.h"
-#include "empi.h"
 #include "request.h"
+#include "empi.h"
+#include "xempi.h"
+
+/* ------------------------ Misc. utility function ------------------------ */
 
 int EMPI_Init ( int *argc, char ***argv )
 {
@@ -24,6 +26,35 @@ int EMPI_Init ( int *argc, char ***argv )
 
    profile_init();
 
+   return error;
+}
+
+int EMPI_Initialized ( int *flag )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Initialized(int *flag=%p)", flag);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Initialized(flag);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Initialized failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
    return error;
 }
 
@@ -120,8 +151,1136 @@ double EMPI_Wtime ( void )
    return result;
 }
 
-#if 0
+int EMPI_Get_processor_name ( char *name, int *resultlen )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
 
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Get_processor_name(char *name=%p, int *resultlen=%p)", name, resultlen);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Get_processor_name(name, resultlen);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Get_processor_name failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Error_string ( int errorcode, char *string, int *resultlen )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Error_string(int errorcode=%d, char *string=%p, int *resultlen=%p)", errorcode, string, resultlen);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Error_string(errorcode, string, resultlen);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Error_string failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+
+
+/* ------------------------ Communicators and groups ------------------------ */
+
+int EMPI_Comm_create ( EMPI_Comm comm, EMPI_Group g, EMPI_Comm *newcomm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_create(EMPI_Comm comm=%s, EMPI_Group g=%s, EMPI_Comm *newcomm=%p)", comm_to_string(comm), group_to_string(g), newcomm);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_create(comm, g, newcomm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_create failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Comm_dup ( EMPI_Comm comm, EMPI_Comm *newcomm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_dup(EMPI_Comm comm=%s, EMPI_Comm *newcomm=%p)", comm_to_string(comm), newcomm);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_dup(comm, newcomm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_dup failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Comm_free ( EMPI_Comm *comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_free(EMPI_Comm *comm=%p)", comm);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_free(comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_free failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Comm_group ( EMPI_Comm comm, EMPI_Group *g )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_group(EMPI_Comm comm=%s, EMPI_Group *g=%p)", comm_to_string(comm), g);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_group(comm, g);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_group failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Comm_rank ( EMPI_Comm comm, int *rank )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_rank(EMPI_Comm comm=%s, int *rank=%p)", comm_to_string(comm), rank);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_rank(comm, rank);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_rank failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Comm_size ( EMPI_Comm comm, int *size )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_size(EMPI_Comm comm=%s, int *size=%p)", comm_to_string(comm), size);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_size(comm, size);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_size failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Comm_split ( EMPI_Comm comm, int color, int key, EMPI_Comm *newcomm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Comm_split(EMPI_Comm comm=%s, int color=%d, int key=%d, EMPI_Comm *newcomm=%p)", comm_to_string(comm), color, key, newcomm);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Comm_split(comm, color, key, newcomm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Comm_split failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Group_range_incl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Group_range_incl(EMPI_Group g=%s, int n=%d, int ranges[][3]=%p, EMPI_Group *newgroup=%p)", group_to_string(g), n, ranges, newgroup);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Group_range_incl(g, n, ranges, newgroup);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Group_range_incl failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+
+
+/* ------------------------ Collective communication ------------------------ */
+
+int EMPI_Allgather ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int recvcount, EMPI_Datatype recvtype, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Allgather(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ALLGATHER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Allgather failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Allgatherv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int *recvcounts, int *displs, EMPI_Datatype recvtype, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Allgatherv(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcounts=%p, int *displs=%p, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ALLGATHER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Allgatherv failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Allreduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Allreduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Allreduce(sendbuf, recvbuf, count, type, op, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ALLREDUCE, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Allreduce failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Alltoall ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int recvcount, EMPI_Datatype recvtype, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Alltoall(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Alltoall(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ALLTOALL, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Alltoall failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype recvtype, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Alltoallv(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, type_to_string(sendtype), recvbuf, recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Alltoallv(sendbuf, sendcnts, sdispls, sendtype, recvbuf, recvcnts, rdispls, recvtype, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ALLTOALL, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Alltoallv failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype *sendtypes, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype *recvtypes, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Alltoallw(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, EMPI_Datatype *sendtypes=%p, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, EMPI_Datatype *recvtypes=%p, EMPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(*sendtypes);
+   CHECK_TYPE(*recvtypes);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Alltoallw(sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ALLTOALL, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Alltoallw failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Scatter ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Scatter(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Scatter(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_SCATTER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Scatter failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Scatterv(void *sendbuf=%p, int *sendcnts=%p, int *displs=%p, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnts, displs, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Scatterv(sendbuf, sendcnts, displs, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_SCATTER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Scatterv failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Barrier ( EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Barrier(EMPI_Comm comm=%s)", comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Barrier(comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_BARRIER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Barrier failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Bcast ( void *buffer, int count, EMPI_Datatype type, int root, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Bcast(void *buffer=%p, int count=%d, EMPI_Datatype type=%s, int root=%d, EMPI_Comm comm=%s)", buffer, count, type_to_string(datatype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Bcast(buffer, count, type, root, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_BCAST, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Bcast failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Gather ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Gather(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Gather(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_GATHER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Gather failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Gatherv ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *displs, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Gatherv(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *displs=%p, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Gatherv(sendbuf, sendcnt, sendtype, recvbuf, recvcnts, displs, recvtype, root, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_GATHER, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Gatherv failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Reduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, int root, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Reduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Reduce(sendbuf, recvbuf, count, type, op, root, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_REDUCE, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Reduce failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+
+/* ------------------------ Send / Receive operations ------------------------ */
+
+
+int EMPI_Ibsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Ibsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Ibsend(buf, count, type, dest, tag, comm, r);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_IBSEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Ibsend failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Irecv ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Request *r )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Irecv(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Irecv(buf, count, type, source, tag, comm, r);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_IRECV, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Irecv failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Irsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Irsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Irsend(buf, count, type, dest, tag, comm, r);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_IRSEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Irsend failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Isend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Isend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Isend(buf, count, type, dest, tag, comm, r);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ISEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Isend failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Rsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Rsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Rsend(buf, count, type, dest, tag, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_RSEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Rsend failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Send ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Send(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Send(buf, count, type, dest, tag, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_SEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Send failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int EMPI_Sendrecv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, int dest, int sendtag, void *recvbuf, int recvcount, EMPI_Datatype recvtype, int source, int recvtag, EMPI_Comm comm, EMPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Sendrecv(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", sendbuf, sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), s);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(sendtype);
+   CHECK_TYPE(recvtype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_SEND_RECV, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Sendrecv failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Ssend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Ssend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Ssend(buf, count, type, dest, tag, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_SSEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Ssend failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+/* ------------------------ Request and status handling ------------------------ */
+
+
+int EMPI_Wait ( EMPI_Request *r, EMPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+   EMPI_Comm comm = eEMPI_COMM_SELF;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Wait(EMPI_Request *r=%p, EMPI_Status *s=%p)", r, s);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+   // We need a communicator to attach the statistics to.
+   comm = request_get_comm(r, EMPI_COMM_SELF);
+#endif
+
+   int error = xEMPI_Wait(r, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_WAIT, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Wait failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Waitall ( int count, EMPI_Request *array_of_requests, EMPI_Status *array_of_statuses )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Waitall(int count=%d, EMPI_Request array_of_requests[]=%p, EMPI_Status array_of_statuses[]=%p)", count, array_of_requests, array_of_statuses);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+#ifndef IBIS_INTERCEPT
+   profile_start = profile_start_ticks();
+#endif // IBIS_INTERCEPT
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Waitall(count, array_of_requests, array_of_statuses);
+
+#if PROFILE_LEVEL > 0
+#ifndef IBIS_INTERCEPT
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_WAITALL, profile_end-profile_start);
+#endif // IBIS_INTERCEPT
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Waitall failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int EMPI_Request_free ( EMPI_Request *r )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "EMPI_Request_free(EMPI_Request *r=%p)", r);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_Request_free(r);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != EMPI_SUCCESS) {
+      ERROR(0, "EMPI_Request_free failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+
+
+
+// HIERO
+
+
+
+// Ignore the rest for now....
+
+#if 0
 
 int EMPI_Type_create_f90_complex ( int p, int r, EMPI_Datatype *newtype )
 {
@@ -382,75 +1541,6 @@ int EMPI_Address ( void *location, EMPI_Aint *address )
 }
 
 
-int EMPI_Allgather ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int recvcount, EMPI_Datatype recvtype, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Allgather(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ALLGATHER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Allgather failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Allgatherv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int *recvcounts, int *displs, EMPI_Datatype recvtype, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Allgatherv(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcounts=%p, int *displs=%p, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ALLGATHER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Allgatherv failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
 
 int EMPI_Alloc_mem ( EMPI_Aint size, EMPI_Info info, void *baseptr )
 {
@@ -482,143 +1572,6 @@ int EMPI_Alloc_mem ( EMPI_Aint size, EMPI_Info info, void *baseptr )
 }
 
 
-int EMPI_Allreduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype, EMPI_Op op, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Allreduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ALLREDUCE, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Allreduce failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Alltoall ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int recvcount, EMPI_Datatype recvtype, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alltoall(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Alltoall(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ALLTOALL, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alltoall failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype recvtype, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alltoallv(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, type_to_string(sendtype), recvbuf, recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Alltoallv(sendbuf, sendcnts, sdispls, sendtype, recvbuf, recvcnts, rdispls, recvtype, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ALLTOALL, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alltoallv failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype *sendtypes, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype *recvtypes, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alltoallw(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, EMPI_Datatype *sendtypes=%p, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, EMPI_Datatype *recvtypes=%p, EMPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(*sendtypes);
-   CHECK_TYPE(*recvtypes);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Alltoallw(sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ALLTOALL, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alltoallw failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Attr_delete ( EMPI_Comm comm, int keyval )
@@ -711,44 +1664,16 @@ int EMPI_Attr_put ( EMPI_Comm comm, int keyval, void *attr_value )
 }
 
 
-int EMPI_Barrier ( EMPI_Comm comm )
+
+
+int EMPI_Bsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Barrier(EMPI_Comm comm=%s)", comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Barrier(comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_BARRIER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Barrier failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Bcast ( void *buffer, int count, EMPI_Datatype datatype, int root, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Bcast(void *buffer=%p, int count=%d, EMPI_Datatype datatype=%s, int root=%d, EMPI_Comm comm=%s)", buffer, count, type_to_string(datatype), root, comm_to_string(comm));
+   INFO(0, "EMPI_Bsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -759,41 +1684,7 @@ int EMPI_Bcast ( void *buffer, int count, EMPI_Datatype datatype, int root, EMPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Bcast(buffer, count, datatype, root, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_BCAST, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Bcast failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Bsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Bsend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Bsend(buf, count, datatype, dest, tag, comm);
+   int error = xEMPI_Bsend(buf, count, type, dest, tag, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -809,14 +1700,14 @@ int EMPI_Bsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag
 }
 
 
-int EMPI_Bsend_init ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int EMPI_Bsend_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Bsend_init(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "EMPI_Bsend_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -827,7 +1718,7 @@ int EMPI_Bsend_init ( void *buf, int count, EMPI_Datatype datatype, int dest, in
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Bsend_init(buf, count, datatype, dest, tag, comm, r);
+   int error = xEMPI_Bsend_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1353,34 +2244,6 @@ int EMPI_Comm_create_errhandler ( EMPI_Comm_errhandler_fn *function, EMPI_Errhan
 }
 
 
-int EMPI_Comm_create ( EMPI_Comm comm, EMPI_Group g, EMPI_Comm *newcomm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_create(EMPI_Comm comm=%s, EMPI_Group g=%s, EMPI_Comm *newcomm=%p)", comm_to_string(comm), group_to_string(g), newcomm);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_create(comm, g, newcomm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_create failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Comm_create_keyval ( EMPI_Comm_copy_attr_function *comm_copy_attr_fn, EMPI_Comm_delete_attr_function *comm_delete_attr_fn, int *comm_keyval, void *extra_state )
@@ -1472,65 +2335,6 @@ int EMPI_Comm_disconnect ( EMPI_Comm *comm )
    return error;
 }
 
-
-int EMPI_Comm_dup ( EMPI_Comm comm, EMPI_Comm *newcomm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_dup(EMPI_Comm comm=%s, EMPI_Comm *newcomm=%p)", comm_to_string(comm), newcomm);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_dup(comm, newcomm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_dup failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Comm_free ( EMPI_Comm *comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_free(EMPI_Comm *comm=%p)", comm);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_free(comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_free failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Comm_free_keyval ( int *comm_keyval )
@@ -1683,34 +2487,6 @@ int EMPI_Comm_get_parent ( EMPI_Comm *parent )
 }
 
 
-int EMPI_Comm_group ( EMPI_Comm comm, EMPI_Group *g )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_group(EMPI_Comm comm=%s, EMPI_Group *g=%p)", comm_to_string(comm), g);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_group(comm, g);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_group failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Comm_join ( int fd, EMPI_Comm *intercomm )
@@ -1742,35 +2518,6 @@ int EMPI_Comm_join ( int fd, EMPI_Comm *intercomm )
    return error;
 }
 
-
-int EMPI_Comm_rank ( EMPI_Comm comm, int *rank )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_rank(EMPI_Comm comm=%s, int *rank=%p)", comm_to_string(comm), rank);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_rank(comm, rank);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_rank failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Comm_remote_group ( EMPI_Comm comm, EMPI_Group *g )
@@ -1923,34 +2670,6 @@ int EMPI_Comm_set_name ( EMPI_Comm comm, char *comm_name )
 }
 
 
-int EMPI_Comm_size ( EMPI_Comm comm, int *size )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_size(EMPI_Comm comm=%s, int *size=%p)", comm_to_string(comm), size);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_size(comm, size);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_size failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Comm_spawn ( char *command, char *argv[], int maxprocs, EMPI_Info info, int root, EMPI_Comm comm, EMPI_Comm *intercomm, int array_of_errcodes[] )
@@ -2012,35 +2731,6 @@ int EMPI_Comm_spawn_multiple ( int count, char *array_of_commands[], char* *arra
    return error;
 }
 
-
-int EMPI_Comm_split ( EMPI_Comm comm, int color, int key, EMPI_Comm *newcomm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_split(EMPI_Comm comm=%s, int color=%d, int key=%d, EMPI_Comm *newcomm=%p)", comm_to_string(comm), color, key, newcomm);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Comm_split(comm, color, key, newcomm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_split failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Comm_test_inter ( EMPI_Comm comm, int *flag )
@@ -2373,44 +3063,15 @@ int EMPI_Error_class ( int errorcode, int *errorclass )
 }
 
 
-int EMPI_Error_string ( int errorcode, char *string, int *resultlen )
+
+int EMPI_Exscan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Error_string(int errorcode=%d, char *string=%p, int *resultlen=%p)", errorcode, string, resultlen);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Error_string(errorcode, string, resultlen);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Error_string failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Exscan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype, EMPI_Op op, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Exscan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "EMPI_Exscan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2421,7 +3082,7 @@ int EMPI_Exscan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatyp
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Exscan(sendbuf, recvbuf, count, datatype, op, comm);
+   int error = xEMPI_Exscan(sendbuf, recvbuf, count, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2827,14 +3488,14 @@ int EMPI_File_get_size ( EMPI_File EMPI_fh, EMPI_Offset *size )
 }
 
 
-int EMPI_File_get_type_extent ( EMPI_File EMPI_fh, EMPI_Datatype datatype, EMPI_Aint *extent )
+int EMPI_File_get_type_extent ( EMPI_File EMPI_fh, EMPI_Datatype type, EMPI_Aint *extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_type_extent(EMPI_File EMPI_fh=%s, EMPI_Datatype datatype=%s, EMPI_Aint *extent=%p)", file_to_string(EMPI_fh), type_to_string(datatype), extent);
+   INFO(0, "EMPI_File_get_type_extent(EMPI_File EMPI_fh=%s, EMPI_Datatype type=%s, EMPI_Aint *extent=%p)", file_to_string(EMPI_fh), type_to_string(datatype), extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2845,7 +3506,7 @@ int EMPI_File_get_type_extent ( EMPI_File EMPI_fh, EMPI_Datatype datatype, EMPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_type_extent(EMPI_fh, datatype, extent);
+   int error = xEMPI_File_get_type_extent(EMPI_fh, type, extent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2896,14 +3557,14 @@ int EMPI_File_get_view ( EMPI_File EMPI_fh, EMPI_Offset *disp, EMPI_Datatype *et
 }
 
 
-int EMPI_File_iread_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype, MPIO_Request *r )
+int EMPI_File_iread_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, MPIO_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iread_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
+   INFO(0, "EMPI_File_iread_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2914,7 +3575,7 @@ int EMPI_File_iread_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int c
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread_at(EMPI_fh, offset, buf, count, datatype, r);
+   int error = xEMPI_File_iread_at(EMPI_fh, offset, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2930,14 +3591,14 @@ int EMPI_File_iread_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int c
 }
 
 
-int EMPI_File_iread ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Request *r )
+int EMPI_File_iread ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iread(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "EMPI_File_iread(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2948,7 +3609,7 @@ int EMPI_File_iread ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype dat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread(EMPI_fh, buf, count, datatype, r);
+   int error = xEMPI_File_iread(EMPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2964,14 +3625,14 @@ int EMPI_File_iread ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype dat
 }
 
 
-int EMPI_File_iread_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Request *r )
+int EMPI_File_iread_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iread_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "EMPI_File_iread_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2982,7 +3643,7 @@ int EMPI_File_iread_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread_shared(EMPI_fh, buf, count, datatype, r);
+   int error = xEMPI_File_iread_shared(EMPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2998,14 +3659,14 @@ int EMPI_File_iread_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
 }
 
 
-int EMPI_File_iwrite_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype, MPIO_Request *r )
+int EMPI_File_iwrite_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, MPIO_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iwrite_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
+   INFO(0, "EMPI_File_iwrite_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3016,7 +3677,7 @@ int EMPI_File_iwrite_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite_at(EMPI_fh, offset, buf, count, datatype, r);
+   int error = xEMPI_File_iwrite_at(EMPI_fh, offset, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3032,14 +3693,14 @@ int EMPI_File_iwrite_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int 
 }
 
 
-int EMPI_File_iwrite ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Request *r )
+int EMPI_File_iwrite ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iwrite(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "EMPI_File_iwrite(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3050,7 +3711,7 @@ int EMPI_File_iwrite ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype da
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite(EMPI_fh, buf, count, datatype, r);
+   int error = xEMPI_File_iwrite(EMPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3066,14 +3727,14 @@ int EMPI_File_iwrite ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype da
 }
 
 
-int EMPI_File_iwrite_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, MPIO_Request *r )
+int EMPI_File_iwrite_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, MPIO_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iwrite_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "EMPI_File_iwrite_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3084,7 +3745,7 @@ int EMPI_File_iwrite_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite_shared(EMPI_fh, buf, count, datatype, r);
+   int error = xEMPI_File_iwrite_shared(EMPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3160,14 +3821,14 @@ int EMPI_File_preallocate ( EMPI_File EMPI_fh, EMPI_Offset size )
 }
 
 
-int EMPI_File_read_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype )
+int EMPI_File_read_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_all_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
+   INFO(0, "EMPI_File_read_all_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3194,21 +3855,21 @@ int EMPI_File_read_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Dat
 }
 
 
-int EMPI_File_read_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
+int EMPI_File_read_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, status);
+   INFO(0, "EMPI_File_read_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_all_end(EMPI_fh, buf, status);
+   int error = xEMPI_File_read_all_end(EMPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3224,14 +3885,14 @@ int EMPI_File_read_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
 }
 
 
-int EMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_all(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_read_all(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3242,7 +3903,7 @@ int EMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_all(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_read_all(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3258,14 +3919,14 @@ int EMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype 
 }
 
 
-int EMPI_File_read_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype )
+int EMPI_File_read_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at_all_begin(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype));
+   INFO(0, "EMPI_File_read_at_all_begin(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3292,21 +3953,21 @@ int EMPI_File_read_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *b
 }
 
 
-int EMPI_File_read_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
+int EMPI_File_read_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, status);
+   INFO(0, "EMPI_File_read_at_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all_end(EMPI_fh, buf, status);
+   int error = xEMPI_File_read_at_all_end(EMPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3321,14 +3982,14 @@ int EMPI_File_read_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *statu
    return error;
 }
 
-int EMPI_File_read_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_read_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at_all(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_read_at_all(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3339,7 +4000,7 @@ int EMPI_File_read_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, in
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all(EMPI_fh, offset, buf, count, datatype, status);
+   int error = xEMPI_File_read_at_all(EMPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3355,14 +4016,14 @@ int EMPI_File_read_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, in
 }
 
 
-int EMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_read_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3373,7 +4034,7 @@ int EMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int co
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at(EMPI_fh, offset, buf, count, datatype, status);
+   int error = xEMPI_File_read_at(EMPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3389,14 +4050,14 @@ int EMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int co
 }
 
 
-int EMPI_File_read ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_read ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_read(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3407,7 +4068,7 @@ int EMPI_File_read ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_read(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3423,14 +4084,14 @@ int EMPI_File_read ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype data
 }
 
 
-int EMPI_File_read_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype )
+int EMPI_File_read_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_ordered_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
+   INFO(0, "EMPI_File_read_ordered_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3457,21 +4118,21 @@ int EMPI_File_read_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI
 }
 
 
-int EMPI_File_read_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
+int EMPI_File_read_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_ordered_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, status);
+   INFO(0, "EMPI_File_read_ordered_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered_end(EMPI_fh, buf, status);
+   int error = xEMPI_File_read_ordered_end(EMPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3487,14 +4148,14 @@ int EMPI_File_read_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *stat
 }
 
 
-int EMPI_File_read_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_read_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_ordered(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_read_ordered(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3505,7 +4166,7 @@ int EMPI_File_read_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_read_ordered(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3521,14 +4182,14 @@ int EMPI_File_read_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
 }
 
 
-int EMPI_File_read_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_read_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_read_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3539,7 +4200,7 @@ int EMPI_File_read_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Dataty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_shared(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_read_shared(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3800,14 +4461,14 @@ int EMPI_File_sync ( EMPI_File EMPI_fh )
 }
 
 
-int EMPI_File_write_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype )
+int EMPI_File_write_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_all_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
+   INFO(0, "EMPI_File_write_all_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3834,21 +4495,21 @@ int EMPI_File_write_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Da
 }
 
 
-int EMPI_File_write_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
+int EMPI_File_write_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, status);
+   INFO(0, "EMPI_File_write_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_all_end(EMPI_fh, buf, status);
+   int error = xEMPI_File_write_all_end(EMPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3864,14 +4525,14 @@ int EMPI_File_write_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status 
 }
 
 
-int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_all(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_write_all(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3882,7 +4543,7 @@ int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_all(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_write_all(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3898,14 +4559,14 @@ int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype
 }
 
 
-int EMPI_File_write_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype )
+int EMPI_File_write_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at_all_begin(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype));
+   INFO(0, "EMPI_File_write_at_all_begin(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3932,21 +4593,21 @@ int EMPI_File_write_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *
 }
 
 
-int EMPI_File_write_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
+int EMPI_File_write_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, status);
+   INFO(0, "EMPI_File_write_at_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all_end(EMPI_fh, buf, status);
+   int error = xEMPI_File_write_at_all_end(EMPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3962,14 +4623,14 @@ int EMPI_File_write_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *stat
 }
 
 
-int EMPI_File_write_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_write_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at_all(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_write_at_all(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3980,7 +4641,7 @@ int EMPI_File_write_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, i
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all(EMPI_fh, offset, buf, count, datatype, status);
+   int error = xEMPI_File_write_at_all(EMPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3996,14 +4657,14 @@ int EMPI_File_write_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, i
 }
 
 
-int EMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_write_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4014,7 +4675,7 @@ int EMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int c
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at(EMPI_fh, offset, buf, count, datatype, status);
+   int error = xEMPI_File_write_at(EMPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4030,14 +4691,14 @@ int EMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int c
 }
 
 
-int EMPI_File_write ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_write ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_write(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4048,7 +4709,7 @@ int EMPI_File_write ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype dat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_write(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4064,14 +4725,14 @@ int EMPI_File_write ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype dat
 }
 
 
-int EMPI_File_write_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype )
+int EMPI_File_write_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_ordered_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
+   INFO(0, "EMPI_File_write_ordered_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4098,21 +4759,21 @@ int EMPI_File_write_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMP
 }
 
 
-int EMPI_File_write_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *status )
+int EMPI_File_write_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_ordered_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, status);
+   INFO(0, "EMPI_File_write_ordered_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered_end(EMPI_fh, buf, status);
+   int error = xEMPI_File_write_ordered_end(EMPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4128,14 +4789,14 @@ int EMPI_File_write_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *sta
 }
 
 
-int EMPI_File_write_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_write_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_ordered(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_write_ordered(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4146,7 +4807,7 @@ int EMPI_File_write_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_write_ordered(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4162,14 +4823,14 @@ int EMPI_File_write_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Data
 }
 
 
-int EMPI_File_write_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype datatype, EMPI_Status *status )
+int EMPI_File_write_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Status *status=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), status);
+   INFO(0, "EMPI_File_write_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4180,7 +4841,7 @@ int EMPI_File_write_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_shared(EMPI_fh, buf, count, datatype, status);
+   int error = xEMPI_File_write_shared(EMPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4227,75 +4888,6 @@ int EMPI_Free_mem ( void *base )
 }
 
 
-int EMPI_Gather ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Gather(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Gather(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_GATHER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Gather failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Gatherv ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *displs, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Gatherv(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *displs=%p, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Gatherv(sendbuf, sendcnt, sendtype, recvbuf, recvcnts, displs, recvtype, root, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_GATHER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Gatherv failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
 
 int EMPI_Get_address ( void *location, EMPI_Aint *address )
 {
@@ -4327,14 +4919,14 @@ int EMPI_Get_address ( void *location, EMPI_Aint *address )
 }
 
 
-int EMPI_Get_count ( EMPI_Status *status, EMPI_Datatype datatype, int *count )
+int EMPI_Get_count ( EMPI_Status *s, EMPI_Datatype type, int *count )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_count(EMPI_Status *status=%p, EMPI_Datatype datatype=%s, int *count=%p)", status, type_to_string(datatype), count);
+   INFO(0, "EMPI_Get_count(EMPI_Status *s=%p, EMPI_Datatype type=%s, int *count=%p)", s, type_to_string(datatype), count);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4345,7 +4937,7 @@ int EMPI_Get_count ( EMPI_Status *status, EMPI_Datatype datatype, int *count )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_count(status, datatype, count);
+   int error = xEMPI_Get_count(status, type, count);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4361,14 +4953,14 @@ int EMPI_Get_count ( EMPI_Status *status, EMPI_Datatype datatype, int *count )
 }
 
 
-int EMPI_Get_elements ( EMPI_Status *status, EMPI_Datatype datatype, int *elements )
+int EMPI_Get_elements ( EMPI_Status *s, EMPI_Datatype type, int *elements )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_elements(EMPI_Status *status=%p, EMPI_Datatype datatype=%s, int *elements=%p)", status, type_to_string(datatype), elements);
+   INFO(0, "EMPI_Get_elements(EMPI_Status *s=%p, EMPI_Datatype type=%s, int *elements=%p)", s, type_to_string(datatype), elements);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4379,7 +4971,7 @@ int EMPI_Get_elements ( EMPI_Status *status, EMPI_Datatype datatype, int *elemen
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_elements(status, datatype, elements);
+   int error = xEMPI_Get_elements(status, type, elements);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4430,34 +5022,6 @@ int EMPI_Get ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatyp
 }
 
 
-int EMPI_Get_processor_name ( char *name, int *resultlen )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_processor_name(char *name=%p, int *resultlen=%p)", name, resultlen);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Get_processor_name(name, resultlen);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get_processor_name failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Get_version ( int *version, int *subversion )
@@ -4940,34 +5504,6 @@ int EMPI_Group_range_excl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *ne
 }
 
 
-int EMPI_Group_range_incl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_range_incl(EMPI_Group g=%s, int n=%d, int ranges[][3]=%p, EMPI_Group *newgroup=%p)", group_to_string(g), n, ranges, newgroup);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Group_range_incl(g, n, ranges, newgroup);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_range_incl failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Group_rank ( EMPI_Group g, int *rank )
@@ -5090,39 +5626,6 @@ int EMPI_Group_union ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgrou
    return error;
 }
 
-
-int EMPI_Ibsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Ibsend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Ibsend(buf, count, datatype, dest, tag, comm, r);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_IBSEND, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Ibsend failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Info_create ( EMPI_Info *info )
@@ -5396,35 +5899,6 @@ int EMPI_Info_set ( EMPI_Info info, char *key, char *value )
 }
 
 
-int EMPI_Initialized ( int *flag )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Initialized(int *flag=%p)", flag);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Initialized(flag);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Initialized failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
 
 int EMPI_Init_thread ( int *argc, char ***argv, int required, int *provided )
 {
@@ -5516,21 +5990,21 @@ int EMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracom
 }
 
 
-int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *status )
+int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Iprobe(int source=%d, int tag=%d, EMPI_Comm comm=%s, int *flag=%p, EMPI_Status *status=%p)", source, tag, comm_to_string(comm), flag, status);
+   INFO(0, "EMPI_Iprobe(int source=%d, int tag=%d, EMPI_Comm comm=%s, int *flag=%p, EMPI_Status *s=%p)", source, tag, comm_to_string(comm), flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Iprobe(source, tag, comm, flag, status);
+   int error = xEMPI_Iprobe(source, tag, comm, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5546,14 +6020,16 @@ int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *s
 }
 
 
-int EMPI_Irecv ( void *buf, int count, EMPI_Datatype datatype, int source, int tag, EMPI_Comm comm, EMPI_Request *r )
+
+
+int EMPI_Issend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Irecv(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
+   INFO(0, "EMPI_Issend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5564,109 +6040,7 @@ int EMPI_Irecv ( void *buf, int count, EMPI_Datatype datatype, int source, int t
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Irecv(buf, count, datatype, source, tag, comm, r);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_IRECV, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Irecv failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Irsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Irsend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Irsend(buf, count, datatype, dest, tag, comm, r);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_IRSEND, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Irsend failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Isend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Isend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Isend(buf, count, datatype, dest, tag, comm, r);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_ISEND, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Isend failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Issend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Issend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Issend(buf, count, datatype, dest, tag, comm, r);
+   int error = xEMPI_Issend(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5922,14 +6296,14 @@ int EMPI_Op_free ( EMPI_Op *op )
 }
 
 
-int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype datatype, void *outbuf, EMPI_Aint outcount, EMPI_Aint *position )
+int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype type, void *outbuf, EMPI_Aint outcount, EMPI_Aint *position )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack_external(char *datarep=%p, void *inbuf=%p, int incount=%d, EMPI_Datatype datatype=%s, void *outbuf=%p, EMPI_Aint outcount=%p, EMPI_Aint *position=%p)", datarep, inbuf, incount, type_to_string(datatype), outbuf, (void *) outcount, position);
+   INFO(0, "EMPI_Pack_external(char *datarep=%p, void *inbuf=%p, int incount=%d, EMPI_Datatype type=%s, void *outbuf=%p, EMPI_Aint outcount=%p, EMPI_Aint *position=%p)", datarep, inbuf, incount, type_to_string(datatype), outbuf, (void *) outcount, position);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5940,7 +6314,7 @@ int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack_external(datarep, inbuf, incount, datatype, outbuf, outcount, position);
+   int error = xEMPI_Pack_external(datarep, inbuf, incount, type, outbuf, outcount, position);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5956,14 +6330,14 @@ int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype 
 }
 
 
-int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype datatype, EMPI_Aint *size )
+int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype type, EMPI_Aint *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack_external_size(char *datarep=%p, int incount=%d, EMPI_Datatype datatype=%s, EMPI_Aint *size=%p)", datarep, incount, type_to_string(datatype), size);
+   INFO(0, "EMPI_Pack_external_size(char *datarep=%p, int incount=%d, EMPI_Datatype type=%s, EMPI_Aint *size=%p)", datarep, incount, type_to_string(datatype), size);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5974,7 +6348,7 @@ int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype datatype
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack_external_size(datarep, incount, datatype, size);
+   int error = xEMPI_Pack_external_size(datarep, incount, type, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5990,14 +6364,14 @@ int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype datatype
 }
 
 
-int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype datatype, void *outbuf, int outcount, int *position, EMPI_Comm comm )
+int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype type, void *outbuf, int outcount, int *position, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack(void *inbuf=%p, int incount=%d, EMPI_Datatype datatype=%s, void *outbuf=%p, int outcount=%d, int *position=%p, EMPI_Comm comm=%s)", inbuf, incount, type_to_string(datatype), outbuf, outcount, position, comm_to_string(comm));
+   INFO(0, "EMPI_Pack(void *inbuf=%p, int incount=%d, EMPI_Datatype type=%s, void *outbuf=%p, int outcount=%d, int *position=%p, EMPI_Comm comm=%s)", inbuf, incount, type_to_string(datatype), outbuf, outcount, position, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6008,7 +6382,7 @@ int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype datatype, void *outbuf, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack(inbuf, incount, datatype, outbuf, outcount, position, comm);
+   int error = xEMPI_Pack(inbuf, incount, type, outbuf, outcount, position, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6024,14 +6398,14 @@ int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype datatype, void *outbuf, 
 }
 
 
-int EMPI_Pack_size ( int incount, EMPI_Datatype datatype, EMPI_Comm comm, int *size )
+int EMPI_Pack_size ( int incount, EMPI_Datatype type, EMPI_Comm comm, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack_size(int incount=%d, EMPI_Datatype datatype=%s, EMPI_Comm comm=%s, int *size=%p)", incount, type_to_string(datatype), comm_to_string(comm), size);
+   INFO(0, "EMPI_Pack_size(int incount=%d, EMPI_Datatype type=%s, EMPI_Comm comm=%s, int *size=%p)", incount, type_to_string(datatype), comm_to_string(comm), size);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6042,7 +6416,7 @@ int EMPI_Pack_size ( int incount, EMPI_Datatype datatype, EMPI_Comm comm, int *s
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack_size(incount, datatype, comm, size);
+   int error = xEMPI_Pack_size(incount, type, comm, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6058,21 +6432,21 @@ int EMPI_Pack_size ( int incount, EMPI_Datatype datatype, EMPI_Comm comm, int *s
 }
 
 
-int EMPI_Probe ( int source, int tag, EMPI_Comm comm, EMPI_Status *status )
+int EMPI_Probe ( int source, int tag, EMPI_Comm comm, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Probe(int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Status *status=%p)", source, tag, comm_to_string(comm), status);
+   INFO(0, "EMPI_Probe(int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", source, tag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Probe(source, tag, comm, status);
+   int error = xEMPI_Probe(source, tag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6183,14 +6557,14 @@ int EMPI_Query_thread ( int *provided )
 }
 
 
-int EMPI_Recv ( void *buf, int count, EMPI_Datatype datatype, int source, int tag, EMPI_Comm comm, EMPI_Status *status )
+int EMPI_Recv ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Recv(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Status *status=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), status);
+   INFO(0, "EMPI_Recv(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6201,7 +6575,7 @@ int EMPI_Recv ( void *buf, int count, EMPI_Datatype datatype, int source, int ta
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Recv(buf, count, datatype, source, tag, comm, status);
+   int error = xEMPI_Recv(buf, count, type, source, tag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6217,14 +6591,14 @@ int EMPI_Recv ( void *buf, int count, EMPI_Datatype datatype, int source, int ta
 }
 
 
-int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype datatype, int source, int tag, EMPI_Comm comm, EMPI_Request *r )
+int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Recv_init(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
+   INFO(0, "EMPI_Recv_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6235,7 +6609,7 @@ int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype datatype, int source, i
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Recv_init(buf, count, datatype, source, tag, comm, r);
+   int error = xEMPI_Recv_init(buf, count, type, source, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6251,48 +6625,15 @@ int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype datatype, int source, i
 }
 
 
-int EMPI_Reduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype, EMPI_Op op, int root, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Op op=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), root, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Reduce(sendbuf, recvbuf, count, datatype, op, root, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_REDUCE, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Reduce failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
 /*
-int EMPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, EMPI_Datatype datatype, EMPI_Op op )
+int EMPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, EMPI_Datatype type, EMPI_Op op )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce_local(void *inbuf=%p, void *inoutbuf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Op op=%s)", inbuf, inoutbuf, count, type_to_string(datatype), op_to_string(op));
+   INFO(0, "EMPI_Reduce_local(void *inbuf=%p, void *inoutbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s)", inbuf, inoutbuf, count, type_to_string(datatype), op_to_string(op));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6303,7 +6644,7 @@ int EMPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, EMPI_Datatype da
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce_local(inbuf, inoutbuf, count, datatype, op);
+   int error = xEMPI_Reduce_local(inbuf, inoutbuf, count, type, op);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6319,14 +6660,14 @@ int EMPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, EMPI_Datatype da
 }
 */
 /*
-int EMPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, EMPI_Datatype datatype, EMPI_Op op, EMPI_Comm comm )
+int EMPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce_scatter_block(void *sendbuf=%p, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype datatype=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, recvcount, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "EMPI_Reduce_scatter_block(void *sendbuf=%p, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, recvcount, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6337,7 +6678,7 @@ int EMPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, EMP
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce_scatter_block(sendbuf, recvbuf, recvcount, datatype, op, comm);
+   int error = xEMPI_Reduce_scatter_block(sendbuf, recvbuf, recvcount, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6353,14 +6694,14 @@ int EMPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, EMP
 }
 */
 
-int EMPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, EMPI_Datatype datatype, EMPI_Op op, EMPI_Comm comm )
+int EMPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce_scatter(void *sendbuf=%p, void *recvbuf=%p, int *recvcnts=%p, EMPI_Datatype datatype=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, recvcnts, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "EMPI_Reduce_scatter(void *sendbuf=%p, void *recvbuf=%p, int *recvcnts=%p, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, recvcnts, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6371,7 +6712,7 @@ int EMPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, EMPI_Data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce_scatter(sendbuf, recvbuf, recvcnts, datatype, op, comm);
+   int error = xEMPI_Reduce_scatter(sendbuf, recvbuf, recvcnts, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6417,51 +6758,22 @@ int EMPI_Register_datarep ( char *name, EMPI_Datarep_conversion_function *read_c
 }
 
 
-int EMPI_Request_free ( EMPI_Request *r )
+
+int EMPI_Request_get_status ( EMPI_Request r, int *flag, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Request_free(EMPI_Request *r=%p)", r);
+   INFO(0, "EMPI_Request_get_status(EMPI_Request r=%s, int *flag=%p, EMPI_Status *s=%p)", request_to_string(r), flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Request_free(r);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Request_free failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Request_get_status ( EMPI_Request r, int *flag, EMPI_Status *status )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Request_get_status(EMPI_Request r=%s, int *flag=%p, EMPI_Status *status=%p)", request_to_string(r), flag, status);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Request_get_status(r, flag, status);
+   int error = xEMPI_Request_get_status(r, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6477,14 +6789,16 @@ int EMPI_Request_get_status ( EMPI_Request r, int *flag, EMPI_Status *status )
 }
 
 
-int EMPI_Rsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm )
+
+
+int EMPI_Rsend_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Rsend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "EMPI_Rsend_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6495,41 +6809,7 @@ int EMPI_Rsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Rsend(buf, count, datatype, dest, tag, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_RSEND, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Rsend failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Rsend_init ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Rsend_init(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Rsend_init(buf, count, datatype, dest, tag, comm, r);
+   int error = xEMPI_Rsend_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6545,14 +6825,14 @@ int EMPI_Rsend_init ( void *buf, int count, EMPI_Datatype datatype, int dest, in
 }
 
 
-int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype, EMPI_Op op, EMPI_Comm comm )
+int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Scan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype datatype=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "EMPI_Scan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6563,7 +6843,7 @@ int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Scan(sendbuf, recvbuf, count, datatype, op, comm);
+   int error = xEMPI_Scan(sendbuf, recvbuf, count, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6579,84 +6859,17 @@ int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype,
 }
 
 
-int EMPI_Scatter ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+
+
+
+int EMPI_Send_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Scatter(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Scatter(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_SCATTER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Scatter failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Scatterv(void *sendbuf=%p, int *sendcnts=%p, int *displs=%p, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnts, displs, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Scatterv(sendbuf, sendcnts, displs, sendtype, recvbuf, recvcnt, recvtype, root, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_SCATTER, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Scatterv failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Send ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Send(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "EMPI_Send_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6667,41 +6880,7 @@ int EMPI_Send ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Send(buf, count, datatype, dest, tag, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_SEND, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Send failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Send_init ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Send_init(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Send_init(buf, count, datatype, dest, tag, comm, r);
+   int error = xEMPI_Send_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6717,49 +6896,16 @@ int EMPI_Send_init ( void *buf, int count, EMPI_Datatype datatype, int dest, int
 }
 
 
-int EMPI_Sendrecv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, int dest, int sendtag, void *recvbuf, int recvcount, EMPI_Datatype recvtype, int source, int recvtag, EMPI_Comm comm, EMPI_Status *status )
+
+
+int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype type, int dest, int sendtag, int source, int recvtag, EMPI_Comm comm, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Sendrecv(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, EMPI_Comm comm=%s, EMPI_Status *status=%p)", sendbuf, sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), status);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(sendtype);
-   CHECK_TYPE(recvtype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, status);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_SEND_RECV, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Sendrecv failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype datatype, int dest, int sendtag, int source, int recvtag, EMPI_Comm comm, EMPI_Status *status )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Sendrecv_replace(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int sendtag=%d, int source=%d, int recvtag=%d, EMPI_Comm comm=%s, EMPI_Status *status=%p)", buf, count, type_to_string(datatype), dest, sendtag, source, recvtag, comm_to_string(comm), status);
+   INFO(0, "EMPI_Sendrecv_replace(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int sendtag=%d, int source=%d, int recvtag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", buf, count, type_to_string(datatype), dest, sendtag, source, recvtag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6770,7 +6916,7 @@ int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype datatype, int de
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Sendrecv_replace(buf, count, datatype, dest, sendtag, source, recvtag, comm, status);
+   int error = xEMPI_Sendrecv_replace(buf, count, type, dest, sendtag, source, recvtag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6786,14 +6932,16 @@ int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype datatype, int de
 }
 
 
-int EMPI_Ssend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm )
+
+
+int EMPI_Ssend_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Ssend(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "EMPI_Ssend_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6804,41 +6952,7 @@ int EMPI_Ssend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Ssend(buf, count, datatype, dest, tag, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_SSEND, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Ssend failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Ssend_init ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Ssend_init(void *buf=%p, int count=%d, EMPI_Datatype datatype=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Ssend_init(buf, count, datatype, dest, tag, comm, r);
+   int error = xEMPI_Ssend_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6914,14 +7028,14 @@ int EMPI_Start ( EMPI_Request *r )
 }
 
 
-int EMPI_Status_set_cancelled ( EMPI_Status *status, int flag )
+int EMPI_Status_set_cancelled ( EMPI_Status *s, int flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Status_set_cancelled(EMPI_Status *status=%p, int flag=%d)", status, flag);
+   INFO(0, "EMPI_Status_set_cancelled(EMPI_Status *s=%p, int flag=%d)", s, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6944,14 +7058,14 @@ int EMPI_Status_set_cancelled ( EMPI_Status *status, int flag )
 }
 
 
-int EMPI_Status_set_elements ( EMPI_Status *status, EMPI_Datatype datatype, int count )
+int EMPI_Status_set_elements ( EMPI_Status *s, EMPI_Datatype type, int count )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Status_set_elements(EMPI_Status *status=%p, EMPI_Datatype datatype=%s, int count=%d)", status, type_to_string(datatype), count);
+   INFO(0, "EMPI_Status_set_elements(EMPI_Status *s=%p, EMPI_Datatype type=%s, int count=%d)", s, type_to_string(datatype), count);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6962,7 +7076,7 @@ int EMPI_Status_set_elements ( EMPI_Status *status, EMPI_Datatype datatype, int 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Status_set_elements(status, datatype, count);
+   int error = xEMPI_Status_set_elements(status, type, count);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7008,21 +7122,21 @@ int EMPI_Testall ( int count, EMPI_Request array_of_requests[], int *flag, EMPI_
 }
 
 
-int EMPI_Testany ( int count, EMPI_Request array_of_requests[], int *index, int *flag, EMPI_Status *status )
+int EMPI_Testany ( int count, EMPI_Request array_of_requests[], int *index, int *flag, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Testany(int count=%d, EMPI_Request array_of_requests[]=%p, int *index=%p, int *flag=%p, EMPI_Status *status=%p)", count, array_of_requests, index, flag, status);
+   INFO(0, "EMPI_Testany(int count=%d, EMPI_Request array_of_requests[]=%p, int *index=%p, int *flag=%p, EMPI_Status *s=%p)", count, array_of_requests, index, flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Testany(count, array_of_requests, index, flag, status);
+   int error = xEMPI_Testany(count, array_of_requests, index, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7038,14 +7152,14 @@ int EMPI_Testany ( int count, EMPI_Request array_of_requests[], int *index, int 
 }
 
 
-int EMPI_Test_cancelled ( EMPI_Status *status, int *flag )
+int EMPI_Test_cancelled ( EMPI_Status *s, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Test_cancelled(EMPI_Status *status=%p, int *flag=%p)", status, flag);
+   INFO(0, "EMPI_Test_cancelled(EMPI_Status *s=%p, int *flag=%p)", s, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7068,21 +7182,21 @@ int EMPI_Test_cancelled ( EMPI_Status *status, int *flag )
 }
 
 
-int EMPI_Test ( EMPI_Request *r, int *flag, EMPI_Status *status )
+int EMPI_Test ( EMPI_Request *r, int *flag, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Test(EMPI_Request *r=%p, int *flag=%p, EMPI_Status *status=%p)", r, flag, status);
+   INFO(0, "EMPI_Test(EMPI_Request *r=%p, int *flag=%p, EMPI_Status *s=%p)", r, flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Test(r, flag, status);
+   int error = xEMPI_Test(r, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7536,14 +7650,14 @@ int EMPI_Type_delete_attr ( EMPI_Datatype type, int type_keyval )
 }
 
 
-int EMPI_Type_dup ( EMPI_Datatype datatype, EMPI_Datatype *newtype )
+int EMPI_Type_dup ( EMPI_Datatype type, EMPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_dup(EMPI_Datatype datatype=%s, EMPI_Datatype *newtype=%p)", type_to_string(datatype), newtype);
+   INFO(0, "EMPI_Type_dup(EMPI_Datatype type=%s, EMPI_Datatype *newtype=%p)", type_to_string(datatype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7571,14 +7685,14 @@ int EMPI_Type_dup ( EMPI_Datatype datatype, EMPI_Datatype *newtype )
 }
 
 
-int EMPI_Type_extent ( EMPI_Datatype datatype, EMPI_Aint *extent )
+int EMPI_Type_extent ( EMPI_Datatype type, EMPI_Aint *extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_extent(EMPI_Datatype datatype=%s, EMPI_Aint *extent=%p)", type_to_string(datatype), extent);
+   INFO(0, "EMPI_Type_extent(EMPI_Datatype type=%s, EMPI_Aint *extent=%p)", type_to_string(datatype), extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7703,14 +7817,14 @@ int EMPI_Type_get_attr ( EMPI_Datatype type, int type_keyval, void *attribute_va
 }
 
 
-int EMPI_Type_get_contents ( EMPI_Datatype datatype, int max_integers, int max_addresses, int max_datatypes, int array_of_integers[], EMPI_Aint array_of_addresses[], EMPI_Datatype array_of_datatypes[] )
+int EMPI_Type_get_contents ( EMPI_Datatype type, int max_integers, int max_addresses, int max_datatypes, int array_of_integers[], EMPI_Aint array_of_addresses[], EMPI_Datatype array_of_datatypes[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_contents(EMPI_Datatype datatype=%s, int max_integers=%d, int max_addresses=%d, int max_datatypes=%d, int array_of_integers[]=%p, EMPI_Aint array_of_addresses[]=%p, EMPI_Datatype array_of_datatypes[]=%p)", type_to_string(datatype), max_integers, max_addresses, max_datatypes, array_of_integers, array_of_addresses, array_of_datatypes);
+   INFO(0, "EMPI_Type_get_contents(EMPI_Datatype type=%s, int max_integers=%d, int max_addresses=%d, int max_datatypes=%d, int array_of_integers[]=%p, EMPI_Aint array_of_addresses[]=%p, EMPI_Datatype array_of_datatypes[]=%p)", type_to_string(datatype), max_integers, max_addresses, max_datatypes, array_of_integers, array_of_addresses, array_of_datatypes);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7738,14 +7852,14 @@ int EMPI_Type_get_contents ( EMPI_Datatype datatype, int max_integers, int max_a
 }
 
 
-int EMPI_Type_get_envelope ( EMPI_Datatype datatype, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner )
+int EMPI_Type_get_envelope ( EMPI_Datatype type, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_envelope(EMPI_Datatype datatype=%s, int *num_integers=%p, int *num_addresses=%p, int *num_datatypes=%p, int *combiner=%p)", type_to_string(datatype), num_integers, num_addresses, num_datatypes, combiner);
+   INFO(0, "EMPI_Type_get_envelope(EMPI_Datatype type=%s, int *num_integers=%p, int *num_addresses=%p, int *num_datatypes=%p, int *combiner=%p)", type_to_string(datatype), num_integers, num_addresses, num_datatypes, combiner);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7772,14 +7886,14 @@ int EMPI_Type_get_envelope ( EMPI_Datatype datatype, int *num_integers, int *num
 }
 
 
-int EMPI_Type_get_extent ( EMPI_Datatype datatype, EMPI_Aint *lb, EMPI_Aint *extent )
+int EMPI_Type_get_extent ( EMPI_Datatype type, EMPI_Aint *lb, EMPI_Aint *extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_extent(EMPI_Datatype datatype=%s, EMPI_Aint *lb=%p, EMPI_Aint *extent=%p)", type_to_string(datatype), lb, extent);
+   INFO(0, "EMPI_Type_get_extent(EMPI_Datatype type=%s, EMPI_Aint *lb=%p, EMPI_Aint *extent=%p)", type_to_string(datatype), lb, extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7806,14 +7920,14 @@ int EMPI_Type_get_extent ( EMPI_Datatype datatype, EMPI_Aint *lb, EMPI_Aint *ext
 }
 
 
-int EMPI_Type_get_name ( EMPI_Datatype datatype, char *type_name, int *resultlen )
+int EMPI_Type_get_name ( EMPI_Datatype type, char *type_name, int *resultlen )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_name(EMPI_Datatype datatype=%s, char *type_name=%p, int *resultlen=%p)", type_to_string(datatype), type_name, resultlen);
+   INFO(0, "EMPI_Type_get_name(EMPI_Datatype type=%s, char *type_name=%p, int *resultlen=%p)", type_to_string(datatype), type_name, resultlen);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7840,14 +7954,14 @@ int EMPI_Type_get_name ( EMPI_Datatype datatype, char *type_name, int *resultlen
 }
 
 
-int EMPI_Type_get_true_extent ( EMPI_Datatype datatype, EMPI_Aint *true_lb, EMPI_Aint *true_extent )
+int EMPI_Type_get_true_extent ( EMPI_Datatype type, EMPI_Aint *true_lb, EMPI_Aint *true_extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_true_extent(EMPI_Datatype datatype=%s, EMPI_Aint *true_lb=%p, EMPI_Aint *true_extent=%p)", type_to_string(datatype), true_lb, true_extent);
+   INFO(0, "EMPI_Type_get_true_extent(EMPI_Datatype type=%s, EMPI_Aint *true_lb=%p, EMPI_Aint *true_extent=%p)", type_to_string(datatype), true_lb, true_extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7979,14 +8093,14 @@ int EMPI_Type_indexed ( int count, int blocklens[], int indices[], EMPI_Datatype
 }
 
 
-int EMPI_Type_lb ( EMPI_Datatype datatype, EMPI_Aint *displacement )
+int EMPI_Type_lb ( EMPI_Datatype type, EMPI_Aint *displacement )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_lb(EMPI_Datatype datatype=%s, EMPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
+   INFO(0, "EMPI_Type_lb(EMPI_Datatype type=%s, EMPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8115,14 +8229,14 @@ int EMPI_Type_set_name ( EMPI_Datatype type, char *type_name )
 }
 
 
-int EMPI_Type_size ( EMPI_Datatype datatype, int *size )
+int EMPI_Type_size ( EMPI_Datatype type, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_size(EMPI_Datatype datatype=%s, int *size=%p)", type_to_string(datatype), size);
+   INFO(0, "EMPI_Type_size(EMPI_Datatype type=%s, int *size=%p)", type_to_string(datatype), size);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8184,14 +8298,14 @@ int EMPI_Type_struct ( int count, int blocklens[], EMPI_Aint indices[], EMPI_Dat
 }
 
 
-int EMPI_Type_ub ( EMPI_Datatype datatype, EMPI_Aint *displacement )
+int EMPI_Type_ub ( EMPI_Datatype type, EMPI_Aint *displacement )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_ub(EMPI_Datatype datatype=%s, EMPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
+   INFO(0, "EMPI_Type_ub(EMPI_Datatype type=%s, EMPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8253,14 +8367,14 @@ int EMPI_Type_vector ( int count, int blocklength, int stride, EMPI_Datatype old
 }
 
 
-int EMPI_Unpack_external ( char *datarep, void *inbuf, EMPI_Aint insize, EMPI_Aint *position, void *outbuf, int outcount, EMPI_Datatype datatype )
+int EMPI_Unpack_external ( char *datarep, void *inbuf, EMPI_Aint insize, EMPI_Aint *position, void *outbuf, int outcount, EMPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Unpack_external(char *datarep=%p, void *inbuf=%p, EMPI_Aint insize=%p, EMPI_Aint *position=%p, void *outbuf=%p, int outcount=%d, EMPI_Datatype datatype=%s)", datarep, inbuf, (void *) insize, position, outbuf, outcount, type_to_string(datatype));
+   INFO(0, "EMPI_Unpack_external(char *datarep=%p, void *inbuf=%p, EMPI_Aint insize=%p, EMPI_Aint *position=%p, void *outbuf=%p, int outcount=%d, EMPI_Datatype type=%s)", datarep, inbuf, (void *) insize, position, outbuf, outcount, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8287,14 +8401,14 @@ int EMPI_Unpack_external ( char *datarep, void *inbuf, EMPI_Aint insize, EMPI_Ai
 }
 
 
-int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, EMPI_Datatype datatype, EMPI_Comm comm )
+int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, EMPI_Datatype type, EMPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Unpack(void *inbuf=%p, int insize=%d, int *position=%p, void *outbuf=%p, int outcount=%d, EMPI_Datatype datatype=%s, EMPI_Comm comm=%s)", inbuf, insize, position, outbuf, outcount, type_to_string(datatype), comm_to_string(comm));
+   INFO(0, "EMPI_Unpack(void *inbuf=%p, int insize=%d, int *position=%p, void *outbuf=%p, int outcount=%d, EMPI_Datatype type=%s, EMPI_Comm comm=%s)", inbuf, insize, position, outbuf, outcount, type_to_string(datatype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8305,7 +8419,7 @@ int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outc
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Unpack(inbuf, insize, position, outbuf, outcount, datatype, comm);
+   int error = xEMPI_Unpack(inbuf, insize, position, outbuf, outcount, type, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8351,55 +8465,22 @@ int EMPI_Unpublish_name ( char *service_name, EMPI_Info info, char *port_name )
 }
 
 
-int EMPI_Waitall ( int count, EMPI_Request array_of_requests[], EMPI_Status array_of_statuses[] )
+
+int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Waitall(int count=%d, EMPI_Request array_of_requests[]=%p, EMPI_Status array_of_statuses[]=%p)", count, array_of_requests, array_of_statuses);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-#ifndef IBIS_INTERCEPT
-   profile_start = profile_start_ticks();
-#endif // IBIS_INTERCEPT
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Waitall(count, array_of_requests, array_of_statuses);
-
-#if PROFILE_LEVEL > 0
-#ifndef IBIS_INTERCEPT
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_WAITALL, profile_end-profile_start);
-#endif // IBIS_INTERCEPT
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Waitall failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI_Status *status )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Waitany(int count=%d, EMPI_Request array_of_requests[]=%p, int *index=%p, EMPI_Status *status=%p)", count, array_of_requests, index, status);
+   INFO(0, "EMPI_Waitany(int count=%d, EMPI_Request array_of_requests[]=%p, int *index=%p, EMPI_Status *s=%p)", count, array_of_requests, index, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Waitany(count, array_of_requests, index, status);
+   int error = xEMPI_Waitany(count, array_of_requests, index, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8415,39 +8496,7 @@ int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI
 }
 
 
-int EMPI_Wait ( EMPI_Request *r, EMPI_Status *status )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-   EMPI_Comm comm = eEMPI_COMM_SELF;
-#endif // PROFILE_LEVEL
 
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_Wait(EMPI_Request *r=%p, EMPI_Status *status=%p)", r, status);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-   // We need a communicator to attach the statistics to.
-   comm = request_get_comm(r, EMPI_COMM_SELF);
-#endif
-
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_Wait(r, status);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_WAIT, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Wait failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int EMPI_Waitsome ( int incount, EMPI_Request array_of_requests[], int *outcount, int array_of_indices[], EMPI_Status array_of_statuses[] )
@@ -9280,5 +9329,4 @@ EMPI_Fint EMPI_Type_c2f ( EMPI_Datatype Type )
 }
 
 
-#endif
-
+#endif // if 0
