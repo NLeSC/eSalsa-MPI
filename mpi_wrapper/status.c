@@ -17,12 +17,21 @@ void set_status(EMPI_Status *s, int source, int tag, int error, datatype *type, 
    s->MPI_ERROR = error;
    s->count = count;
    s->cancelled = cancelled;
-   s->type = type;
+   s->type = type->handle;
 }
 
 void clear_status(EMPI_Status *s)
 {
-   set_status(s, EMPI_ANY_SOURCE, EMPI_ANY_TAG, EMPI_SUCCESS, EMPI_DATATYPE_NULL, 0, FALSE);
+   if (s == EMPI_STATUS_IGNORE) {
+      return;
+   }
+
+   s->MPI_SOURCE = EMPI_ANY_SOURCE;
+   s->MPI_TAG = EMPI_ANY_TAG;
+   s->MPI_ERROR = EMPI_SUCCESS;
+   s->count = 0;
+   s->cancelled = FALSE;
+   s->type = EMPI_DATATYPE_NULL;
 }
 
 void set_status_error(EMPI_Status *s, int source, int tag, int error, datatype *type)
@@ -36,7 +45,12 @@ void set_status_count(EMPI_Status *s, datatype *type, int count)
       return;
    }
 
-   s->type = type;
+   if (type != NULL) {
+      s->type = type->handle;
+   } else {
+      s->type = EMPI_DATATYPE_NULL;
+   }
+
    s->count = count;
 }
 

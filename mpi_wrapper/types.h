@@ -1,8 +1,6 @@
 #ifndef _TYPES_H_
 #define _TYPES_H_
 
-//#include "flags.h"
-
 typedef struct s_msg_buffer message_buffer;
 typedef struct s_communicator communicator;
 typedef struct s_request request;

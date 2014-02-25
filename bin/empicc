@@ -1,0 +1,3 @@
+#!/bin/bash
+echo gcc -I/home/jason/Workspace/eSalsa-MPI/includes/ $@
+gcc -I/home/jason/Workspace/eSalsa-MPI/includes/ $@

@@ -98,7 +98,7 @@ static int unpack_message(void *buf, int count, datatype *t, communicator *c,
    }
 */
 
-   error = TRANSLATE_ERROR(MPI_Unpack(m->data_buffer, m->header.bytes, &position, buf,
+   error = TRANSLATE_ERROR(PMPI_Unpack(m->data_buffer, m->header.bytes, &position, buf,
                         count, t->type, c->comm));
 
    if (error == EMPI_SUCCESS) {
@@ -233,42 +233,6 @@ static int send_message(message_buffer *m)
    return EMPI_SUCCESS;
 }
 
-/*
-static int receive_opcode(int* opcode, int *error, int blocking)
-{
-   DEBUG(1, "Receiving from socket (blocking=%d)", blocking);
-
-   int result = wa_wait_for_data(blocking);
-
-   DEBUG(1, "Result of receive: result=%d error=%d", result, *error);
-
-   if (result == -1) {
-      *error = MPI_ERR_INTERN;
-      return 0;
-   }
-
-   if (result == 0) {
-      if (blocking == 1) {
-         *error = MPI_ERR_INTERN;
-      } else {
-         *error = MPI_SUCCESS;
-      }
-      return 0;
-   }
-
-   result = wa_receivefully((unsigned char *) opcode, 4);
-
-   if (result != CONNECT_OK) {
-      ERROR(1, "Failed to receive message opcode!");
-      *error = MPI_ERR_INTERN;
-      return 0;
-   }
-
-   *opcode = ntohl(*opcode);
-   return 1;
-}
-*/
-
 static int receive_opcode(int* opcode, int *error, int blocking)
 {
    DEBUG(1, "Receiving from socket (blocking=%d)", blocking);
@@ -400,7 +364,7 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
    int bytes, error;
 
    // FIXME ??
-   error = TRANSLATE_ERROR(MPI_Pack_size(count, t->type, c->comm, &bytes));
+   error = TRANSLATE_ERROR(PMPI_Pack_size(count, t->type, c->comm, &bytes));
 
    if (error != EMPI_SUCCESS) {
       return error;
@@ -415,7 +379,7 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
    bytes = 0;
 
    // FIXME ??
-   error = TRANSLATE_ERROR(MPI_Pack(buf, count, t->type, m->data_buffer, m->data_buffer_size, &bytes, c->comm));
+   error = TRANSLATE_ERROR(PMPI_Pack(buf, count, t->type, m->data_buffer, m->data_buffer_size, &bytes, c->comm));
 
    write_message_header(m, opcode, c->handle, c->global_rank, dest, tag, count, bytes);
 
@@ -441,74 +405,6 @@ int messaging_bcast_receive(void *buf, int count, datatype *t, int root, communi
 {
    return messaging_receive(buf, count, t, root, BCAST_TAG, EMPI_STATUS_IGNORE, c);
 }
-
-/*
-int messaging_allreduce(void* buf, int count, MPI_Datatype datatype, communicator* c)
-{
-   return do_send(OPCODE_COLLECTIVE_ALLREDUCE, buf, count, datatype, 0, ALLREDUCE_TAG, c);
-}
-
-int messaging_allreduce_receive(void *buf, int count, MPI_Datatype datatype, communicator* c)
-{
-   return messaging_receive(buf, count, datatype, 0, ALLREDUCE_TAG, MPI_STATUS_IGNORE, c);
-}
-*/
-
-/*
-int messaging_probe_receive_request(request *r)
-{
-   int error = MPI_SUCCESS;
-   message_buffer *m;
-
-   // Check if the request was already completed.
-   if (r->flags & REQUEST_FLAG_COMPLETED) {
-      return 1;
-   }
-
-   // We now need to see if we can fullfill the waiting
-   // receive request. There are 3 ways to do this:
-   //
-   // 1. Check to see if we have any pending messages which match.
-   // 2. Check if the local MPI can fullfill the request.
-   // 3. Check if the wide area connection can fullfill the request.
-   //
-   // NOTE: step 2 is only performed if the request refers to a MIXED
-   //       operation, i.e., a receive from an communicator that contains
-   //       both local and remote (wa) processes.
-   // If the request is fullfilled, TRUE is returned, FALSE otherwise.
-
-   m = find_pending_message(r->c, r->source_or_dest, r->tag);
-
-   if (m == NULL) {
-      m = probe_wa(r->c, r->source_or_dest, r->tag, 0, &error);
-   }
-
-   if (m != NULL) {
-      r->flags |= REQUEST_FLAG_COMPLETED;
-      r->message = m;
-//      r->error = unpack_message(r->buf, r->count, r->type, r->c->comm, m, status);
-      return 1;
-
-   } else if (error != MPI_SUCCESS) {
-      // Something happened in probe_wa!
-      r->flags |= REQUEST_FLAG_COMPLETED;
-      r->error = error;
-      return 1;
-   }
-
-   return 0;
-}
-
-void messaging_complete_receive_request(request *r, MPI_Status *status)
-{
-   // Check if we still need to receive a message.
-   if (!(r->flags & REQUEST_FLAG_COMPLETED)) {
-      r->error = messaging_receive(r->buf, r->count, r->type, r->source_or_dest, r->tag, status, r->comm);
-   } else {
-      r->error = unpack_message(r->buf, r->count, r->type, r->c->comm, r->message, status);
-   }
-}
-*/
 
 int messaging_receive(void *buf, int count, datatype *t,
               int source, int tag, EMPI_Status *status, communicator* c)

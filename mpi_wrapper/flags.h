@@ -51,4 +51,7 @@
 // Maximum number of operations that can be created (at once, for each individual process).
 #define MAX_OPERATIONS 256
 
+// Maximum number of datatypes that can be created (at once, for each individual process).
+#define MAX_DATATYPES 256
+
 #endif

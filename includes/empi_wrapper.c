@@ -1,10 +1,11 @@
 #include "flags.h"
 
 #include "mpi.h"
+
 #include "profiling.h"
 #include "logging.h"
 
-#include "xempi.h"
+#include "empi.h"
 
 /* ------------------------ Misc. utility function ------------------------ */
 
@@ -16,7 +17,7 @@ int MPI_Init ( int *argc, char ***argv )
    INFO(0, "MPI_Init(int *argc=%p, char ***argv=%p)", argc, argv);
 #endif // TRACE_CALLS
 
-   int error = xEMPI_Init(argc, argv);
+   int error = EMPI_Init(argc, argv);
 
 #ifdef TRACE_ERRORS
    if (error != MPI_SUCCESS) {
@@ -43,7 +44,7 @@ int MPI_Initialized ( int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Initialized(flag);
+   int error = EMPI_Initialized(flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -64,7 +65,7 @@ int MPI_Abort ( MPI_Comm comm, int errorcode )
    INFO(0, "MPI_Abort(MPI_Comm comm=%s, int errorcode=%d)", comm_to_string(comm), errorcode);
 #endif // TRACE_CALLS
 
-   int error = xEMPI_Abort(comm, errorcode);
+   int error = EMPI_Abort(comm, errorcode);
 
 #if PROFILE_LEVEL > 0
    profile_finalize();
@@ -84,7 +85,7 @@ int MPI_Finalize ( void )
    INFO(0, "MPI_Finalize()");
 #endif // TRACE_CALLS
 
-   int error = xEMPI_Finalize();
+   int error = EMPI_Finalize();
 
 #if PROFILE_LEVEL > 0
    profile_finalize();
@@ -112,7 +113,7 @@ int MPI_Finalized ( int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Finalized(flag);
+   int error = EMPI_Finalized(flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -141,7 +142,7 @@ double MPI_Wtime ( void )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   double result = xEMPI_Wtime();
+   double result = EMPI_Wtime();
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -165,7 +166,7 @@ int MPI_Get_processor_name ( char *name, int *resultlen )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_processor_name(name, resultlen);
+   int error = EMPI_Get_processor_name(name, resultlen);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -194,7 +195,7 @@ int MPI_Error_string ( int errorcode, char *string, int *resultlen )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Error_string(errorcode, string, resultlen);
+   int error = EMPI_Error_string(errorcode, string, resultlen);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -228,7 +229,7 @@ int MPI_Comm_create ( MPI_Comm comm, MPI_Group g, MPI_Comm *newcomm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_create(comm, g, newcomm);
+   int error = EMPI_Comm_create(comm, g, newcomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -257,7 +258,7 @@ int MPI_Comm_dup ( MPI_Comm comm, MPI_Comm *newcomm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_dup(comm, newcomm);
+   int error = EMPI_Comm_dup(comm, newcomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -287,7 +288,7 @@ int MPI_Comm_free ( MPI_Comm *comm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_free(comm);
+   int error = EMPI_Comm_free(comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -316,7 +317,7 @@ int MPI_Comm_group ( MPI_Comm comm, MPI_Group *g )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_group(comm, g);
+   int error = EMPI_Comm_group(comm, g);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -346,7 +347,7 @@ int MPI_Comm_rank ( MPI_Comm comm, int *rank )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_rank(comm, rank);
+   int error = EMPI_Comm_rank(comm, rank);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -376,7 +377,7 @@ int MPI_Comm_size ( MPI_Comm comm, int *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_size(comm, size);
+   int error = EMPI_Comm_size(comm, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -406,7 +407,7 @@ int MPI_Comm_split ( MPI_Comm comm, int color, int key, MPI_Comm *newcomm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_split(comm, color, key, newcomm);
+   int error = EMPI_Comm_split(comm, color, key, newcomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -435,7 +436,7 @@ int MPI_Group_range_incl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgr
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_range_incl(g, n, ranges, newgroup);
+   int error = EMPI_Group_range_incl(g, n, ranges, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -464,7 +465,7 @@ int MPI_Group_range_excl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgr
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_range_excl(g, n, ranges, newgroup);
+   int error = EMPI_Group_range_excl(g, n, ranges, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -494,7 +495,7 @@ int MPI_Group_translate_ranks ( MPI_Group group1, int n, int *ranks1, MPI_Group 
 #endif // PROFILE_LEVEL
 
 
-   int error = xEMPI_Group_translate_ranks(group1, n, ranks1, group2, ranks2);
+   int error = EMPI_Group_translate_ranks(group1, n, ranks1, group2, ranks2);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -524,7 +525,7 @@ int MPI_Group_union ( MPI_Group group1, MPI_Group group2, MPI_Group *newgroup )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_union(group1, group2, newgroup);
+   int error = EMPI_Group_union(group1, group2, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -553,7 +554,7 @@ int MPI_Group_incl ( MPI_Group g, int n, int *ranks, MPI_Group *newgroup )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_incl(g, n, ranks, newgroup);
+   int error = EMPI_Group_incl(g, n, ranks, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -590,7 +591,7 @@ int MPI_Allgather ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *r
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
+   int error = EMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -625,7 +626,7 @@ int MPI_Allgatherv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
+   int error = EMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -658,7 +659,7 @@ int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Allreduce(sendbuf, recvbuf, count, type, op, comm);
+   int error = EMPI_Allreduce(sendbuf, recvbuf, count, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -693,7 +694,7 @@ int MPI_Alltoall ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *re
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Alltoall(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
+   int error = EMPI_Alltoall(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -728,7 +729,7 @@ int MPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype sen
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Alltoallv(sendbuf, sendcnts, sdispls, sendtype, recvbuf, recvcnts, rdispls, recvtype, comm);
+   int error = EMPI_Alltoallv(sendbuf, sendcnts, sdispls, sendtype, recvbuf, recvcnts, rdispls, recvtype, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -763,7 +764,7 @@ int MPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype *se
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Alltoallw(sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm);
+   int error = EMPI_Alltoallw(sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -797,7 +798,7 @@ int MPI_Scatter ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Scatter(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+   int error = EMPI_Scatter(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -832,7 +833,7 @@ int MPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, MPI_Datatype sendt
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Scatterv(sendbuf, sendcnts, displs, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+   int error = EMPI_Scatterv(sendbuf, sendcnts, displs, sendtype, recvbuf, recvcnt, recvtype, root, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -861,7 +862,7 @@ int MPI_Barrier ( MPI_Comm comm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Barrier(comm);
+   int error = EMPI_Barrier(comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -895,7 +896,7 @@ int MPI_Bcast ( void *buffer, int count, MPI_Datatype type, int root, MPI_Comm c
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Bcast(buffer, count, type, root, comm);
+   int error = EMPI_Bcast(buffer, count, type, root, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -929,7 +930,7 @@ int MPI_Gather ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvbu
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Gather(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+   int error = EMPI_Gather(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -964,7 +965,7 @@ int MPI_Gatherv ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Gatherv(sendbuf, sendcnt, sendtype, recvbuf, recvcnts, displs, recvtype, root, comm);
+   int error = EMPI_Gatherv(sendbuf, sendcnt, sendtype, recvbuf, recvcnts, displs, recvtype, root, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -998,7 +999,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce(sendbuf, recvbuf, count, type, op, root, comm);
+   int error = EMPI_Reduce(sendbuf, recvbuf, count, type, op, root, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1036,7 +1037,7 @@ int MPI_Ibsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Ibsend(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Ibsend(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1071,7 +1072,7 @@ int MPI_Irecv ( void *buf, int count, MPI_Datatype type, int source, int tag, MP
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Irecv(buf, count, type, source, tag, comm, r);
+   int error = EMPI_Irecv(buf, count, type, source, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1105,7 +1106,7 @@ int MPI_Irsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Irsend(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Irsend(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1139,7 +1140,7 @@ int MPI_Isend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Isend(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Isend(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1173,7 +1174,7 @@ int MPI_Rsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Rsend(buf, count, type, dest, tag, comm);
+   int error = EMPI_Rsend(buf, count, type, dest, tag, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1207,7 +1208,7 @@ int MPI_Send ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_C
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Send(buf, count, type, dest, tag, comm);
+   int error = EMPI_Send(buf, count, type, dest, tag, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1242,7 +1243,7 @@ int MPI_Sendrecv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, int dest
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, s);
+   int error = EMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1275,7 +1276,7 @@ int MPI_Ssend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Ssend(buf, count, type, dest, tag, comm);
+   int error = EMPI_Ssend(buf, count, type, dest, tag, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1309,7 +1310,7 @@ int MPI_Recv ( void *buf, int count, MPI_Datatype type, int source, int tag, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Recv(buf, count, type, source, tag, comm, s);
+   int error = EMPI_Recv(buf, count, type, source, tag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1344,7 +1345,7 @@ int MPI_Wait ( MPI_Request *r, MPI_Status *s )
    comm = request_get_comm(r, MPI_COMM_SELF);
 #endif
 
-   int error = xEMPI_Wait(r, s);
+   int error = EMPI_Wait(r, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1375,7 +1376,7 @@ int MPI_Waitall ( int count, MPI_Request *array_of_requests, MPI_Status *array_o
 #endif // IBIS_INTERCEPT
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Waitall(count, array_of_requests, array_of_statuses);
+   int error = EMPI_Waitall(count, array_of_requests, array_of_statuses);
 
 #if PROFILE_LEVEL > 0
 #ifndef IBIS_INTERCEPT
@@ -1406,7 +1407,7 @@ int MPI_Request_free ( MPI_Request *r )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Request_free(r);
+   int error = EMPI_Request_free(r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1435,7 +1436,7 @@ int MPI_Waitany ( int count, MPI_Request array_of_requests[], int *index, MPI_St
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Waitany(count, array_of_requests, index, s);
+   int error = EMPI_Waitany(count, array_of_requests, index, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1472,7 +1473,7 @@ int MPI_Type_free ( MPI_Datatype *datatype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_free(datatype);
+   int error = EMPI_Type_free(datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1505,7 +1506,7 @@ int MPI_Type_get_envelope ( MPI_Datatype type, int *num_integers, int *num_addre
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_get_envelope(type, num_integers, num_addresses, num_datatypes, combiner);
+   int error = EMPI_Type_get_envelope(type, num_integers, num_addresses, num_datatypes, combiner);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1539,7 +1540,7 @@ int MPI_Type_create_indexed_block ( int count, int blocklength, int array_of_dis
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_indexed_block(count, blocklength, array_of_displacements, oldtype, newtype);
+   int error = EMPI_Type_create_indexed_block(count, blocklength, array_of_displacements, oldtype, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1573,7 +1574,7 @@ int MPI_Type_contiguous ( int count, MPI_Datatype old_type, MPI_Datatype *new_ty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_contiguous(count, old_type, new_type_p);
+   int error = EMPI_Type_contiguous(count, old_type, new_type_p);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1607,7 +1608,7 @@ int MPI_Type_commit ( MPI_Datatype *datatype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_commit(datatype);
+   int error = EMPI_Type_commit(datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1640,7 +1641,7 @@ int MPI_Type_get_name ( MPI_Datatype type, char *type_name, int *resultlen )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_get_name(type, type_name, resultlen);
+   int error = EMPI_Type_get_name(type, type_name, resultlen);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1676,7 +1677,7 @@ int MPI_File_set_view ( MPI_File MPI_fh, MPI_Offset disp, MPI_Datatype etype, MP
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_view(MPI_fh, disp, etype, filetype, datarep, info);
+   int error = EMPI_File_set_view(MPI_fh, disp, etype, filetype, datarep, info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1706,7 +1707,7 @@ int MPI_File_open ( MPI_Comm comm, char *filename, int amode, MPI_Info info, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_open(comm, filename, amode, info, fh);
+   int error = EMPI_File_open(comm, filename, amode, info, fh);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1735,7 +1736,7 @@ int MPI_File_close ( MPI_File *fh )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_close(fh);
+   int error = EMPI_File_close(fh);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1768,7 +1769,7 @@ int MPI_File_write_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at(MPI_fh, offset, buf, count, type, s);
+   int error = EMPI_File_write_at(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1801,7 +1802,7 @@ int MPI_File_read_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at(MPI_fh, offset, buf, count, type, s);
+   int error = EMPI_File_read_at(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1834,7 +1835,7 @@ int MPI_File_read_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_all(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_read_all(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1868,7 +1869,7 @@ int MPI_File_write_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype typ
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_all(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_write_all(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1903,7 +1904,7 @@ int MPI_Info_create ( MPI_Info *info )
 #endif // PROFILE_LEVEL
 
 
-   int error = xEMPI_Info_create(info);
+   int error = EMPI_Info_create(info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1933,7 +1934,7 @@ int MPI_Info_delete ( MPI_Info info, char *key )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_delete(info, key);
+   int error = EMPI_Info_delete(info, key);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1963,7 +1964,7 @@ int MPI_Info_set ( MPI_Info info, char *key, char *value )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_set(info, key, value);
+   int error = EMPI_Info_set(info, key, value);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1992,7 +1993,7 @@ int MPI_Info_free ( MPI_Info *info )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_free(info);
+   int error = EMPI_Info_free(info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2026,7 +2027,7 @@ int MPI_Intercomm_create ( MPI_Comm local_comm, int local_leader, MPI_Comm peer_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Intercomm_create(local_comm, local_leader, peer_comm, remote_leader, tag, newintercomm);
+   int error = EMPI_Intercomm_create(local_comm, local_leader, peer_comm, remote_leader, tag, newintercomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2056,7 +2057,7 @@ int MPI_Intercomm_merge ( MPI_Comm intercomm, int high, MPI_Comm *newintracomm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Intercomm_merge(intercomm, high, newintracomm);
+   int error = EMPI_Intercomm_merge(intercomm, high, newintracomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2102,7 +2103,7 @@ int MPI_Type_create_f90_complex ( int p, int r, MPI_Datatype *newtype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_f90_complex(p, r, newtype);
+   int error = EMPI_Type_create_f90_complex(p, r, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2136,7 +2137,7 @@ int MPI_Type_create_f90_integer ( int r, MPI_Datatype *newtype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_f90_integer(r, newtype);
+   int error = EMPI_Type_create_f90_integer(r, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2170,7 +2171,7 @@ int MPI_Type_create_f90_real ( int p, int r, MPI_Datatype *newtype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_f90_real(p, r, newtype);
+   int error = EMPI_Type_create_f90_real(p, r, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2207,7 +2208,7 @@ int MPI_Accumulate ( void *origin_addr, int origin_count, MPI_Datatype origin_da
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Accumulate(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, op, win);
+   int error = EMPI_Accumulate(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, op, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2237,7 +2238,7 @@ int MPI_Add_error_class ( int *errorclass )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Add_error_class(errorclass);
+   int error = EMPI_Add_error_class(errorclass);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2267,7 +2268,7 @@ int MPI_Add_error_code ( int errorclass, int *errorcode )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Add_error_code(errorclass, errorcode);
+   int error = EMPI_Add_error_code(errorclass, errorcode);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2297,7 +2298,7 @@ int MPI_Add_error_string ( int errorcode, char *string )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Add_error_string(errorcode, string);
+   int error = EMPI_Add_error_string(errorcode, string);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2327,7 +2328,7 @@ int MPI_Address ( void *location, MPI_Aint *address )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Address(location, address);
+   int error = EMPI_Address(location, address);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2358,7 +2359,7 @@ int MPI_Alloc_mem ( MPI_Aint size, MPI_Info info, void *baseptr )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Alloc_mem(size, info, baseptr);
+   int error = EMPI_Alloc_mem(size, info, baseptr);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2390,7 +2391,7 @@ int MPI_Attr_delete ( MPI_Comm comm, int keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Attr_delete(comm, keyval);
+   int error = EMPI_Attr_delete(comm, keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2420,7 +2421,7 @@ int MPI_Attr_get ( MPI_Comm comm, int keyval, void *attr_value, int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Attr_get(comm, keyval, attr_value, flag);
+   int error = EMPI_Attr_get(comm, keyval, attr_value, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2450,7 +2451,7 @@ int MPI_Attr_put ( MPI_Comm comm, int keyval, void *attr_value )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Attr_put(comm, keyval, attr_value);
+   int error = EMPI_Attr_put(comm, keyval, attr_value);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2486,7 +2487,7 @@ int MPI_Bsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Bsend(buf, count, type, dest, tag, comm);
+   int error = EMPI_Bsend(buf, count, type, dest, tag, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2520,7 +2521,7 @@ int MPI_Bsend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Bsend_init(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Bsend_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2550,7 +2551,7 @@ int MPI_Buffer_attach ( void *buffer, int size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Buffer_attach(buffer, size);
+   int error = EMPI_Buffer_attach(buffer, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2580,7 +2581,7 @@ int MPI_Buffer_detach ( void *buffer, int *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Buffer_detach(buffer, size);
+   int error = EMPI_Buffer_detach(buffer, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2610,7 +2611,7 @@ int MPI_Cancel ( MPI_Request *r )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cancel(r);
+   int error = EMPI_Cancel(r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2640,7 +2641,7 @@ int MPI_Cart_coords ( MPI_Comm comm, int rank, int maxdims, int *coords )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_coords(comm, rank, maxdims, coords);
+   int error = EMPI_Cart_coords(comm, rank, maxdims, coords);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2670,7 +2671,7 @@ int MPI_Cart_create ( MPI_Comm comm_old, int ndims, int *dims, int *periods, int
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_create(comm_old, ndims, dims, periods, reorder, comm_cart);
+   int error = EMPI_Cart_create(comm_old, ndims, dims, periods, reorder, comm_cart);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2700,7 +2701,7 @@ int MPI_Cartdim_get ( MPI_Comm comm, int *ndims )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cartdim_get(comm, ndims);
+   int error = EMPI_Cartdim_get(comm, ndims);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2730,7 +2731,7 @@ int MPI_Cart_get ( MPI_Comm comm, int maxdims, int *dims, int *periods, int *coo
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_get(comm, maxdims, dims, periods, coords);
+   int error = EMPI_Cart_get(comm, maxdims, dims, periods, coords);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2760,7 +2761,7 @@ int MPI_Cart_map ( MPI_Comm comm_old, int ndims, int *dims, int *periods, int *n
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_map(comm_old, ndims, dims, periods, newrank);
+   int error = EMPI_Cart_map(comm_old, ndims, dims, periods, newrank);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2790,7 +2791,7 @@ int MPI_Cart_rank ( MPI_Comm comm, int *coords, int *rank )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_rank(comm, coords, rank);
+   int error = EMPI_Cart_rank(comm, coords, rank);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2820,7 +2821,7 @@ int MPI_Cart_shift ( MPI_Comm comm, int direction, int displ, int *source, int *
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_shift(comm, direction, displ, source, dest);
+   int error = EMPI_Cart_shift(comm, direction, displ, source, dest);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2850,7 +2851,7 @@ int MPI_Cart_sub ( MPI_Comm comm, int *remain_dims, MPI_Comm *comm_new )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Cart_sub(comm, remain_dims, comm_new);
+   int error = EMPI_Cart_sub(comm, remain_dims, comm_new);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2880,7 +2881,7 @@ int MPI_Close_port ( char *port_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Close_port(port_name);
+   int error = EMPI_Close_port(port_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2910,7 +2911,7 @@ int MPI_Comm_accept ( char *port_name, MPI_Info info, int root, MPI_Comm comm, M
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_accept(port_name, info, root, comm, newcomm);
+   int error = EMPI_Comm_accept(port_name, info, root, comm, newcomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2940,7 +2941,7 @@ int MPI_Comm_call_errhandler ( MPI_Comm comm, int errorcode )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_call_errhandler(comm, errorcode);
+   int error = EMPI_Comm_call_errhandler(comm, errorcode);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2970,7 +2971,7 @@ int MPI_Comm_compare ( MPI_Comm comm1, MPI_Comm comm2, int *result )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_compare(comm1, comm2, result);
+   int error = EMPI_Comm_compare(comm1, comm2, result);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3000,7 +3001,7 @@ int MPI_Comm_connect ( char *port_name, MPI_Info info, int root, MPI_Comm comm, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_connect(port_name, info, root, comm, newcomm);
+   int error = EMPI_Comm_connect(port_name, info, root, comm, newcomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3030,7 +3031,7 @@ int MPI_Comm_create_errhandler ( MPI_Comm_errhandler_fn *function, MPI_Errhandle
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_create_errhandler(function, errhandler);
+   int error = EMPI_Comm_create_errhandler(function, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3062,7 +3063,7 @@ int MPI_Comm_create_keyval ( MPI_Comm_copy_attr_function *comm_copy_attr_fn, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_create_keyval(comm_copy_attr_fn, comm_delete_attr_fn, comm_keyval, extra_state);
+   int error = EMPI_Comm_create_keyval(comm_copy_attr_fn, comm_delete_attr_fn, comm_keyval, extra_state);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3092,7 +3093,7 @@ int MPI_Comm_delete_attr ( MPI_Comm comm, int comm_keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_delete_attr(comm, comm_keyval);
+   int error = EMPI_Comm_delete_attr(comm, comm_keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3122,7 +3123,7 @@ int MPI_Comm_disconnect ( MPI_Comm *comm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_disconnect(comm);
+   int error = EMPI_Comm_disconnect(comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3153,7 +3154,7 @@ int MPI_Comm_free_keyval ( int *comm_keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_free_keyval(comm_keyval);
+   int error = EMPI_Comm_free_keyval(comm_keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3183,7 +3184,7 @@ int MPI_Comm_get_attr ( MPI_Comm comm, int comm_keyval, void *attribute_val, int
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_get_attr(comm, comm_keyval, attribute_val, flag);
+   int error = EMPI_Comm_get_attr(comm, comm_keyval, attribute_val, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3213,7 +3214,7 @@ int MPI_Comm_get_errhandler ( MPI_Comm comm, MPI_Errhandler *errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_get_errhandler(comm, errhandler);
+   int error = EMPI_Comm_get_errhandler(comm, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3243,7 +3244,7 @@ int MPI_Comm_get_name ( MPI_Comm comm, char *comm_name, int *resultlen )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_get_name(comm, comm_name, resultlen);
+   int error = EMPI_Comm_get_name(comm, comm_name, resultlen);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3273,7 +3274,7 @@ int MPI_Comm_get_parent ( MPI_Comm *parent )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_get_parent(parent);
+   int error = EMPI_Comm_get_parent(parent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3305,7 +3306,7 @@ int MPI_Comm_join ( int fd, MPI_Comm *intercomm )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_join(fd, intercomm);
+   int error = EMPI_Comm_join(fd, intercomm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3336,7 +3337,7 @@ int MPI_Comm_remote_group ( MPI_Comm comm, MPI_Group *g )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_remote_group(comm, g);
+   int error = EMPI_Comm_remote_group(comm, g);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3366,7 +3367,7 @@ int MPI_Comm_remote_size ( MPI_Comm comm, int *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_remote_size(comm, size);
+   int error = EMPI_Comm_remote_size(comm, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3396,7 +3397,7 @@ int MPI_Comm_set_attr ( MPI_Comm comm, int comm_keyval, void *attribute_val )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_set_attr(comm, comm_keyval, attribute_val);
+   int error = EMPI_Comm_set_attr(comm, comm_keyval, attribute_val);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3426,7 +3427,7 @@ int MPI_Comm_set_errhandler ( MPI_Comm comm, MPI_Errhandler errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_set_errhandler(comm, errhandler);
+   int error = EMPI_Comm_set_errhandler(comm, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3456,7 +3457,7 @@ int MPI_Comm_set_name ( MPI_Comm comm, char *comm_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_set_name(comm, comm_name);
+   int error = EMPI_Comm_set_name(comm, comm_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3488,7 +3489,7 @@ int MPI_Comm_spawn ( char *command, char *argv[], int maxprocs, MPI_Info info, i
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_spawn(command, argv, maxprocs, info, root, comm, intercomm, array_of_errcodes);
+   int error = EMPI_Comm_spawn(command, argv, maxprocs, info, root, comm, intercomm, array_of_errcodes);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3518,7 +3519,7 @@ int MPI_Comm_spawn_multiple ( int count, char *array_of_commands[], char* *array
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_spawn_multiple(count, array_of_commands, array_of_argv, array_of_maxprocs, array_of_info, root, comm, intercomm, array_of_errcodes);
+   int error = EMPI_Comm_spawn_multiple(count, array_of_commands, array_of_argv, array_of_maxprocs, array_of_info, root, comm, intercomm, array_of_errcodes);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3549,7 +3550,7 @@ int MPI_Comm_test_inter ( MPI_Comm comm, int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Comm_test_inter(comm, flag);
+   int error = EMPI_Comm_test_inter(comm, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3579,7 +3580,7 @@ int MPI_Dims_create ( int nnodes, int ndims, int *dims )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Dims_create(nnodes, ndims, dims);
+   int error = EMPI_Dims_create(nnodes, ndims, dims);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3609,7 +3610,7 @@ int MPI_Dist_graph_create_adjacent ( MPI_Comm comm_old, int indegree, int source
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Dist_graph_create_adjacent(comm_old, indegree, sources, sourceweights, outdegree, destinations, destweights, info, reorder, comm_dist_graph);
+   int error = EMPI_Dist_graph_create_adjacent(comm_old, indegree, sources, sourceweights, outdegree, destinations, destweights, info, reorder, comm_dist_graph);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3639,7 +3640,7 @@ int MPI_Dist_graph_create ( MPI_Comm comm_old, int n, int sources[], int degrees
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Dist_graph_create(comm_old, n, sources, degrees, destinations, weights, info, reorder, comm_dist_graph);
+   int error = EMPI_Dist_graph_create(comm_old, n, sources, degrees, destinations, weights, info, reorder, comm_dist_graph);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3669,7 +3670,7 @@ int MPI_Dist_graph_neighbors_count ( MPI_Comm comm, int *indegree, int *outdegre
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Dist_graph_neighbors_count(comm, indegree, outdegree, weighted);
+   int error = EMPI_Dist_graph_neighbors_count(comm, indegree, outdegree, weighted);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3699,7 +3700,7 @@ int MPI_Dist_graph_neighbors ( MPI_Comm comm, int maxindegree, int sources[], in
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Dist_graph_neighbors(comm, maxindegree, sources, sourceweights, maxoutdegree, destinations, destweights);
+   int error = EMPI_Dist_graph_neighbors(comm, maxindegree, sources, sourceweights, maxoutdegree, destinations, destweights);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3729,7 +3730,7 @@ int MPI_Errhandler_create ( MPI_Handler_function *function, MPI_Errhandler *errh
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Errhandler_create(function, errhandler);
+   int error = EMPI_Errhandler_create(function, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3759,7 +3760,7 @@ int MPI_Errhandler_free ( MPI_Errhandler *errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Errhandler_free(errhandler);
+   int error = EMPI_Errhandler_free(errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3789,7 +3790,7 @@ int MPI_Errhandler_get ( MPI_Comm comm, MPI_Errhandler *errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Errhandler_get(comm, errhandler);
+   int error = EMPI_Errhandler_get(comm, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3819,7 +3820,7 @@ int MPI_Errhandler_set ( MPI_Comm comm, MPI_Errhandler errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Errhandler_set(comm, errhandler);
+   int error = EMPI_Errhandler_set(comm, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3849,7 +3850,7 @@ int MPI_Error_class ( int errorcode, int *errorclass )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Error_class(errorcode, errorclass);
+   int error = EMPI_Error_class(errorcode, errorclass);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3884,7 +3885,7 @@ int MPI_Exscan ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Exscan(sendbuf, recvbuf, count, type, op, comm);
+   int error = EMPI_Exscan(sendbuf, recvbuf, count, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3914,7 +3915,7 @@ int MPI_File_call_errhandler ( MPI_File fh, int errorcode )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_call_errhandler(fh, errorcode);
+   int error = EMPI_File_call_errhandler(fh, errorcode);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3946,7 +3947,7 @@ int MPI_File_create_errhandler ( MPI_File_errhandler_fn *function, MPI_Errhandle
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_create_errhandler(function, errhandler);
+   int error = EMPI_File_create_errhandler(function, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -3976,7 +3977,7 @@ int MPI_File_delete ( char *filename, MPI_Info info )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_delete(filename, info);
+   int error = EMPI_File_delete(filename, info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4006,7 +4007,7 @@ int MPI_File_get_amode ( MPI_File MPI_fh, int *amode )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_amode(MPI_fh, amode);
+   int error = EMPI_File_get_amode(MPI_fh, amode);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4036,7 +4037,7 @@ int MPI_File_get_atomicity ( MPI_File MPI_fh, int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_atomicity(MPI_fh, flag);
+   int error = EMPI_File_get_atomicity(MPI_fh, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4066,7 +4067,7 @@ int MPI_File_get_byte_offset ( MPI_File MPI_fh, MPI_Offset offset, MPI_Offset *d
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_byte_offset(MPI_fh, offset, disp);
+   int error = EMPI_File_get_byte_offset(MPI_fh, offset, disp);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4096,7 +4097,7 @@ int MPI_File_get_errhandler ( MPI_File file, MPI_Errhandler *errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_errhandler(file, errhandler);
+   int error = EMPI_File_get_errhandler(file, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4126,7 +4127,7 @@ int MPI_File_get_group ( MPI_File MPI_fh, MPI_Group *g )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_group(MPI_fh, g);
+   int error = EMPI_File_get_group(MPI_fh, g);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4156,7 +4157,7 @@ int MPI_File_get_info ( MPI_File MPI_fh, MPI_Info *info_used )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_info(MPI_fh, info_used);
+   int error = EMPI_File_get_info(MPI_fh, info_used);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4186,7 +4187,7 @@ int MPI_File_get_position ( MPI_File MPI_fh, MPI_Offset *offset )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_position(MPI_fh, offset);
+   int error = EMPI_File_get_position(MPI_fh, offset);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4216,7 +4217,7 @@ int MPI_File_get_position_shared ( MPI_File MPI_fh, MPI_Offset *offset )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_position_shared(MPI_fh, offset);
+   int error = EMPI_File_get_position_shared(MPI_fh, offset);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4246,7 +4247,7 @@ int MPI_File_get_size ( MPI_File MPI_fh, MPI_Offset *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_size(MPI_fh, size);
+   int error = EMPI_File_get_size(MPI_fh, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4280,7 +4281,7 @@ int MPI_File_get_type_extent ( MPI_File MPI_fh, MPI_Datatype type, MPI_Aint *ext
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_type_extent(MPI_fh, type, extent);
+   int error = EMPI_File_get_type_extent(MPI_fh, type, extent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4315,7 +4316,7 @@ int MPI_File_get_view ( MPI_File MPI_fh, MPI_Offset *disp, MPI_Datatype *etype, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_view(MPI_fh, disp, etype, filetype, datarep);
+   int error = EMPI_File_get_view(MPI_fh, disp, etype, filetype, datarep);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4349,7 +4350,7 @@ int MPI_File_iread_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread_at(MPI_fh, offset, buf, count, type, r);
+   int error = EMPI_File_iread_at(MPI_fh, offset, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4383,7 +4384,7 @@ int MPI_File_iread ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, M
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread(MPI_fh, buf, count, type, r);
+   int error = EMPI_File_iread(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4417,7 +4418,7 @@ int MPI_File_iread_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread_shared(MPI_fh, buf, count, type, r);
+   int error = EMPI_File_iread_shared(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4451,7 +4452,7 @@ int MPI_File_iwrite_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int coun
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite_at(MPI_fh, offset, buf, count, type, r);
+   int error = EMPI_File_iwrite_at(MPI_fh, offset, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4485,7 +4486,7 @@ int MPI_File_iwrite ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite(MPI_fh, buf, count, type, r);
+   int error = EMPI_File_iwrite(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4519,7 +4520,7 @@ int MPI_File_iwrite_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite_shared(MPI_fh, buf, count, type, r);
+   int error = EMPI_File_iwrite_shared(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4551,7 +4552,7 @@ int MPI_File_preallocate ( MPI_File MPI_fh, MPI_Offset size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_preallocate(MPI_fh, size);
+   int error = EMPI_File_preallocate(MPI_fh, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4585,7 +4586,7 @@ int MPI_File_read_all_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Datatyp
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_all_begin(MPI_fh, buf, count, datatype);
+   int error = EMPI_File_read_all_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4615,7 +4616,7 @@ int MPI_File_read_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_all_end(MPI_fh, buf, s);
+   int error = EMPI_File_read_all_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4651,7 +4652,7 @@ int MPI_File_read_at_all_begin ( MPI_File MPI_fh, MPI_Offset offset, void *buf, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all_begin(MPI_fh, offset, buf, count, datatype);
+   int error = EMPI_File_read_at_all_begin(MPI_fh, offset, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4681,7 +4682,7 @@ int MPI_File_read_at_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all_end(MPI_fh, buf, s);
+   int error = EMPI_File_read_at_all_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4714,7 +4715,7 @@ int MPI_File_read_at_all ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int co
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all(MPI_fh, offset, buf, count, type, s);
+   int error = EMPI_File_read_at_all(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4750,7 +4751,7 @@ int MPI_File_read ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MP
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_read(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4784,7 +4785,7 @@ int MPI_File_read_ordered_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Dat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered_begin(MPI_fh, buf, count, datatype);
+   int error = EMPI_File_read_ordered_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4814,7 +4815,7 @@ int MPI_File_read_ordered_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered_end(MPI_fh, buf, s);
+   int error = EMPI_File_read_ordered_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4848,7 +4849,7 @@ int MPI_File_read_ordered ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_read_ordered(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4882,7 +4883,7 @@ int MPI_File_read_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype t
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_shared(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_read_shared(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4912,7 +4913,7 @@ int MPI_File_seek ( MPI_File MPI_fh, MPI_Offset offset, int whence )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_seek(MPI_fh, offset, whence);
+   int error = EMPI_File_seek(MPI_fh, offset, whence);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4942,7 +4943,7 @@ int MPI_File_seek_shared ( MPI_File MPI_fh, MPI_Offset offset, int whence )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_seek_shared(MPI_fh, offset, whence);
+   int error = EMPI_File_seek_shared(MPI_fh, offset, whence);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -4972,7 +4973,7 @@ int MPI_File_set_atomicity ( MPI_File MPI_fh, int flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_atomicity(MPI_fh, flag);
+   int error = EMPI_File_set_atomicity(MPI_fh, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5002,7 +5003,7 @@ int MPI_File_set_errhandler ( MPI_File file, MPI_Errhandler errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_errhandler(file, errhandler);
+   int error = EMPI_File_set_errhandler(file, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5032,7 +5033,7 @@ int MPI_File_set_info ( MPI_File MPI_fh, MPI_Info info )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_info(MPI_fh, info);
+   int error = EMPI_File_set_info(MPI_fh, info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5062,7 +5063,7 @@ int MPI_File_set_size ( MPI_File MPI_fh, MPI_Offset size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_size(MPI_fh, size);
+   int error = EMPI_File_set_size(MPI_fh, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5093,7 +5094,7 @@ int MPI_File_sync ( MPI_File MPI_fh )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_sync(MPI_fh);
+   int error = EMPI_File_sync(MPI_fh);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5127,7 +5128,7 @@ int MPI_File_write_all_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Dataty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_all_begin(MPI_fh, buf, count, datatype);
+   int error = EMPI_File_write_all_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5157,7 +5158,7 @@ int MPI_File_write_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_all_end(MPI_fh, buf, s);
+   int error = EMPI_File_write_all_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5193,7 +5194,7 @@ int MPI_File_write_at_all_begin ( MPI_File MPI_fh, MPI_Offset offset, void *buf,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all_begin(MPI_fh, offset, buf, count, datatype);
+   int error = EMPI_File_write_at_all_begin(MPI_fh, offset, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5223,7 +5224,7 @@ int MPI_File_write_at_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all_end(MPI_fh, buf, s);
+   int error = EMPI_File_write_at_all_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5257,7 +5258,7 @@ int MPI_File_write_at_all ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int c
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all(MPI_fh, offset, buf, count, type, s);
+   int error = EMPI_File_write_at_all(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5293,7 +5294,7 @@ int MPI_File_write ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, M
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_write(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5327,7 +5328,7 @@ int MPI_File_write_ordered_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Da
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered_begin(MPI_fh, buf, count, datatype);
+   int error = EMPI_File_write_ordered_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5357,7 +5358,7 @@ int MPI_File_write_ordered_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered_end(MPI_fh, buf, s);
+   int error = EMPI_File_write_ordered_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5391,7 +5392,7 @@ int MPI_File_write_ordered ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_write_ordered(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5425,7 +5426,7 @@ int MPI_File_write_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_shared(MPI_fh, buf, count, type, s);
+   int error = EMPI_File_write_shared(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5456,7 +5457,7 @@ int MPI_Free_mem ( void *base )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Free_mem(base);
+   int error = EMPI_Free_mem(base);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5487,7 +5488,7 @@ int MPI_Get_address ( void *location, MPI_Aint *address )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_address(location, address);
+   int error = EMPI_Get_address(location, address);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5521,7 +5522,7 @@ int MPI_Get_count ( MPI_Status *s, MPI_Datatype type, int *count )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_count(status, type, count);
+   int error = EMPI_Get_count(status, type, count);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5555,7 +5556,7 @@ int MPI_Get_elements ( MPI_Status *s, MPI_Datatype type, int *elements )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_elements(status, type, elements);
+   int error = EMPI_Get_elements(status, type, elements);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5590,7 +5591,7 @@ int MPI_Get ( void *origin_addr, int origin_count, MPI_Datatype origin_datatype,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, win);
+   int error = EMPI_Get(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5622,7 +5623,7 @@ int MPI_Get_version ( int *version, int *subversion )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Get_version(version, subversion);
+   int error = EMPI_Get_version(version, subversion);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5652,7 +5653,7 @@ int MPI_Graph_create ( MPI_Comm comm_old, int nnodes, int *indx, int *edges, int
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Graph_create(comm_old, nnodes, indx, edges, reorder, comm_graph);
+   int error = EMPI_Graph_create(comm_old, nnodes, indx, edges, reorder, comm_graph);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5682,7 +5683,7 @@ int MPI_Graphdims_get ( MPI_Comm comm, int *nnodes, int *nedges )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Graphdims_get(comm, nnodes, nedges);
+   int error = EMPI_Graphdims_get(comm, nnodes, nedges);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5712,7 +5713,7 @@ int MPI_Graph_get ( MPI_Comm comm, int maxindex, int maxedges, int *indx, int *e
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Graph_get(comm, maxindex, maxedges, indx, edges);
+   int error = EMPI_Graph_get(comm, maxindex, maxedges, indx, edges);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5742,7 +5743,7 @@ int MPI_Graph_map ( MPI_Comm comm_old, int nnodes, int *indx, int *edges, int *n
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Graph_map(comm_old, nnodes, indx, edges, newrank);
+   int error = EMPI_Graph_map(comm_old, nnodes, indx, edges, newrank);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5772,7 +5773,7 @@ int MPI_Graph_neighbors_count ( MPI_Comm comm, int rank, int *nneighbors )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Graph_neighbors_count(comm, rank, nneighbors);
+   int error = EMPI_Graph_neighbors_count(comm, rank, nneighbors);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5802,7 +5803,7 @@ int MPI_Graph_neighbors ( MPI_Comm comm, int rank, int maxneighbors, int *neighb
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Graph_neighbors(comm, rank, maxneighbors, neighbors);
+   int error = EMPI_Graph_neighbors(comm, rank, maxneighbors, neighbors);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5832,7 +5833,7 @@ int MPI_Grequest_complete ( MPI_Request r )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Grequest_complete(r);
+   int error = EMPI_Grequest_complete(r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5862,7 +5863,7 @@ int MPI_Grequest_start ( MPI_Grequest_query_function *query_fn, MPI_Grequest_fre
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Grequest_start(query_fn, free_fn, cancel_fn, extra_state, r);
+   int error = EMPI_Grequest_start(query_fn, free_fn, cancel_fn, extra_state, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5892,7 +5893,7 @@ int MPI_Group_compare ( MPI_Group group1, MPI_Group group2, int *result )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_compare(group1, group2, result);
+   int error = EMPI_Group_compare(group1, group2, result);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5922,7 +5923,7 @@ int MPI_Group_difference ( MPI_Group group1, MPI_Group group2, MPI_Group *newgro
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_difference(group1, group2, newgroup);
+   int error = EMPI_Group_difference(group1, group2, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5952,7 +5953,7 @@ int MPI_Group_excl ( MPI_Group g, int n, int *ranks, MPI_Group *newgroup )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_excl(g, n, ranks, newgroup);
+   int error = EMPI_Group_excl(g, n, ranks, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -5982,7 +5983,7 @@ int MPI_Group_free ( MPI_Group *g )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_free(g);
+   int error = EMPI_Group_free(g);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6013,7 +6014,7 @@ int MPI_Group_intersection ( MPI_Group group1, MPI_Group group2, MPI_Group *newg
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_intersection(group1, group2, newgroup);
+   int error = EMPI_Group_intersection(group1, group2, newgroup);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6046,7 +6047,7 @@ int MPI_Group_rank ( MPI_Group g, int *rank )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_rank(g, rank);
+   int error = EMPI_Group_rank(g, rank);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6076,7 +6077,7 @@ int MPI_Group_size ( MPI_Group g, int *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_size(g, size);
+   int error = EMPI_Group_size(g, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6110,7 +6111,7 @@ int MPI_Info_dup ( MPI_Info info, MPI_Info *newinfo )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_dup(info, newinfo);
+   int error = EMPI_Info_dup(info, newinfo);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6141,7 +6142,7 @@ int MPI_Info_get ( MPI_Info info, char *key, int valuelen, char *value, int *fla
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_get(info, key, valuelen, value, flag);
+   int error = EMPI_Info_get(info, key, valuelen, value, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6171,7 +6172,7 @@ int MPI_Info_get_nkeys ( MPI_Info info, int *nkeys )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_get_nkeys(info, nkeys);
+   int error = EMPI_Info_get_nkeys(info, nkeys);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6201,7 +6202,7 @@ int MPI_Info_get_nthkey ( MPI_Info info, int n, char *key )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_get_nthkey(info, n, key);
+   int error = EMPI_Info_get_nthkey(info, n, key);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6231,7 +6232,7 @@ int MPI_Info_get_valuelen ( MPI_Info info, char *key, int *valuelen, int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Info_get_valuelen(info, key, valuelen, flag);
+   int error = EMPI_Info_get_valuelen(info, key, valuelen, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6264,7 +6265,7 @@ int MPI_Init_thread ( int *argc, char ***argv, int required, int *provided )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Init_thread(argc, argv, required, provided);
+   int error = EMPI_Init_thread(argc, argv, required, provided);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6294,7 +6295,7 @@ int MPI_Iprobe ( int source, int tag, MPI_Comm comm, int *flag, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Iprobe(source, tag, comm, flag, s);
+   int error = EMPI_Iprobe(source, tag, comm, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6330,7 +6331,7 @@ int MPI_Issend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Issend(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Issend(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6360,7 +6361,7 @@ int MPI_Is_thread_main ( int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Is_thread_main(flag);
+   int error = EMPI_Is_thread_main(flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6390,7 +6391,7 @@ int MPI_Keyval_create ( MPI_Copy_function *copy_fn, MPI_Delete_function *delete_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
+   int error = EMPI_Keyval_create(copy_fn, delete_fn, keyval, extra_state);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6420,7 +6421,7 @@ int MPI_Keyval_free ( int *keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Keyval_free(keyval);
+   int error = EMPI_Keyval_free(keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6450,7 +6451,7 @@ int MPI_Lookup_name ( char *service_name, MPI_Info info, char *port_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Lookup_name(service_name, info, port_name);
+   int error = EMPI_Lookup_name(service_name, info, port_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6480,7 +6481,7 @@ int MPI_Op_commutative ( MPI_Op op, int *commute )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Op_commutative(op, commute);
+   int error = EMPI_Op_commutative(op, commute);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6510,7 +6511,7 @@ int MPI_Op_create ( MPI_User_function *function, int commute, MPI_Op *op )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Op_create(function, commute, op);
+   int error = EMPI_Op_create(function, commute, op);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6540,7 +6541,7 @@ int MPI_Open_port ( MPI_Info info, char *port_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Open_port(info, port_name);
+   int error = EMPI_Open_port(info, port_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6570,7 +6571,7 @@ int MPI_Op_free ( MPI_Op *op )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Op_free(op);
+   int error = EMPI_Op_free(op);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6604,7 +6605,7 @@ int MPI_Pack_external ( char *datarep, void *inbuf, int incount, MPI_Datatype ty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack_external(datarep, inbuf, incount, type, outbuf, outcount, position);
+   int error = EMPI_Pack_external(datarep, inbuf, incount, type, outbuf, outcount, position);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6638,7 +6639,7 @@ int MPI_Pack_external_size ( char *datarep, int incount, MPI_Datatype type, MPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack_external_size(datarep, incount, type, size);
+   int error = EMPI_Pack_external_size(datarep, incount, type, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6672,7 +6673,7 @@ int MPI_Pack ( void *inbuf, int incount, MPI_Datatype type, void *outbuf, int ou
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack(inbuf, incount, type, outbuf, outcount, position, comm);
+   int error = EMPI_Pack(inbuf, incount, type, outbuf, outcount, position, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6706,7 +6707,7 @@ int MPI_Pack_size ( int incount, MPI_Datatype type, MPI_Comm comm, int *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Pack_size(incount, type, comm, size);
+   int error = EMPI_Pack_size(incount, type, comm, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6736,7 +6737,7 @@ int MPI_Probe ( int source, int tag, MPI_Comm comm, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Probe(source, tag, comm, s);
+   int error = EMPI_Probe(source, tag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6766,7 +6767,7 @@ int MPI_Publish_name ( char *service_name, MPI_Info info, char *port_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Publish_name(service_name, info, port_name);
+   int error = EMPI_Publish_name(service_name, info, port_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6801,7 +6802,7 @@ int MPI_Put ( void *origin_addr, int origin_count, MPI_Datatype origin_datatype,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, win);
+   int error = EMPI_Put(origin_addr, origin_count, origin_datatype, target_rank, target_disp, target_count, target_datatype, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6831,7 +6832,7 @@ int MPI_Query_thread ( int *provided )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Query_thread(provided);
+   int error = EMPI_Query_thread(provided);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6866,7 +6867,7 @@ int MPI_Recv_init ( void *buf, int count, MPI_Datatype type, int source, int tag
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Recv_init(buf, count, type, source, tag, comm, r);
+   int error = EMPI_Recv_init(buf, count, type, source, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6901,7 +6902,7 @@ int MPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, MPI_Datatype type
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce_local(inbuf, inoutbuf, count, type, op);
+   int error = EMPI_Reduce_local(inbuf, inoutbuf, count, type, op);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6935,7 +6936,7 @@ int MPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, MPI_
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce_scatter_block(sendbuf, recvbuf, recvcount, type, op, comm);
+   int error = EMPI_Reduce_scatter_block(sendbuf, recvbuf, recvcount, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6969,7 +6970,7 @@ int MPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, MPI_Dataty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Reduce_scatter(sendbuf, recvbuf, recvcnts, type, op, comm);
+   int error = EMPI_Reduce_scatter(sendbuf, recvbuf, recvcnts, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -6999,7 +7000,7 @@ int MPI_Register_datarep ( char *name, MPI_Datarep_conversion_function *read_con
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Register_datarep(name, read_conv_fn, write_conv_fn, extent_fn, state);
+   int error = EMPI_Register_datarep(name, read_conv_fn, write_conv_fn, extent_fn, state);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7030,7 +7031,7 @@ int MPI_Request_get_status ( MPI_Request r, int *flag, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Request_get_status(r, flag, s);
+   int error = EMPI_Request_get_status(r, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7066,7 +7067,7 @@ int MPI_Rsend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Rsend_init(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Rsend_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7100,7 +7101,7 @@ int MPI_Scan ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_O
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Scan(sendbuf, recvbuf, count, type, op, comm);
+   int error = EMPI_Scan(sendbuf, recvbuf, count, type, op, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7137,7 +7138,7 @@ int MPI_Send_init ( void *buf, int count, MPI_Datatype type, int dest, int tag, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Send_init(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Send_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7173,7 +7174,7 @@ int MPI_Sendrecv_replace ( void *buf, int count, MPI_Datatype type, int dest, in
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Sendrecv_replace(buf, count, type, dest, sendtag, source, recvtag, comm, s);
+   int error = EMPI_Sendrecv_replace(buf, count, type, dest, sendtag, source, recvtag, comm, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7209,7 +7210,7 @@ int MPI_Ssend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Ssend_init(buf, count, type, dest, tag, comm, r);
+   int error = EMPI_Ssend_init(buf, count, type, dest, tag, comm, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7239,7 +7240,7 @@ int MPI_Startall ( int count, MPI_Request array_of_requests[] )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Startall(count, array_of_requests);
+   int error = EMPI_Startall(count, array_of_requests);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7269,7 +7270,7 @@ int MPI_Start ( MPI_Request *r )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Start(r);
+   int error = EMPI_Start(r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7299,7 +7300,7 @@ int MPI_Status_set_cancelled ( MPI_Status *s, int flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Status_set_cancelled(status, flag);
+   int error = EMPI_Status_set_cancelled(status, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7333,7 +7334,7 @@ int MPI_Status_set_elements ( MPI_Status *s, MPI_Datatype type, int count )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Status_set_elements(status, type, count);
+   int error = EMPI_Status_set_elements(status, type, count);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7363,7 +7364,7 @@ int MPI_Testall ( int count, MPI_Request array_of_requests[], int *flag, MPI_Sta
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Testall(count, array_of_requests, flag, array_of_statuses);
+   int error = EMPI_Testall(count, array_of_requests, flag, array_of_statuses);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7393,7 +7394,7 @@ int MPI_Testany ( int count, MPI_Request array_of_requests[], int *index, int *f
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Testany(count, array_of_requests, index, flag, s);
+   int error = EMPI_Testany(count, array_of_requests, index, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7423,7 +7424,7 @@ int MPI_Test_cancelled ( MPI_Status *s, int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Test_cancelled(status, flag);
+   int error = EMPI_Test_cancelled(status, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7453,7 +7454,7 @@ int MPI_Test ( MPI_Request *r, int *flag, MPI_Status *s )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Test(r, flag, s);
+   int error = EMPI_Test(r, flag, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7483,7 +7484,7 @@ int MPI_Testsome ( int incount, MPI_Request array_of_requests[], int *outcount, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Testsome(incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
+   int error = EMPI_Testsome(incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7513,7 +7514,7 @@ int MPI_Topo_test ( MPI_Comm comm, int *topo_type )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Topo_test(comm, topo_type);
+   int error = EMPI_Topo_test(comm, topo_type);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7549,7 +7550,7 @@ int MPI_Type_create_darray ( int size, int rank, int ndims, int array_of_gsizes[
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_darray(size, rank, ndims, array_of_gsizes, array_of_distribs, array_of_dargs, array_of_psizes, order, oldtype, newtype);
+   int error = EMPI_Type_create_darray(size, rank, ndims, array_of_gsizes, array_of_distribs, array_of_dargs, array_of_psizes, order, oldtype, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7584,7 +7585,7 @@ int MPI_Type_create_hindexed ( int count, int blocklengths[], MPI_Aint displacem
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_hindexed(count, blocklengths, displacements, oldtype, newtype);
+   int error = EMPI_Type_create_hindexed(count, blocklengths, displacements, oldtype, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7619,7 +7620,7 @@ int MPI_Type_create_hvector ( int count, int blocklength, MPI_Aint stride, MPI_D
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_hvector(count, blocklength, stride, oldtype, newtype);
+   int error = EMPI_Type_create_hvector(count, blocklength, stride, oldtype, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7650,7 +7651,7 @@ int MPI_Type_create_keyval ( MPI_Type_copy_attr_function *type_copy_attr_fn, MPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_keyval(type_copy_attr_fn, type_delete_attr_fn, type_keyval, extra_state);
+   int error = EMPI_Type_create_keyval(type_copy_attr_fn, type_delete_attr_fn, type_keyval, extra_state);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7685,7 +7686,7 @@ int MPI_Type_create_resized ( MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_resized(oldtype, lb, extent, newtype);
+   int error = EMPI_Type_create_resized(oldtype, lb, extent, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7720,7 +7721,7 @@ int MPI_Type_create_struct ( int count, int array_of_blocklengths[], MPI_Aint ar
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_struct(count, array_of_blocklengths, array_of_displacements, array_of_types, newtype);
+   int error = EMPI_Type_create_struct(count, array_of_blocklengths, array_of_displacements, array_of_types, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7755,7 +7756,7 @@ int MPI_Type_create_subarray ( int ndims, int array_of_sizes[], int array_of_sub
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_create_subarray(ndims, array_of_sizes, array_of_subsizes, array_of_starts, order, oldtype, newtype);
+   int error = EMPI_Type_create_subarray(ndims, array_of_sizes, array_of_subsizes, array_of_starts, order, oldtype, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7789,7 +7790,7 @@ int MPI_Type_delete_attr ( MPI_Datatype type, int type_keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_delete_attr(type, type_keyval);
+   int error = EMPI_Type_delete_attr(type, type_keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7824,7 +7825,7 @@ int MPI_Type_dup ( MPI_Datatype type, MPI_Datatype *newtype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_dup(datatype, newtype);
+   int error = EMPI_Type_dup(datatype, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7858,7 +7859,7 @@ int MPI_Type_extent ( MPI_Datatype type, MPI_Aint *extent )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_extent(datatype, extent);
+   int error = EMPI_Type_extent(datatype, extent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7889,7 +7890,7 @@ int MPI_Type_free_keyval ( int *type_keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_free_keyval(type_keyval);
+   int error = EMPI_Type_free_keyval(type_keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7923,7 +7924,7 @@ int MPI_Type_get_attr ( MPI_Datatype type, int type_keyval, void *attribute_val,
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_get_attr(type, type_keyval, attribute_val, flag);
+   int error = EMPI_Type_get_attr(type, type_keyval, attribute_val, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7958,7 +7959,7 @@ int MPI_Type_get_contents ( MPI_Datatype type, int max_integers, int max_address
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_get_contents(datatype, max_integers, max_addresses, max_datatypes, array_of_integers, array_of_addresses, array_of_datatypes);
+   int error = EMPI_Type_get_contents(datatype, max_integers, max_addresses, max_datatypes, array_of_integers, array_of_addresses, array_of_datatypes);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -7993,7 +7994,7 @@ int MPI_Type_get_extent ( MPI_Datatype type, MPI_Aint *lb, MPI_Aint *extent )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_get_extent(datatype, lb, extent);
+   int error = EMPI_Type_get_extent(datatype, lb, extent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8028,7 +8029,7 @@ int MPI_Type_get_true_extent ( MPI_Datatype type, MPI_Aint *true_lb, MPI_Aint *t
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_get_true_extent(datatype, true_lb, true_extent);
+   int error = EMPI_Type_get_true_extent(datatype, true_lb, true_extent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8063,7 +8064,7 @@ int MPI_Type_hindexed ( int count, int blocklens[], MPI_Aint indices[], MPI_Data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_hindexed(count, blocklens, indices, old_type, newtype);
+   int error = EMPI_Type_hindexed(count, blocklens, indices, old_type, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8098,7 +8099,7 @@ int MPI_Type_hvector ( int count, int blocklen, MPI_Aint stride, MPI_Datatype ol
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_hvector(count, blocklen, stride, old_type, newtype_p);
+   int error = EMPI_Type_hvector(count, blocklen, stride, old_type, newtype_p);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8133,7 +8134,7 @@ int MPI_Type_indexed ( int count, int blocklens[], int indices[], MPI_Datatype o
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_indexed(count, blocklens, indices, old_type, newtype);
+   int error = EMPI_Type_indexed(count, blocklens, indices, old_type, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8167,7 +8168,7 @@ int MPI_Type_lb ( MPI_Datatype type, MPI_Aint *displacement )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_lb(datatype, displacement);
+   int error = EMPI_Type_lb(datatype, displacement);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8201,7 +8202,7 @@ int MPI_Type_match_size ( int typeclass, int size, MPI_Datatype *datatype )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_match_size(typeclass, size, datatype);
+   int error = EMPI_Type_match_size(typeclass, size, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8235,7 +8236,7 @@ int MPI_Type_set_attr ( MPI_Datatype type, int type_keyval, void *attribute_val 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_set_attr(type, type_keyval, attribute_val);
+   int error = EMPI_Type_set_attr(type, type_keyval, attribute_val);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8269,7 +8270,7 @@ int MPI_Type_set_name ( MPI_Datatype type, char *type_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_set_name(type, type_name);
+   int error = EMPI_Type_set_name(type, type_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8303,7 +8304,7 @@ int MPI_Type_size ( MPI_Datatype type, int *size )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_size(datatype, size);
+   int error = EMPI_Type_size(datatype, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8338,7 +8339,7 @@ int MPI_Type_struct ( int count, int blocklens[], MPI_Aint indices[], MPI_Dataty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_struct(count, blocklens, indices, old_types, newtype);
+   int error = EMPI_Type_struct(count, blocklens, indices, old_types, newtype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8372,7 +8373,7 @@ int MPI_Type_ub ( MPI_Datatype type, MPI_Aint *displacement )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_ub(datatype, displacement);
+   int error = EMPI_Type_ub(datatype, displacement);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8407,7 +8408,7 @@ int MPI_Type_vector ( int count, int blocklength, int stride, MPI_Datatype old_t
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Type_vector(count, blocklength, stride, old_type, newtype_p);
+   int error = EMPI_Type_vector(count, blocklength, stride, old_type, newtype_p);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8441,7 +8442,7 @@ int MPI_Unpack_external ( char *datarep, void *inbuf, MPI_Aint insize, MPI_Aint 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Unpack_external(datarep, inbuf, insize, position, outbuf, outcount, datatype);
+   int error = EMPI_Unpack_external(datarep, inbuf, insize, position, outbuf, outcount, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8475,7 +8476,7 @@ int MPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outco
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Unpack(inbuf, insize, position, outbuf, outcount, type, comm);
+   int error = EMPI_Unpack(inbuf, insize, position, outbuf, outcount, type, comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8505,7 +8506,7 @@ int MPI_Unpublish_name ( char *service_name, MPI_Info info, char *port_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Unpublish_name(service_name, info, port_name);
+   int error = EMPI_Unpublish_name(service_name, info, port_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8540,7 +8541,7 @@ int MPI_Waitsome ( int incount, MPI_Request array_of_requests[], int *outcount, 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Waitsome(incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
+   int error = EMPI_Waitsome(incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8570,7 +8571,7 @@ int MPI_Win_call_errhandler ( MPI_Win win, int errorcode )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_call_errhandler(win, errorcode);
+   int error = EMPI_Win_call_errhandler(win, errorcode);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8600,7 +8601,7 @@ int MPI_Win_complete ( MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_complete(win);
+   int error = EMPI_Win_complete(win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8630,7 +8631,7 @@ int MPI_Win_create_errhandler ( MPI_Win_errhandler_fn *function, MPI_Errhandler 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_create_errhandler(function, errhandler);
+   int error = EMPI_Win_create_errhandler(function, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8660,7 +8661,7 @@ int MPI_Win_create ( void *base, MPI_Aint size, int disp_unit, MPI_Info info, MP
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_create(base, size, disp_unit, info, comm, win);
+   int error = EMPI_Win_create(base, size, disp_unit, info, comm, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8690,7 +8691,7 @@ int MPI_Win_create_keyval ( MPI_Win_copy_attr_function *win_copy_attr_fn, MPI_Wi
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_create_keyval(win_copy_attr_fn, win_delete_attr_fn, win_keyval, extra_state);
+   int error = EMPI_Win_create_keyval(win_copy_attr_fn, win_delete_attr_fn, win_keyval, extra_state);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8720,7 +8721,7 @@ int MPI_Win_delete_attr ( MPI_Win win, int win_keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_delete_attr(win, win_keyval);
+   int error = EMPI_Win_delete_attr(win, win_keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8749,7 +8750,7 @@ int MPI_Win_fence ( int assert, MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_fence(assert, win);
+   int error = EMPI_Win_fence(assert, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8779,7 +8780,7 @@ int MPI_Win_free ( MPI_Win *win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_free(win);
+   int error = EMPI_Win_free(win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8809,7 +8810,7 @@ int MPI_Win_free_keyval ( int *win_keyval )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_free_keyval(win_keyval);
+   int error = EMPI_Win_free_keyval(win_keyval);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8839,7 +8840,7 @@ int MPI_Win_get_attr ( MPI_Win win, int win_keyval, void *attribute_val, int *fl
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_get_attr(win, win_keyval, attribute_val, flag);
+   int error = EMPI_Win_get_attr(win, win_keyval, attribute_val, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8869,7 +8870,7 @@ int MPI_Win_get_errhandler ( MPI_Win win, MPI_Errhandler *errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_get_errhandler(win, errhandler);
+   int error = EMPI_Win_get_errhandler(win, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8899,7 +8900,7 @@ int MPI_Win_get_group ( MPI_Win win, MPI_Group *g )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_get_group(win, g);
+   int error = EMPI_Win_get_group(win, g);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8929,7 +8930,7 @@ int MPI_Win_get_name ( MPI_Win win, char *win_name, int *resultlen )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_get_name(win, win_name, resultlen);
+   int error = EMPI_Win_get_name(win, win_name, resultlen);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8959,7 +8960,7 @@ int MPI_Win_lock ( int lock_type, int rank, int assert, MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_lock(lock_type, rank, assert, win);
+   int error = EMPI_Win_lock(lock_type, rank, assert, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -8989,7 +8990,7 @@ int MPI_Win_post ( MPI_Group g, int assert, MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_post(g, assert, win);
+   int error = EMPI_Win_post(g, assert, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9019,7 +9020,7 @@ int MPI_Win_set_attr ( MPI_Win win, int win_keyval, void *attribute_val )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_set_attr(win, win_keyval, attribute_val);
+   int error = EMPI_Win_set_attr(win, win_keyval, attribute_val);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9049,7 +9050,7 @@ int MPI_Win_set_errhandler ( MPI_Win win, MPI_Errhandler errhandler )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_set_errhandler(win, errhandler);
+   int error = EMPI_Win_set_errhandler(win, errhandler);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9079,7 +9080,7 @@ int MPI_Win_set_name ( MPI_Win win, char *win_name )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_set_name(win, win_name);
+   int error = EMPI_Win_set_name(win, win_name);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9109,7 +9110,7 @@ int MPI_Win_start ( MPI_Group g, int assert, MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_start(g, assert, win);
+   int error = EMPI_Win_start(g, assert, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9139,7 +9140,7 @@ int MPI_Win_test ( MPI_Win win, int *flag )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_test(win, flag);
+   int error = EMPI_Win_test(win, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9169,7 +9170,7 @@ int MPI_Win_unlock ( int rank, MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_unlock(rank, win);
+   int error = EMPI_Win_unlock(rank, win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9199,7 +9200,7 @@ int MPI_Win_wait ( MPI_Win win )
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Win_wait(win);
+   int error = EMPI_Win_wait(win);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9229,7 +9230,7 @@ int MPI_Group_comm_create ( MPI_Comm old_comm, MPI_Group g, int tag, MPI_Comm *n
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_Group_comm_create(old_comm, g, tag, new_comm);
+   int error = EMPI_Group_comm_create(old_comm, g, tag, new_comm);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -9247,20 +9248,20 @@ int MPI_Group_comm_create ( MPI_Comm old_comm, MPI_Group g, int tag, MPI_Comm *n
 
 MPI_Comm MPI_Comm_f2c ( MPI_Fint comm )
 {
-   return xEMPI_Comm_f2c(comm);
+   return EMPI_Comm_f2c(comm);
 }
 
 
 MPI_Group MPI_Group_f2c ( MPI_Fint g )
 {
-   return xEMPI_Group_f2c(g);
+   return EMPI_Group_f2c(g);
 
 }
 
 
 MPI_Request MPI_Request_f2c ( MPI_Fint r )
 {
-   return xEMPI_Request_f2c(r);
+   return EMPI_Request_f2c(r);
 
 }
 
@@ -9268,91 +9269,91 @@ MPI_Request MPI_Request_f2c ( MPI_Fint r )
 MPI_Info MPI_Info_f2c ( MPI_Fint info )
 {
 
-   return xEMPI_Info_f2c(info);
+   return EMPI_Info_f2c(info);
 }
 
 
 MPI_File MPI_File_f2c ( MPI_Fint file )
 {
-   return xEMPI_File_f2c(file);
+   return EMPI_File_f2c(file);
 }
 
 
 MPI_Op MPI_Op_f2c ( MPI_Fint op )
 {
-   return xEMPI_Op_f2c(op);
+   return EMPI_Op_f2c(op);
 }
 
 
 MPI_Win MPI_Win_f2c ( MPI_Fint Win )
 {
-   return xEMPI_Win_f2c(Win);
+   return EMPI_Win_f2c(Win);
 }
 
 
 MPI_Errhandler MPI_Errhandler_f2c ( MPI_Fint Errhandler )
 {
-   return xEMPI_Errhandler_f2c(Errhandler);
+   return EMPI_Errhandler_f2c(Errhandler);
 }
 
 
 MPI_Datatype MPI_Type_f2c ( MPI_Fint Type )
 {
-   return xEMPI_Type_f2c(Type);
+   return EMPI_Type_f2c(Type);
 }
 
 
 MPI_Fint MPI_Comm_c2f ( MPI_Comm comm )
 {
-   return xEMPI_Comm_c2f(comm);
+   return EMPI_Comm_c2f(comm);
 }
 
 
 MPI_Fint MPI_Group_c2f ( MPI_Group g )
 {
-   return xEMPI_Group_c2f(g);
+   return EMPI_Group_c2f(g);
 }
 
 
 MPI_Fint MPI_Request_c2f ( MPI_Request r )
 {
-   return xEMPI_Request_c2f(r);
+   return EMPI_Request_c2f(r);
 }
 
 
 MPI_Fint MPI_Info_c2f ( MPI_Info info )
 {
-   return xEMPI_Info_c2f(info);
+   return EMPI_Info_c2f(info);
 }
 
 
 MPI_Fint MPI_File_c2f ( MPI_File file )
 {
-   return xEMPI_File_c2f(file);
+   return EMPI_File_c2f(file);
 }
 
 
 MPI_Fint MPI_Op_c2f ( MPI_Op op )
 {
-   return xEMPI_Op_c2f(op);
+   return EMPI_Op_c2f(op);
 }
 
 
 MPI_Fint MPI_Win_c2f ( MPI_Win Win )
 {
-   return xEMPI_Win_c2f(Win);
+   return EMPI_Win_c2f(Win);
 }
 
 
 MPI_Fint MPI_Errhandler_c2f ( MPI_Errhandler Errhandler )
 {
-   return xEMPI_Errhandler_c2f(Errhandler);
+   return EMPI_Errhandler_c2f(Errhandler);
 }
 
 
 MPI_Fint MPI_Type_c2f ( MPI_Datatype Type )
 {
-   return xEMPI_Type_c2f(Type);
+   return EMPI_Type_c2f(Type);
 }
 
 

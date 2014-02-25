@@ -9,8 +9,6 @@
 
 typedef int EMPI_Comm;
 
-typedef status EMPI_Status;
-
 typedef int EMPI_Group;
 typedef int EMPI_Info;
 typedef int EMPI_Request;
@@ -46,9 +44,11 @@ typedef int EMPI_Fint;
 
 typedef int EMPI_Datatype;
 
+typedef status EMPI_Status;
+
 typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_Datatype *datatype);
 
-/* BASIC C Datatypes -- as defined in MPI 2.2 standard. */
+/* BASIC C Datatypes -- as defined in MPI 2.1 standard. */
 
 #define EMPI_DATATYPE_NULL         (0)
 #define EMPI_CHAR                  (1)
@@ -56,7 +56,7 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 #define EMPI_INT                   (3)
 #define EMPI_LONG                  (4)
 #define EMPI_LONG_LONG_INT         (5)
-#define EMPI_LONG_LONG             (EMPI_LONG_LONG_INT)
+#define EMPI_LONG_LONG             (EMPI_LONG_LONG_INT) // Official synonym since MPI 2.1
 
 #define EMPI_SIGNED_CHAR           (6)
 #define EMPI_UNSIGNED_CHAR         (7)
@@ -71,6 +71,49 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 
 #define EMPI_WCHAR                 (15)
 
+#define EMPI_BYTE                  (16)
+#define EMPI_PACKED                (17)
+
+/* Special datatypes for C reduction operations -- as defined in MPI 2.1 standard. */
+
+#define EMPI_FLOAT_INT             (18)
+#define EMPI_DOUBLE_INT            (19)
+#define EMPI_LONG_INT              (20)
+#define EMPI_2INT                  (21)
+#define EMPI_SHORT_INT             (22)
+#define EMPI_LONG_DOUBLE_INT       (23)
+
+/* BASIC Fortran Datatypes -- as defined in MPI 2.1 standard. */
+
+#define EMPI_INTEGER               (24)
+#define EMPI_REAL                  (25)
+#define EMPI_DOUBLE_PRECISION      (26)
+#define EMPI_COMPLEX               (27)
+#define EMPI_LOGICAL               (28)
+#define EMPI_CHARACTER             (29)
+
+/* Optional Fortran Datatypes -- as defined in MPI 2.1 standard. */
+
+#define EMPI_DOUBLE_COMPLEX        (30)
+
+#define EMPI_INTEGER1              (31)
+#define EMPI_INTEGER2              (32)
+#define EMPI_INTEGER4              (33)
+#define EMPI_INTEGER8              (34)
+
+#define EMPI_REAL2                 (35)
+#define EMPI_REAL4                 (36)
+#define EMPI_REAL8                 (37)
+
+/* Special datatypes for Fortran reduction operations -- as defined in MPI 2.1 standard. */
+
+#define EMPI_2REAL                 (38)
+#define EMPI_2DOUBLE_PRECISION     (39)
+#define EMPI_2INTEGER              (40)
+
+#define EMPI_DEFINED_DATATYPES     (41)
+
+/*
 #ifdef HAVE_MPI_2_2
 
 #define EMPI_C_BOOL                (16)
@@ -92,49 +135,8 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 #define EMPI_COMPLEX32             (EMPI_C_LONG_DOUBLE_COMPLEX)
 
 #endif
+*/
 
-#define EMPI_BYTE                  (28)
-
-#define EMPI_PACKED                (29)
-
-/* Special datatypes for reduction operations -- as defined in MPI 2.2 standard. */
-
-#define EMPI_FLOAT_INT             (30)
-#define EMPI_DOUBLE_INT            (31)
-#define EMPI_LONG_INT              (32)
-#define EMPI_2INT                  (33)
-#define EMPI_SHORT_INT             (34)
-#define EMPI_LONG_DOUBLE_INT       (35)
-
-/* BASIC Fortran Datatypes -- as defined in MPI 2.1 standard. */
-
-#define EMPI_INTEGER               (EMPI_INT)
-#define EMPI_REAL                  (EMPI_FLOAT)
-#define EMPI_DOUBLE_PRECISION      (EMPI_DOUBLE)
-#define EMPI_LOGICAL               (EMPI_INT) // FIXME -- check!
-#define EMPI_CHARACTER             (EMPI_CHAR)
-#define EMPI_COMPLEX               (36)
-#define EMPI_DOUBLE_COMPLEX        (37)
-
-#define EMPI_INTEGER1              (EMPI_SIGNED_CHAR)
-#define EMPI_INTEGER2              (EMPI_SHORT)
-#define EMPI_INTEGER4              (EMPI_INT)
-#define EMPI_INTEGER8              (EMPI_LONG_LONG_INT)
-
-#define EMPI_UNSIGNED_INTEGER1     (EMPI_UNSIGNED_CHAR)
-#define EMPI_UNSIGNED_INTEGER2     (EMPI_UNSIGNED_SHORT)
-#define EMPI_UNSIGNED_INTEGER4     (EMPI_UNSIGNED)
-#define EMPI_UNSIGNED_INTEGER8     (EMPI_UNSIGNED_LONG_LONG)
-
-#define EMPI_REAL4                 (EMPI_FLOAT)
-#define EMPI_REAL8                 (EMPI_DOUBLE)
-#define EMPI_REAL16                (EMPI_LONG_DOUBLE)
-
-#define EMPI_2REAL                 (38)
-#define EMPI_2DOUBLE_PRECISION     (39)
-#define EMPI_2INTEGER              (EMPI_2INT)
-
-#define EMPI_DEFINED_DATATYPES     (40)
 
 /* Communicators */
 

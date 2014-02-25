@@ -10,7 +10,7 @@ struct s_status {
   int MPI_ERROR;
   int count;
   int cancelled;
-  datatype *type;
+  EMPI_Datatype type;
 };
 
 void clear_status(EMPI_Status *s);

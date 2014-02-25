@@ -77,7 +77,7 @@ void free_request(request *r)
 {
    if (r != NULL) {
       if (r->req != MPI_REQUEST_NULL) {
-          MPI_Request_free(&(r->req));
+          PMPI_Request_free(&(r->req));
       }
 
       reqs[r->handle] = NULL;

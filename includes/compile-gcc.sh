@@ -7,24 +7,19 @@
 
 CC=gcc
 
-rm -f *.o libempi.a libempi.so
+rm -f *.o
+rm -f ../lib/libempi-frontend.a
+rm -f ../lib/libempi-frontend.so
 
 $CC -c -g -Wall -fPIC logging.c
 $CC -c -g -Wall -fPIC profiling.c
-$CC -c -g -Wall -fPIC empi.c
-$CC -c -g -Wall -fPIC empif.c
+$CC -c -g -Wall -fPIC empi_wrapper.c
+$CC -c -g -Wall -fPIC empif_wrapper.c
 
-$CC -shared -o libempi.so \
+ar -cr ../lib/libempi-frontend.a \
 logging.o \
 profiling.o \
-empi.o \
-empif.o
+empi_wrapper.o \
+empif_wrapper.o
 
-ar -cr libempi.a \
-logging.o \
-profiling.o \
-empi.o \
-empif.o
-
-rm -f *.o
 

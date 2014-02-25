@@ -1,0 +1,3 @@
+#!/bin/bash
+echo gfortran -I/home/jason/Workspace/eSalsa-MPI/includes/ $@
+gfortran -I/home/jason/Workspace/eSalsa-MPI/includes/ $@

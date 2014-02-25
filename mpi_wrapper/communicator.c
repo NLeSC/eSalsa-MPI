@@ -13,8 +13,6 @@
 #include "messaging.h"
 #include "logging.h"
 
-#include "mpi.h"
-
 extern uint32_t cluster_rank;
 
 static communicator *comms[MAX_COMMUNICATORS];
@@ -30,17 +28,17 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
 
    if (handle < 0 || handle >= MAX_COMMUNICATORS) {
       ERROR(1, "Ran out of communicator storage (%d)!", handle);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    if (initial == 0 && handle < 3) {
       ERROR(1, "Attempting to overwrite reserved communicator (%d)!", handle);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    if (comms[handle] != NULL) {
       ERROR(1, "Attempting to overwrite existing communicator (%d)!", handle);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    INFO(0, "Creating communicator %d : local(%d %d) | global(%d %d)",
@@ -50,7 +48,7 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
 
    if (c == NULL) {
       ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    c->handle = handle;
@@ -71,64 +69,15 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
    c->local_ranks = local_ranks;
 
    if (c->cluster_count > 0) {
-/*
-      c->cluster_ranks = malloc(c->cluster_count * sizeof(unsigned char));
-
-      if (c->cluster_ranks == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
-         return MPI_ERR_INTERN;
-      }
-*/
       for (i=0;i<c->cluster_count;i++) {
-//         c->cluster_ranks[i] = (unsigned char) GET_CLUSTER_RANK(c->members[c->coordinators[i]]);
-
          if (c->cluster_ranks[i] == cluster_rank) {
             c->my_coordinator = c->coordinators[i];
          }
       }
 
    } else {
-//      c->cluster_ranks = NULL;
       c->my_coordinator = 0;
    }
-
-/*
-   if (c->global_size > 0) {
-
-      c->member_cluster_index = malloc(c->global_size * sizeof(uint8_t));
-
-      if (c->member_cluster_index == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
-         return MPI_ERR_INTERN;
-      }
-
-      c->local_ranks = malloc(c->global_size * sizeof(uint32_t));
-
-      if (c->local_ranks == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
-         return MPI_ERR_INTERN;
-      }
-
-      tmp = malloc(c->cluster_count * sizeof(int));
-
-      if (tmp == NULL) {
-         ERROR(1, "Failed to allocate space for communicator (%d)!", handle);
-         return MPI_ERR_INTERN;
-      }
-
-      for (i=0;i<c->global_size;i++) {
-
-
-
-         c->member_cluster_index[i] = (uint8_t) comm_cluster_rank_to_cluster_index(c, GET_CLUSTER_RANK(c->members[i]));
-      }
-
-      free(tmp);
-
-   } else {
-      c->member_cluster_index = NULL;
-   }
-*/
 
    comms[handle] = c;
 
@@ -142,7 +91,7 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
       *out = c;
    }
 
-   return MPI_SUCCESS;
+   return EMPI_SUCCESS;
 }
 
 
@@ -168,7 +117,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
 
    if (coordinators == NULL) {
       ERROR(1, "Failed to allocate space for communicator (coordinators)!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    for (i=0;i<cluster_count;i++) {
@@ -184,7 +133,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
    if (cluster_ranks == NULL) {
       ERROR(1, "Failed to allocate space for communicator (cluster_ranks)!");
       free(coordinators);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    for (i=0;i<cluster_count;i++) {
@@ -197,7 +146,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
       ERROR(1, "Failed to allocate space for communicator (members)!");
       free(coordinators);
       free(cluster_ranks);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    member_cluster_index = malloc(global_count * sizeof(uint32_t));
@@ -207,7 +156,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
       free(coordinators);
       free(cluster_ranks);
       free(members);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    local_ranks = malloc(global_count * sizeof(uint32_t));
@@ -218,7 +167,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
       free(cluster_ranks);
       free(members);
       free(member_cluster_index);
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    tmp_process_rank = 0;
@@ -252,7 +201,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
                             cluster_ranks, member_cluster_index, local_ranks,
                             NULL);
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       ERROR(1, "Failed to create MPI_COMM_WORLD!");
       return error;
    }
@@ -262,35 +211,35 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
 
    if (members == NULL) {
       ERROR(1, "Failed to allocate space for communicator (members -- self)!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    coordinators = malloc(sizeof(int));
 
    if (coordinators == NULL) {
       ERROR(1, "Failed to allocate space for communicator (coordinators -- self)!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    cluster_sizes = malloc(sizeof(int));
 
    if (cluster_sizes == NULL) {
       ERROR(1, "Failed to allocate space for communicator (cluster_sizes -- self)!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    member_cluster_index = malloc(sizeof(uint32_t));
 
    if (member_cluster_index == NULL) {
       ERROR(1, "Failed to allocate space for communicator (member_cluster_index -- self)!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    local_ranks = malloc(sizeof(uint32_t));
 
    if (local_ranks == NULL) {
       ERROR(1, "Failed to allocate space for communicator (local_ranks -- self)!");
-      return MPI_ERR_INTERN;
+      return EMPI_ERR_INTERN;
    }
 
    members[0] = my_pid;
@@ -307,7 +256,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
                             0, 1, 0, 1, 1, coordinators, cluster_sizes, flags, members,
                             cluster_ranks, member_cluster_index, local_ranks, NULL);
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       ERROR(1, "Failed to create MPI_COMM_SELF!");
       return error;
    }
@@ -317,7 +266,7 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
                             0, 0, 0, 0, 0, NULL, NULL, 0, NULL,
                             NULL, NULL, NULL, NULL);
 
-   if (error != MPI_SUCCESS) {
+   if (error != EMPI_SUCCESS) {
       ERROR(1, "Failed to create MPI_COMM_NULL!");
    }
 
@@ -396,11 +345,6 @@ int comm_cluster_rank_to_cluster_index(communicator *c, int cluster_rank)
 
    return -1;
 }
-
-//void set_communicator_ptr(MPI_Comm *dst, communicator *src)
-//{
-//   memcpy(dst, &src, sizeof(communicator *));
-//}
 
 int comm_is_world(communicator* c)
 {
@@ -501,11 +445,11 @@ void store_message(message_buffer *m)
 int match_message(message_buffer *m, int comm, int source, int tag)
 {
    int result = ((comm == m->header.comm) &&
-                 (source == MPI_ANY_SOURCE || source == m->header.source) &&
-                 (tag == MPI_ANY_TAG || tag == m->header.tag));
+                 (source == EMPI_ANY_SOURCE || source == m->header.source) &&
+                 (tag == EMPI_ANY_TAG || tag == m->header.tag));
 
    DEBUG(5, "MATCH_MESSAGE: (comm=%d source=%d [any=%d] tag=%d [any=%d]) == (m.comm=%d m.source=%d m.tag=%d) => %d",
-	comm, source, MPI_ANY_SOURCE, tag, MPI_ANY_TAG,
+	comm, source, EMPI_ANY_SOURCE, tag, EMPI_ANY_TAG,
         m->header.comm, m->header.source, m->header.tag, result);
 
    return result;
@@ -559,34 +503,3 @@ message_buffer *find_pending_message(communicator *c, int source, int tag)
    return NULL;
 }
 
-/*
-MPI_Comm comm_f2c(int f)
-{
-   int i;
-   MPI_Comm res;
-
-fprintf(stderr, "   JASON: comm_f2c(%d)\n", f);
-
-   if (f == -1) {
-fprintf(stderr, "   JASON: comm_f2c(%d) return null\n", f);
-      return MPI_COMM_NULL;
-   }
-
-   for (i=0;i<MAX_COMMUNICATORS;i++) {
-
-      if (comms[i] != NULL) {
-
-fprintf(stderr, "   JASON: comm_f2c(%d) %p %p\n", f, comms[i], comms[i]->comm);
-
-         if (PMPI_Comm_c2f(comms[i]->comm) == f) {
-
-fprintf(stderr, "   FOUND MATCHING COMM!\n");
-            set_communicator_ptr(&res, comms[i]);
-            return res;
-         }
-      }
-   }
-
-   return MPI_COMM_NULL;
-}
-*/
