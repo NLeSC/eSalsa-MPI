@@ -30,7 +30,11 @@ int xEMPI_Comm_size ( EMPI_Comm comm, int *size );
 int xEMPI_Comm_split ( EMPI_Comm comm, int color, int key, EMPI_Comm *newcomm );
 
 int xEMPI_Group_range_incl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup );
+int xEMPI_Group_range_excl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup );
 
+int xEMPI_Group_translate_ranks ( EMPI_Group group1, int n, int *ranks1, EMPI_Group group2, int *ranks2 );
+int xEMPI_Group_union ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup );
+int xEMPI_Group_incl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup );
 
 // Collectives
 
@@ -59,16 +63,44 @@ int xEMPI_Rsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int ta
 int xEMPI_Send ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm );
 int xEMPI_Sendrecv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, int dest, int sendtag, void *recvbuf, int recvcount, EMPI_Datatype recvtype, int source, int recvtag, EMPI_Comm comm, EMPI_Status *status );
 int xEMPI_Ssend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm );
-
+int xEMPI_Recv(void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Status *s);
 
 // Request and status handling.
-
 int xEMPI_Wait ( EMPI_Request *r, EMPI_Status *status );
 int xEMPI_Waitall ( int count, EMPI_Request *array_of_requests, EMPI_Status *array_of_statuses );
 int xEMPI_Request_free ( EMPI_Request *r );
+int xEMPI_Waitany(int count, EMPI_Request *array_of_requests, int *index, EMPI_Status *s);
 
 
+// Datatypes
+int xEMPI_Type_free ( EMPI_Datatype *type );
+int xEMPI_Type_get_envelope ( EMPI_Datatype type, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner );
+int xEMPI_Type_create_indexed_block ( int count, int blocklength, int array_of_displacements[], EMPI_Datatype oldtype, EMPI_Datatype *newtype );
+int xEMPI_Type_contiguous ( int count, EMPI_Datatype old_type, EMPI_Datatype *new_type_p );
+int xEMPI_Type_commit ( EMPI_Datatype *type );
+int xEMPI_Type_get_name ( EMPI_Datatype type, char *type_name, int *resultlen );
 
+
+// Files
+int xEMPI_File_set_view ( EMPI_File EMPI_fh, EMPI_Offset disp, EMPI_Datatype etype, EMPI_Datatype filetype, char *datarep, EMPI_Info info );
+int xEMPI_File_open ( EMPI_Comm comm, char *filename, int amode, EMPI_Info info, EMPI_File *fh );
+int xEMPI_File_close ( EMPI_File *mpi_fh );
+int xEMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s );
+int xEMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s );
+int xEMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s );
+int xEMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s );
+
+
+// Info
+int xEMPI_Info_create ( EMPI_Info *info );
+int xEMPI_Info_delete ( EMPI_Info info, char *key );
+int xEMPI_Info_set ( EMPI_Info info, char *key, char *value );
+int xEMPI_Info_free ( EMPI_Info *info );
+
+
+// Intercomm
+int xEMPI_Intercomm_create ( EMPI_Comm local_comm, int local_leader, EMPI_Comm peer_comm, int remote_leader, int tag, EMPI_Comm *newintercomm );
+int xEMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracomm );
 
 
 // Datatypes

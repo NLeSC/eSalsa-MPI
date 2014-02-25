@@ -182,10 +182,10 @@ void FORT_NAME( empi_reduce , EMPI_REDUCE ) ( void *sendbuf, void *recvbuf, int 
 
 /* Send / receive */
 
-void FORT_NAME( empi_ibsend , EMPI_IBSEND ) ( void *buf, int *count, int *type, int *dest, int *tag, int *comm, int *r , int *ierr )
-{
-   *ierr = EMPI_Ibsend(buf, *count, *type, *dest, *tag, *comm, r);
-}
+//void FORT_NAME( empi_ibsend , EMPI_IBSEND ) ( void *buf, int *count, int *type, int *dest, int *tag, int *comm, int *r , int *ierr )
+//{
+//   *ierr = EMPI_Ibsend(buf, *count, *type, *dest, *tag, *comm, r);
+//}
 
 void FORT_NAME( empi_irecv , EMPI_IRECV ) ( void *buf, int *count, int *type, int *source, int *tag, int *comm, int *r , int *ierr )
 {

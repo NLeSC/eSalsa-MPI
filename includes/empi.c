@@ -1,26 +1,26 @@
 #include "flags.h"
+
+#include "mpi.h"
 #include "profiling.h"
 #include "logging.h"
-#include "debugging.h"
-#include "request.h"
-#include "empi.h"
+
 #include "xempi.h"
 
 /* ------------------------ Misc. utility function ------------------------ */
 
-int EMPI_Init ( int *argc, char ***argv )
+int MPI_Init ( int *argc, char ***argv )
 {
-   init_debug();
+   init_logging();
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Init(int *argc=%p, char ***argv=%p)", argc, argv);
+   INFO(0, "MPI_Init(int *argc=%p, char ***argv=%p)", argc, argv);
 #endif // TRACE_CALLS
 
    int error = xEMPI_Init(argc, argv);
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Init failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Init failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
 
@@ -29,14 +29,14 @@ int EMPI_Init ( int *argc, char ***argv )
    return error;
 }
 
-int EMPI_Initialized ( int *flag )
+int MPI_Initialized ( int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Initialized(int *flag=%p)", flag);
+   INFO(0, "MPI_Initialized(int *flag=%p)", flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -47,21 +47,21 @@ int EMPI_Initialized ( int *flag )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Initialized failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Initialized failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Abort ( EMPI_Comm comm, int errorcode )
+int MPI_Abort ( MPI_Comm comm, int errorcode )
 {
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Abort(EMPI_Comm comm=%s, int errorcode=%d)", comm_to_string(comm), errorcode);
+   INFO(0, "MPI_Abort(MPI_Comm comm=%s, int errorcode=%d)", comm_to_string(comm), errorcode);
 #endif // TRACE_CALLS
 
    int error = xEMPI_Abort(comm, errorcode);
@@ -71,17 +71,17 @@ int EMPI_Abort ( EMPI_Comm comm, int errorcode )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Abort failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Abort failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Finalize ( void )
+int MPI_Finalize ( void )
 {
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Finalize()");
+   INFO(0, "MPI_Finalize()");
 #endif // TRACE_CALLS
 
    int error = xEMPI_Finalize();
@@ -91,21 +91,21 @@ int EMPI_Finalize ( void )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Finalize failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Finalize failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Finalized ( int *flag )
+int MPI_Finalized ( int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Finalized(int *flag=%p)", flag);
+   INFO(0, "MPI_Finalized(int *flag=%p)", flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -116,25 +116,25 @@ int EMPI_Finalized ( int *flag )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Finalized failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Finalized failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-double EMPI_Wtime ( void )
+double MPI_Wtime ( void )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Wtime( void )");
+   INFO(0, "MPI_Wtime( void )");
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -145,20 +145,20 @@ double EMPI_Wtime ( void )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
    return result;
 }
 
-int EMPI_Get_processor_name ( char *name, int *resultlen )
+int MPI_Get_processor_name ( char *name, int *resultlen )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_processor_name(char *name=%p, int *resultlen=%p)", name, resultlen);
+   INFO(0, "MPI_Get_processor_name(char *name=%p, int *resultlen=%p)", name, resultlen);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -169,25 +169,25 @@ int EMPI_Get_processor_name ( char *name, int *resultlen )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get_processor_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get_processor_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Error_string ( int errorcode, char *string, int *resultlen )
+int MPI_Error_string ( int errorcode, char *string, int *resultlen )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Error_string(int errorcode=%d, char *string=%p, int *resultlen=%p)", errorcode, string, resultlen);
+   INFO(0, "MPI_Error_string(int errorcode=%d, char *string=%p, int *resultlen=%p)", errorcode, string, resultlen);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -198,12 +198,12 @@ int EMPI_Error_string ( int errorcode, char *string, int *resultlen )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Error_string failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Error_string failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -214,14 +214,14 @@ int EMPI_Error_string ( int errorcode, char *string, int *resultlen )
 
 /* ------------------------ Communicators and groups ------------------------ */
 
-int EMPI_Comm_create ( EMPI_Comm comm, EMPI_Group g, EMPI_Comm *newcomm )
+int MPI_Comm_create ( MPI_Comm comm, MPI_Group g, MPI_Comm *newcomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_create(EMPI_Comm comm=%s, EMPI_Group g=%s, EMPI_Comm *newcomm=%p)", comm_to_string(comm), group_to_string(g), newcomm);
+   INFO(0, "MPI_Comm_create(MPI_Comm comm=%s, MPI_Group g=%s, MPI_Comm *newcomm=%p)", comm_to_string(comm), group_to_string(g), newcomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -236,21 +236,21 @@ int EMPI_Comm_create ( EMPI_Comm comm, EMPI_Group g, EMPI_Comm *newcomm )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Comm_dup ( EMPI_Comm comm, EMPI_Comm *newcomm )
+int MPI_Comm_dup ( MPI_Comm comm, MPI_Comm *newcomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_dup(EMPI_Comm comm=%s, EMPI_Comm *newcomm=%p)", comm_to_string(comm), newcomm);
+   INFO(0, "MPI_Comm_dup(MPI_Comm comm=%s, MPI_Comm *newcomm=%p)", comm_to_string(comm), newcomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -265,22 +265,22 @@ int EMPI_Comm_dup ( EMPI_Comm comm, EMPI_Comm *newcomm )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_dup failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_dup failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_free ( EMPI_Comm *comm )
+int MPI_Comm_free ( MPI_Comm *comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_free(EMPI_Comm *comm=%p)", comm);
+   INFO(0, "MPI_Comm_free(MPI_Comm *comm=%p)", comm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -291,25 +291,25 @@ int EMPI_Comm_free ( EMPI_Comm *comm )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Comm_group ( EMPI_Comm comm, EMPI_Group *g )
+int MPI_Comm_group ( MPI_Comm comm, MPI_Group *g )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_group(EMPI_Comm comm=%s, EMPI_Group *g=%p)", comm_to_string(comm), g);
+   INFO(0, "MPI_Comm_group(MPI_Comm comm=%s, MPI_Group *g=%p)", comm_to_string(comm), g);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -324,22 +324,22 @@ int EMPI_Comm_group ( EMPI_Comm comm, EMPI_Group *g )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_group failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_group failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_rank ( EMPI_Comm comm, int *rank )
+int MPI_Comm_rank ( MPI_Comm comm, int *rank )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_rank(EMPI_Comm comm=%s, int *rank=%p)", comm_to_string(comm), rank);
+   INFO(0, "MPI_Comm_rank(MPI_Comm comm=%s, int *rank=%p)", comm_to_string(comm), rank);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -354,22 +354,22 @@ int EMPI_Comm_rank ( EMPI_Comm comm, int *rank )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_rank failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_rank failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_size ( EMPI_Comm comm, int *size )
+int MPI_Comm_size ( MPI_Comm comm, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_size(EMPI_Comm comm=%s, int *size=%p)", comm_to_string(comm), size);
+   INFO(0, "MPI_Comm_size(MPI_Comm comm=%s, int *size=%p)", comm_to_string(comm), size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -384,22 +384,22 @@ int EMPI_Comm_size ( EMPI_Comm comm, int *size )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_split ( EMPI_Comm comm, int color, int key, EMPI_Comm *newcomm )
+int MPI_Comm_split ( MPI_Comm comm, int color, int key, MPI_Comm *newcomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_split(EMPI_Comm comm=%s, int color=%d, int key=%d, EMPI_Comm *newcomm=%p)", comm_to_string(comm), color, key, newcomm);
+   INFO(0, "MPI_Comm_split(MPI_Comm comm=%s, int color=%d, int key=%d, MPI_Comm *newcomm=%p)", comm_to_string(comm), color, key, newcomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -414,21 +414,21 @@ int EMPI_Comm_split ( EMPI_Comm comm, int color, int key, EMPI_Comm *newcomm )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_split failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_split failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Group_range_incl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup )
+int MPI_Group_range_incl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_range_incl(EMPI_Group g=%s, int n=%d, int ranges[][3]=%p, EMPI_Group *newgroup=%p)", group_to_string(g), n, ranges, newgroup);
+   INFO(0, "MPI_Group_range_incl(MPI_Group g=%s, int n=%d, int ranges[][3]=%p, MPI_Group *newgroup=%p)", group_to_string(g), n, ranges, newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -439,25 +439,25 @@ int EMPI_Group_range_incl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *ne
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_range_incl failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_range_incl failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Group_range_excl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup )
+int MPI_Group_range_excl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_range_excl(EMPI_Group g=%s, int n=%d, int ranges[][3]=%p, EMPI_Group *newgroup=%p)", group_to_string(g), n, ranges, newgroup);
+   INFO(0, "MPI_Group_range_excl(MPI_Group g=%s, int n=%d, int ranges[][3]=%p, MPI_Group *newgroup=%p)", group_to_string(g), n, ranges, newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -468,25 +468,25 @@ int EMPI_Group_range_excl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *ne
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_range_excl failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_range_excl failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Group_translate_ranks ( EMPI_Group group1, int n, int *ranks1, EMPI_Group group2, int *ranks2 )
+int MPI_Group_translate_ranks ( MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2 )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_translate_ranks(EMPI_Group group1=%s, int n=%d, int *ranks1=%p, EMPI_Group group2=%s, int *ranks2=%p)", group_to_string(group1), n, ranks1, group_to_string(group2), ranks2);
+   INFO(0, "MPI_Group_translate_ranks(MPI_Group group1=%s, int n=%d, int *ranks1=%p, MPI_Group group2=%s, int *ranks2=%p)", group_to_string(group1), n, ranks1, group_to_string(group2), ranks2);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -498,26 +498,26 @@ int EMPI_Group_translate_ranks ( EMPI_Group group1, int n, int *ranks1, EMPI_Gro
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_translate_ranks failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_translate_ranks failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Group_union ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup )
+int MPI_Group_union ( MPI_Group group1, MPI_Group group2, MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_union(EMPI_Group group1=%s, EMPI_Group group2=%s, EMPI_Group *newgroup=%p)", group_to_string(group1), group_to_string(group2), newgroup);
+   INFO(0, "MPI_Group_union(MPI_Group group1=%s, MPI_Group group2=%s, MPI_Group *newgroup=%p)", group_to_string(group1), group_to_string(group2), newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -528,25 +528,25 @@ int EMPI_Group_union ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgrou
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_union failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_union failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Group_incl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup )
+int MPI_Group_incl ( MPI_Group g, int n, int *ranks, MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_incl(EMPI_Group g=%s, int n=%d, int *ranks=%p, EMPI_Group *newgroup=%p)", group_to_string(g), n, ranks, newgroup);
+   INFO(0, "MPI_Group_incl(MPI_Group g=%s, int n=%d, int *ranks=%p, MPI_Group *newgroup=%p)", group_to_string(g), n, ranks, newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -557,12 +557,12 @@ int EMPI_Group_incl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_incl failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_incl failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -571,14 +571,14 @@ int EMPI_Group_incl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup )
 
 /* ------------------------ Collective communication ------------------------ */
 
-int EMPI_Allgather ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int recvcount, EMPI_Datatype recvtype, EMPI_Comm comm )
+int MPI_Allgather ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Allgather(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Allgather(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -598,22 +598,22 @@ int EMPI_Allgather ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Allgather failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Allgather failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Allgatherv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int *recvcounts, int *displs, EMPI_Datatype recvtype, EMPI_Comm comm )
+int MPI_Allgatherv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int *recvcounts, int *displs, MPI_Datatype recvtype, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Allgatherv(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcounts=%p, int *displs=%p, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Allgatherv(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcounts=%p, int *displs=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -633,21 +633,21 @@ int EMPI_Allgatherv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Allgatherv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Allgatherv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Allreduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
+int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Allreduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "MPI_Allreduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -666,22 +666,22 @@ int EMPI_Allreduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Allreduce failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Allreduce failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Alltoall ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *recvbuf, int recvcount, EMPI_Datatype recvtype, EMPI_Comm comm )
+int MPI_Alltoall ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *recvbuf, int recvcount, MPI_Datatype recvtype, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alltoall(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Alltoall(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -701,22 +701,22 @@ int EMPI_Alltoall ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, void *
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alltoall failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Alltoall failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype recvtype, EMPI_Comm comm )
+int MPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *rdispls, MPI_Datatype recvtype, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alltoallv(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, EMPI_Datatype recvtype=%s, EMPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, type_to_string(sendtype), recvbuf, recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Alltoallv(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, type_to_string(sendtype), recvbuf, recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -736,22 +736,22 @@ int EMPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype s
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alltoallv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Alltoallv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype *sendtypes, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype *recvtypes, EMPI_Comm comm )
+int MPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype *sendtypes, void *recvbuf, int *recvcnts, int *rdispls, MPI_Datatype *recvtypes, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alltoallw(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, EMPI_Datatype *sendtypes=%p, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, EMPI_Datatype *recvtypes=%p, EMPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm_to_string(comm));
+   INFO(0, "MPI_Alltoallw(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, MPI_Datatype *sendtypes=%p, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, MPI_Datatype *recvtypes=%p, MPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, sendtypes, recvbuf, recvcnts, rdispls, recvtypes, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -771,21 +771,21 @@ int EMPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype *
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alltoallw failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Alltoallw failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Scatter ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+int MPI_Scatter ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvbuf, int recvcnt, MPI_Datatype recvtype, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Scatter(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Scatter(void *sendbuf=%p, int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -805,22 +805,22 @@ int EMPI_Scatter ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *rec
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Scatter failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Scatter failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+int MPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, MPI_Datatype sendtype, void *recvbuf, int recvcnt, MPI_Datatype recvtype, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Scatterv(void *sendbuf=%p, int *sendcnts=%p, int *displs=%p, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnts, displs, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Scatterv(void *sendbuf=%p, int *sendcnts=%p, int *displs=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnts, displs, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -840,21 +840,21 @@ int EMPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, EMPI_Datatype sen
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Scatterv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Scatterv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Barrier ( EMPI_Comm comm )
+int MPI_Barrier ( MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Barrier(EMPI_Comm comm=%s)", comm_to_string(comm));
+   INFO(0, "MPI_Barrier(MPI_Comm comm=%s)", comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -869,22 +869,22 @@ int EMPI_Barrier ( EMPI_Comm comm )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Barrier failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Barrier failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Bcast ( void *buffer, int count, EMPI_Datatype type, int root, EMPI_Comm comm )
+int MPI_Bcast ( void *buffer, int count, MPI_Datatype type, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Bcast(void *buffer=%p, int count=%d, EMPI_Datatype type=%s, int root=%d, EMPI_Comm comm=%s)", buffer, count, type_to_string(datatype), root, comm_to_string(comm));
+   INFO(0, "MPI_Bcast(void *buffer=%p, int count=%d, MPI_Datatype type=%s, int root=%d, MPI_Comm comm=%s)", buffer, count, type_to_string(datatype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -903,21 +903,21 @@ int EMPI_Bcast ( void *buffer, int count, EMPI_Datatype type, int root, EMPI_Com
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Bcast failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Bcast failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Gather ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+int MPI_Gather ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvbuf, int recvcnt, MPI_Datatype recvtype, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Gather(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Gather(void *sendbuf=%p, int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -937,22 +937,22 @@ int EMPI_Gather ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recv
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Gather failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Gather failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Gatherv ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *displs, EMPI_Datatype recvtype, int root, EMPI_Comm comm )
+int MPI_Gatherv ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *displs, MPI_Datatype recvtype, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Gatherv(void *sendbuf=%p, int sendcnt=%d, EMPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *displs=%p, EMPI_Datatype recvtype=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Gatherv(void *sendbuf=%p, int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *displs=%p, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -972,22 +972,22 @@ int EMPI_Gatherv ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *rec
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Gatherv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Gatherv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Reduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, int root, EMPI_Comm comm )
+int MPI_Reduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, int root=%d, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), root, comm_to_string(comm));
+   INFO(0, "MPI_Reduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1006,8 +1006,8 @@ int EMPI_Reduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, E
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Reduce failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Reduce failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -1018,14 +1018,14 @@ int EMPI_Reduce ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, E
 /* ------------------------ Send / Receive operations ------------------------ */
 
 /*
-int EMPI_Ibsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Ibsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Ibsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Ibsend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1044,8 +1044,8 @@ int EMPI_Ibsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, E
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Ibsend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Ibsend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -1053,14 +1053,14 @@ int EMPI_Ibsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, E
 */
 
 
-int EMPI_Irecv ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Irecv ( void *buf, int count, MPI_Datatype type, int source, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Irecv(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Irecv(void *buf=%p, int count=%d, MPI_Datatype type=%s, int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1079,22 +1079,22 @@ int EMPI_Irecv ( void *buf, int count, EMPI_Datatype type, int source, int tag, 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Irecv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Irecv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Irsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Irsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Irsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Irsend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1113,22 +1113,22 @@ int EMPI_Irsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, E
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Irsend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Irsend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Isend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Isend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Isend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Isend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1147,22 +1147,22 @@ int EMPI_Isend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EM
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Isend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Isend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Rsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+int MPI_Rsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Rsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Rsend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1181,22 +1181,22 @@ int EMPI_Rsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EM
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Rsend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Rsend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Send ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+int MPI_Send ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Send(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Send(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1215,22 +1215,22 @@ int EMPI_Send ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMP
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Send failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Send failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Sendrecv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, int dest, int sendtag, void *recvbuf, int recvcount, EMPI_Datatype recvtype, int source, int recvtag, EMPI_Comm comm, EMPI_Status *s )
+int MPI_Sendrecv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, int dest, int sendtag, void *recvbuf, int recvcount, MPI_Datatype recvtype, int source, int recvtag, MPI_Comm comm, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Sendrecv(void *sendbuf=%p, int sendcount=%d, EMPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", sendbuf, sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), s);
+   INFO(0, "MPI_Sendrecv(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, MPI_Comm comm=%s, MPI_Status *s=%p)", sendbuf, sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1250,21 +1250,21 @@ int EMPI_Sendrecv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, int de
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Sendrecv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Sendrecv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Ssend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+int MPI_Ssend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Ssend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Ssend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1283,22 +1283,22 @@ int EMPI_Ssend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EM
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Ssend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Ssend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Recv ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Status *s )
+int MPI_Recv ( void *buf, int count, MPI_Datatype type, int source, int tag, MPI_Comm comm, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Recv(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), s);
+   INFO(0, "MPI_Recv(void *buf=%p, int count=%d, MPI_Datatype type=%s, int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Status *s=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1317,8 +1317,8 @@ int EMPI_Recv ( void *buf, int count, EMPI_Datatype type, int source, int tag, E
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Recv failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Recv failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -1327,21 +1327,21 @@ int EMPI_Recv ( void *buf, int count, EMPI_Datatype type, int source, int tag, E
 /* ------------------------ Request and status handling ------------------------ */
 
 
-int EMPI_Wait ( EMPI_Request *r, EMPI_Status *s )
+int MPI_Wait ( MPI_Request *r, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
-   EMPI_Comm comm = eEMPI_COMM_SELF;
+   MPI_Comm comm = eMPI_COMM_SELF;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Wait(EMPI_Request *r=%p, EMPI_Status *s=%p)", r, s);
+   INFO(0, "MPI_Wait(MPI_Request *r=%p, MPI_Status *s=%p)", r, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
    // We need a communicator to attach the statistics to.
-   comm = request_get_comm(r, EMPI_COMM_SELF);
+   comm = request_get_comm(r, MPI_COMM_SELF);
 #endif
 
    int error = xEMPI_Wait(r, s);
@@ -1352,21 +1352,21 @@ int EMPI_Wait ( EMPI_Request *r, EMPI_Status *s )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Wait failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Wait failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Waitall ( int count, EMPI_Request *array_of_requests, EMPI_Status *array_of_statuses )
+int MPI_Waitall ( int count, MPI_Request *array_of_requests, MPI_Status *array_of_statuses )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Waitall(int count=%d, EMPI_Request array_of_requests[]=%p, EMPI_Status array_of_statuses[]=%p)", count, array_of_requests, array_of_statuses);
+   INFO(0, "MPI_Waitall(int count=%d, MPI_Request array_of_requests[]=%p, MPI_Status array_of_statuses[]=%p)", count, array_of_requests, array_of_statuses);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1380,26 +1380,26 @@ int EMPI_Waitall ( int count, EMPI_Request *array_of_requests, EMPI_Status *arra
 #if PROFILE_LEVEL > 0
 #ifndef IBIS_INTERCEPT
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_WAITALL, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_WAITALL, profile_end-profile_start);
 #endif // IBIS_INTERCEPT
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Waitall failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Waitall failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Request_free ( EMPI_Request *r )
+int MPI_Request_free ( MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Request_free(EMPI_Request *r=%p)", r);
+   INFO(0, "MPI_Request_free(MPI_Request *r=%p)", r);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1410,25 +1410,25 @@ int EMPI_Request_free ( EMPI_Request *r )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Request_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Request_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI_Status *s )
+int MPI_Waitany ( int count, MPI_Request array_of_requests[], int *index, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Waitany(int count=%d, EMPI_Request array_of_requests[]=%p, int *index=%p, EMPI_Status *s=%p)", count, array_of_requests, index, s);
+   INFO(0, "MPI_Waitany(int count=%d, MPI_Request array_of_requests[]=%p, int *index=%p, MPI_Status *s=%p)", count, array_of_requests, index, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1439,12 +1439,12 @@ int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_WAITANY, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_WAITANY, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Waitany failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Waitany failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -1454,14 +1454,14 @@ int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI
 /* ------------------------ Datatypes ------------------------ */
 
 
-int EMPI_Type_free ( EMPI_Datatype *datatype )
+int MPI_Type_free ( MPI_Datatype *datatype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_free(EMPI_Datatype *datatype=%p)", datatype);
+   INFO(0, "MPI_Type_free(MPI_Datatype *datatype=%p)", datatype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1476,25 +1476,25 @@ int EMPI_Type_free ( EMPI_Datatype *datatype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Type_get_envelope ( EMPI_Datatype type, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner )
+int MPI_Type_get_envelope ( MPI_Datatype type, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_envelope(EMPI_Datatype type=%s, int *num_integers=%p, int *num_addresses=%p, int *num_datatypes=%p, int *combiner=%p)", type_to_string(datatype), num_integers, num_addresses, num_datatypes, combiner);
+   INFO(0, "MPI_Type_get_envelope(MPI_Datatype type=%s, int *num_integers=%p, int *num_addresses=%p, int *num_datatypes=%p, int *combiner=%p)", type_to_string(datatype), num_integers, num_addresses, num_datatypes, combiner);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1509,25 +1509,25 @@ int EMPI_Type_get_envelope ( EMPI_Datatype type, int *num_integers, int *num_add
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_get_envelope failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_get_envelope failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Type_create_indexed_block ( int count, int blocklength, int array_of_displacements[], EMPI_Datatype oldtype, EMPI_Datatype *newtype )
+int MPI_Type_create_indexed_block ( int count, int blocklength, int array_of_displacements[], MPI_Datatype oldtype, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_indexed_block(int count=%d, int blocklength=%d, int array_of_displacements[]=%p, EMPI_Datatype oldtype=%s, EMPI_Datatype *newtype=%p)", count, blocklength, array_of_displacements, type_to_string(oldtype), newtype);
+   INFO(0, "MPI_Type_create_indexed_block(int count=%d, int blocklength=%d, int array_of_displacements[]=%p, MPI_Datatype oldtype=%s, MPI_Datatype *newtype=%p)", count, blocklength, array_of_displacements, type_to_string(oldtype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1543,25 +1543,25 @@ int EMPI_Type_create_indexed_block ( int count, int blocklength, int array_of_di
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_indexed_block failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_indexed_block failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Type_contiguous ( int count, EMPI_Datatype old_type, EMPI_Datatype *new_type_p )
+int MPI_Type_contiguous ( int count, MPI_Datatype old_type, MPI_Datatype *new_type_p )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_contiguous(int count=%d, EMPI_Datatype old_type=%s, EMPI_Datatype *new_type_p=%p)", count, type_to_string(old_type), new_type_p);
+   INFO(0, "MPI_Type_contiguous(int count=%d, MPI_Datatype old_type=%s, MPI_Datatype *new_type_p=%p)", count, type_to_string(old_type), new_type_p);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1577,26 +1577,26 @@ int EMPI_Type_contiguous ( int count, EMPI_Datatype old_type, EMPI_Datatype *new
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_contiguous failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_contiguous failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_commit ( EMPI_Datatype *datatype )
+int MPI_Type_commit ( MPI_Datatype *datatype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_commit(EMPI_Datatype *datatype=%p)", datatype);
+   INFO(0, "MPI_Type_commit(MPI_Datatype *datatype=%p)", datatype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1611,25 +1611,25 @@ int EMPI_Type_commit ( EMPI_Datatype *datatype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_commit failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_commit failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Type_get_name ( EMPI_Datatype type, char *type_name, int *resultlen )
+int MPI_Type_get_name ( MPI_Datatype type, char *type_name, int *resultlen )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_name(EMPI_Datatype type=%s, char *type_name=%p, int *resultlen=%p)", type_to_string(datatype), type_name, resultlen);
+   INFO(0, "MPI_Type_get_name(MPI_Datatype type=%s, char *type_name=%p, int *resultlen=%p)", type_to_string(datatype), type_name, resultlen);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1644,12 +1644,12 @@ int EMPI_Type_get_name ( EMPI_Datatype type, char *type_name, int *resultlen )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_get_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_get_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -1657,14 +1657,14 @@ int EMPI_Type_get_name ( EMPI_Datatype type, char *type_name, int *resultlen )
 
 /* ------------------------ Files ------------------------ */
 
-int EMPI_File_set_view ( EMPI_File EMPI_fh, EMPI_Offset disp, EMPI_Datatype etype, EMPI_Datatype filetype, char *datarep, EMPI_Info info )
+int MPI_File_set_view ( MPI_File MPI_fh, MPI_Offset disp, MPI_Datatype etype, MPI_Datatype filetype, char *datarep, MPI_Info info )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_set_view(EMPI_File EMPI_fh=%s, EMPI_Offset disp=%p, EMPI_Datatype etype=%s, EMPI_Datatype filetype=%s, char *datarep=%p, EMPI_Info info=%s)", file_to_string(EMPI_fh), (void *) disp, type_to_string(etype), type_to_string(filetype), datarep, info_to_string(info));
+   INFO(0, "MPI_File_set_view(MPI_File MPI_fh=%s, MPI_Offset disp=%p, MPI_Datatype etype=%s, MPI_Datatype filetype=%s, char *datarep=%p, MPI_Info info=%s)", file_to_string(MPI_fh), (void *) disp, type_to_string(etype), type_to_string(filetype), datarep, info_to_string(info));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1676,30 +1676,30 @@ int EMPI_File_set_view ( EMPI_File EMPI_fh, EMPI_Offset disp, EMPI_Datatype etyp
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_view(EMPI_fh, disp, etype, filetype, datarep, info);
+   int error = xEMPI_File_set_view(MPI_fh, disp, etype, filetype, datarep, info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_set_view failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_set_view failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_open ( EMPI_Comm comm, char *filename, int amode, EMPI_Info info, EMPI_File *fh )
+int MPI_File_open ( MPI_Comm comm, char *filename, int amode, MPI_Info info, MPI_File *fh )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_open(EMPI_Comm comm=%s, char *filename=%p, int amode=%d, EMPI_Info info=%s, EMPI_File *fh=%p)", comm_to_string(comm), filename, amode, info_to_string(info), fh);
+   INFO(0, "MPI_File_open(MPI_Comm comm=%s, char *filename=%p, int amode=%d, MPI_Info info=%s, MPI_File *fh=%p)", comm_to_string(comm), filename, amode, info_to_string(info), fh);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1714,21 +1714,21 @@ int EMPI_File_open ( EMPI_Comm comm, char *filename, int amode, EMPI_Info info, 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_open failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_open failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_File_close ( EMPI_File *fh )
+int MPI_File_close ( MPI_File *fh )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_close(EMPI_File *fh=%p)", fh);
+   INFO(0, "MPI_File_close(MPI_File *fh=%p)", fh);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1739,25 +1739,25 @@ int EMPI_File_close ( EMPI_File *fh )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_close failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_close failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_write_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_write_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1768,29 +1768,29 @@ int EMPI_File_write_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int c
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at(EMPI_fh, offset, buf, count, type, s);
+   int error = xEMPI_File_write_at(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_at failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_at failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_read_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_read_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1801,29 +1801,29 @@ int EMPI_File_read_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int co
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at(EMPI_fh, offset, buf, count, type, s);
+   int error = xEMPI_File_read_at(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_at failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_at failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_read_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_all(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_read_all(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1834,30 +1834,30 @@ int EMPI_File_read_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_all(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_read_all(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_all failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_all failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_write_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_all(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_write_all(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -1868,16 +1868,16 @@ int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_all(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_write_all(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_all failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_all failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -1888,14 +1888,14 @@ int EMPI_File_write_all ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype
 /* ------------------------ Info ------------------------ */
 
 
-int EMPI_Info_create ( EMPI_Info *info )
+int MPI_Info_create ( MPI_Info *info )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_create(EMPI_Info *info=%p)", info);
+   INFO(0, "MPI_Info_create(MPI_Info *info=%p)", info);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1907,26 +1907,26 @@ int EMPI_Info_create ( EMPI_Info *info )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Info_delete ( EMPI_Info info, char *key )
+int MPI_Info_delete ( MPI_Info info, char *key )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_delete(EMPI_Info info=%s, char *key=%p)", info_to_string(info), key);
+   INFO(0, "MPI_Info_delete(MPI_Info info=%s, char *key=%p)", info_to_string(info), key);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1937,26 +1937,26 @@ int EMPI_Info_delete ( EMPI_Info info, char *key )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_delete failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_delete failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Info_set ( EMPI_Info info, char *key, char *value )
+int MPI_Info_set ( MPI_Info info, char *key, char *value )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_set(EMPI_Info info=%s, char *key=%p, char *value=%p)", info_to_string(info), key, value);
+   INFO(0, "MPI_Info_set(MPI_Info info=%s, char *key=%p, char *value=%p)", info_to_string(info), key, value);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1967,25 +1967,25 @@ int EMPI_Info_set ( EMPI_Info info, char *key, char *value )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_set failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_set failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Info_free ( EMPI_Info *info )
+int MPI_Info_free ( MPI_Info *info )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_free(EMPI_Info *info=%p)", info);
+   INFO(0, "MPI_Info_free(MPI_Info *info=%p)", info);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1996,12 +1996,12 @@ int EMPI_Info_free ( EMPI_Info *info )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -2012,14 +2012,14 @@ int EMPI_Info_free ( EMPI_Info *info )
 /* ------------------------ Intercomm ------------------------ */
 
 
-int EMPI_Intercomm_create ( EMPI_Comm local_comm, int local_leader, EMPI_Comm peer_comm, int remote_leader, int tag, EMPI_Comm *newintercomm )
+int MPI_Intercomm_create ( MPI_Comm local_comm, int local_leader, MPI_Comm peer_comm, int remote_leader, int tag, MPI_Comm *newintercomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Intercomm_create(EMPI_Comm local_comm=%s, int local_leader=%d, EMPI_Comm peer_comm=%s, int remote_leader=%d, int tag=%d, EMPI_Comm *newintercomm=%p)", comm_to_string(local_comm), local_leader, comm_to_string(peer_comm), remote_leader, tag, newintercomm);
+   INFO(0, "MPI_Intercomm_create(MPI_Comm local_comm=%s, int local_leader=%d, MPI_Comm peer_comm=%s, int remote_leader=%d, int tag=%d, MPI_Comm *newintercomm=%p)", comm_to_string(local_comm), local_leader, comm_to_string(peer_comm), remote_leader, tag, newintercomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2034,22 +2034,22 @@ int EMPI_Intercomm_create ( EMPI_Comm local_comm, int local_leader, EMPI_Comm pe
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Intercomm_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Intercomm_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracomm )
+int MPI_Intercomm_merge ( MPI_Comm intercomm, int high, MPI_Comm *newintracomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Intercomm_merge(EMPI_Comm intercomm=%s, int high=%d, EMPI_Comm *newintracomm=%p)", comm_to_string(intercomm), high, newintracomm);
+   INFO(0, "MPI_Intercomm_merge(MPI_Comm intercomm=%s, int high=%d, MPI_Comm *newintracomm=%p)", comm_to_string(intercomm), high, newintracomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2064,8 +2064,8 @@ int EMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracom
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Intercomm_merge failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Intercomm_merge failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -2084,14 +2084,14 @@ int EMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracom
 
 #if 0
 
-int EMPI_Type_create_f90_complex ( int p, int r, EMPI_Datatype *newtype )
+int MPI_Type_create_f90_complex ( int p, int r, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_f90_complex(int p=%d, int r=%d, EMPI_Datatype *newtype=%p)", p, r, newtype);
+   INFO(0, "MPI_Type_create_f90_complex(int p=%d, int r=%d, MPI_Datatype *newtype=%p)", p, r, newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2106,26 +2106,26 @@ int EMPI_Type_create_f90_complex ( int p, int r, EMPI_Datatype *newtype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_f90_complex failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_f90_complex failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_f90_integer ( int r, EMPI_Datatype *newtype )
+int MPI_Type_create_f90_integer ( int r, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_f90_integer(int r=%d, EMPI_Datatype *newtype=%p)", r, newtype);
+   INFO(0, "MPI_Type_create_f90_integer(int r=%d, MPI_Datatype *newtype=%p)", r, newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2140,26 +2140,26 @@ int EMPI_Type_create_f90_integer ( int r, EMPI_Datatype *newtype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_f90_integer failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_f90_integer failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_f90_real ( int p, int r, EMPI_Datatype *newtype )
+int MPI_Type_create_f90_real ( int p, int r, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_f90_real(int p=%d, int r=%d, EMPI_Datatype *newtype=%p)", p, r, newtype);
+   INFO(0, "MPI_Type_create_f90_real(int p=%d, int r=%d, MPI_Datatype *newtype=%p)", p, r, newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2174,12 +2174,12 @@ int EMPI_Type_create_f90_real ( int p, int r, EMPI_Datatype *newtype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_f90_real failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_f90_real failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -2188,14 +2188,14 @@ int EMPI_Type_create_f90_real ( int p, int r, EMPI_Datatype *newtype )
 
 
 
-int EMPI_Accumulate ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatype, int target_rank, EMPI_Aint target_disp, int target_count, EMPI_Datatype target_datatype, EMPI_Op op, EMPI_Win win )
+int MPI_Accumulate ( void *origin_addr, int origin_count, MPI_Datatype origin_datatype, int target_rank, MPI_Aint target_disp, int target_count, MPI_Datatype target_datatype, MPI_Op op, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Accumulate(void *origin_addr=%p, int origin_count=%d, EMPI_Datatype origin_datatype=%s, int target_rank=%d, EMPI_Aint target_disp=%p, int target_count=%d, EMPI_Datatype target_datatype=%s, EMPI_Op op=%s, EMPI_Win win=%s)", origin_addr, origin_count, type_to_string(origin_datatype), target_rank, (void *) target_disp, target_count, type_to_string(target_datatype), op_to_string(op), win_to_string(win));
+   INFO(0, "MPI_Accumulate(void *origin_addr=%p, int origin_count=%d, MPI_Datatype origin_datatype=%s, int target_rank=%d, MPI_Aint target_disp=%p, int target_count=%d, MPI_Datatype target_datatype=%s, MPI_Op op=%s, MPI_Win win=%s)", origin_addr, origin_count, type_to_string(origin_datatype), target_rank, (void *) target_disp, target_count, type_to_string(target_datatype), op_to_string(op), win_to_string(win));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2211,26 +2211,26 @@ int EMPI_Accumulate ( void *origin_addr, int origin_count, EMPI_Datatype origin_
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Accumulate failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Accumulate failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Add_error_class ( int *errorclass )
+int MPI_Add_error_class ( int *errorclass )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Add_error_class(int *errorclass=%p)", errorclass);
+   INFO(0, "MPI_Add_error_class(int *errorclass=%p)", errorclass);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2241,26 +2241,26 @@ int EMPI_Add_error_class ( int *errorclass )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Add_error_class failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Add_error_class failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Add_error_code ( int errorclass, int *errorcode )
+int MPI_Add_error_code ( int errorclass, int *errorcode )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Add_error_code(int errorclass=%d, int *errorcode=%p)", errorclass, errorcode);
+   INFO(0, "MPI_Add_error_code(int errorclass=%d, int *errorcode=%p)", errorclass, errorcode);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2271,26 +2271,26 @@ int EMPI_Add_error_code ( int errorclass, int *errorcode )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Add_error_code failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Add_error_code failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Add_error_string ( int errorcode, char *string )
+int MPI_Add_error_string ( int errorcode, char *string )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Add_error_string(int errorcode=%d, char *string=%p)", errorcode, string);
+   INFO(0, "MPI_Add_error_string(int errorcode=%d, char *string=%p)", errorcode, string);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2301,26 +2301,26 @@ int EMPI_Add_error_string ( int errorcode, char *string )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Add_error_string failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Add_error_string failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Address ( void *location, EMPI_Aint *address )
+int MPI_Address ( void *location, MPI_Aint *address )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Address(void *location=%p, EMPI_Aint *address=%p)", location, address);
+   INFO(0, "MPI_Address(void *location=%p, MPI_Aint *address=%p)", location, address);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2331,12 +2331,12 @@ int EMPI_Address ( void *location, EMPI_Aint *address )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Address failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Address failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -2344,14 +2344,14 @@ int EMPI_Address ( void *location, EMPI_Aint *address )
 
 
 
-int EMPI_Alloc_mem ( EMPI_Aint size, EMPI_Info info, void *baseptr )
+int MPI_Alloc_mem ( MPI_Aint size, MPI_Info info, void *baseptr )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Alloc_mem(EMPI_Aint size=%p, EMPI_Info info=%s, void *baseptr=%p)", (void *) size, info_to_string(info), baseptr);
+   INFO(0, "MPI_Alloc_mem(MPI_Aint size=%p, MPI_Info info=%s, void *baseptr=%p)", (void *) size, info_to_string(info), baseptr);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2362,12 +2362,12 @@ int EMPI_Alloc_mem ( EMPI_Aint size, EMPI_Info info, void *baseptr )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Alloc_mem failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Alloc_mem failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -2376,14 +2376,14 @@ int EMPI_Alloc_mem ( EMPI_Aint size, EMPI_Info info, void *baseptr )
 
 
 
-int EMPI_Attr_delete ( EMPI_Comm comm, int keyval )
+int MPI_Attr_delete ( MPI_Comm comm, int keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Attr_delete(EMPI_Comm comm=%s, int keyval=%d)", comm_to_string(comm), keyval);
+   INFO(0, "MPI_Attr_delete(MPI_Comm comm=%s, int keyval=%d)", comm_to_string(comm), keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2398,22 +2398,22 @@ int EMPI_Attr_delete ( EMPI_Comm comm, int keyval )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Attr_delete failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Attr_delete failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Attr_get ( EMPI_Comm comm, int keyval, void *attr_value, int *flag )
+int MPI_Attr_get ( MPI_Comm comm, int keyval, void *attr_value, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Attr_get(EMPI_Comm comm=%s, int keyval=%d, void *attr_value=%p, int *flag=%p)", comm_to_string(comm), keyval, attr_value, flag);
+   INFO(0, "MPI_Attr_get(MPI_Comm comm=%s, int keyval=%d, void *attr_value=%p, int *flag=%p)", comm_to_string(comm), keyval, attr_value, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2428,22 +2428,22 @@ int EMPI_Attr_get ( EMPI_Comm comm, int keyval, void *attr_value, int *flag )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Attr_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Attr_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Attr_put ( EMPI_Comm comm, int keyval, void *attr_value )
+int MPI_Attr_put ( MPI_Comm comm, int keyval, void *attr_value )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Attr_put(EMPI_Comm comm=%s, int keyval=%d, void *attr_value=%p)", comm_to_string(comm), keyval, attr_value);
+   INFO(0, "MPI_Attr_put(MPI_Comm comm=%s, int keyval=%d, void *attr_value=%p)", comm_to_string(comm), keyval, attr_value);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2458,8 +2458,8 @@ int EMPI_Attr_put ( EMPI_Comm comm, int keyval, void *attr_value )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Attr_put failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Attr_put failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -2468,14 +2468,14 @@ int EMPI_Attr_put ( EMPI_Comm comm, int keyval, void *attr_value )
 
 
 
-int EMPI_Bsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm )
+int MPI_Bsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Bsend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Bsend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2494,22 +2494,22 @@ int EMPI_Bsend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EM
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Bsend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Bsend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Bsend_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Bsend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Bsend_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Bsend_init(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -2528,22 +2528,22 @@ int EMPI_Bsend_init ( void *buf, int count, EMPI_Datatype type, int dest, int ta
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Bsend_init failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Bsend_init failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Buffer_attach ( void *buffer, int size )
+int MPI_Buffer_attach ( void *buffer, int size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Buffer_attach(void *buffer=%p, int size=%d)", buffer, size);
+   INFO(0, "MPI_Buffer_attach(void *buffer=%p, int size=%d)", buffer, size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2554,26 +2554,26 @@ int EMPI_Buffer_attach ( void *buffer, int size )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Buffer_attach failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Buffer_attach failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Buffer_detach ( void *buffer, int *size )
+int MPI_Buffer_detach ( void *buffer, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Buffer_detach(void *buffer=%p, int *size=%p)", buffer, size);
+   INFO(0, "MPI_Buffer_detach(void *buffer=%p, int *size=%p)", buffer, size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2584,26 +2584,26 @@ int EMPI_Buffer_detach ( void *buffer, int *size )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Buffer_detach failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Buffer_detach failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cancel ( EMPI_Request *r )
+int MPI_Cancel ( MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cancel(EMPI_Request *r=%p)", r);
+   INFO(0, "MPI_Cancel(MPI_Request *r=%p)", r);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2614,26 +2614,26 @@ int EMPI_Cancel ( EMPI_Request *r )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cancel failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cancel failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_coords ( EMPI_Comm comm, int rank, int maxdims, int *coords )
+int MPI_Cart_coords ( MPI_Comm comm, int rank, int maxdims, int *coords )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_coords(EMPI_Comm comm=%s, int rank=%d, int maxdims=%d, int *coords=%p)", comm_to_string(comm), rank, maxdims, coords);
+   INFO(0, "MPI_Cart_coords(MPI_Comm comm=%s, int rank=%d, int maxdims=%d, int *coords=%p)", comm_to_string(comm), rank, maxdims, coords);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2648,22 +2648,22 @@ int EMPI_Cart_coords ( EMPI_Comm comm, int rank, int maxdims, int *coords )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_coords failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_coords failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_create ( EMPI_Comm comm_old, int ndims, int *dims, int *periods, int reorder, EMPI_Comm *comm_cart )
+int MPI_Cart_create ( MPI_Comm comm_old, int ndims, int *dims, int *periods, int reorder, MPI_Comm *comm_cart )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_create(EMPI_Comm comm_old=%s, int ndims=%d, int *dims=%p, int *periods=%p, int reorder=%d, EMPI_Comm *comm_cart=%p)", comm_to_string(comm_old), ndims, dims, periods, reorder, comm_cart);
+   INFO(0, "MPI_Cart_create(MPI_Comm comm_old=%s, int ndims=%d, int *dims=%p, int *periods=%p, int reorder=%d, MPI_Comm *comm_cart=%p)", comm_to_string(comm_old), ndims, dims, periods, reorder, comm_cart);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2678,22 +2678,22 @@ int EMPI_Cart_create ( EMPI_Comm comm_old, int ndims, int *dims, int *periods, i
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cartdim_get ( EMPI_Comm comm, int *ndims )
+int MPI_Cartdim_get ( MPI_Comm comm, int *ndims )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cartdim_get(EMPI_Comm comm=%s, int *ndims=%p)", comm_to_string(comm), ndims);
+   INFO(0, "MPI_Cartdim_get(MPI_Comm comm=%s, int *ndims=%p)", comm_to_string(comm), ndims);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2708,22 +2708,22 @@ int EMPI_Cartdim_get ( EMPI_Comm comm, int *ndims )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cartdim_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cartdim_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_get ( EMPI_Comm comm, int maxdims, int *dims, int *periods, int *coords )
+int MPI_Cart_get ( MPI_Comm comm, int maxdims, int *dims, int *periods, int *coords )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_get(EMPI_Comm comm=%s, int maxdims=%d, int *dims=%p, int *periods=%p, int *coords=%p)", comm_to_string(comm), maxdims, dims, periods, coords);
+   INFO(0, "MPI_Cart_get(MPI_Comm comm=%s, int maxdims=%d, int *dims=%p, int *periods=%p, int *coords=%p)", comm_to_string(comm), maxdims, dims, periods, coords);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2738,22 +2738,22 @@ int EMPI_Cart_get ( EMPI_Comm comm, int maxdims, int *dims, int *periods, int *c
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_map ( EMPI_Comm comm_old, int ndims, int *dims, int *periods, int *newrank )
+int MPI_Cart_map ( MPI_Comm comm_old, int ndims, int *dims, int *periods, int *newrank )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_map(EMPI_Comm comm_old=%s, int ndims=%d, int *dims=%p, int *periods=%p, int *newrank=%p)", comm_to_string(comm_old), ndims, dims, periods, newrank);
+   INFO(0, "MPI_Cart_map(MPI_Comm comm_old=%s, int ndims=%d, int *dims=%p, int *periods=%p, int *newrank=%p)", comm_to_string(comm_old), ndims, dims, periods, newrank);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2768,22 +2768,22 @@ int EMPI_Cart_map ( EMPI_Comm comm_old, int ndims, int *dims, int *periods, int 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_map failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_map failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_rank ( EMPI_Comm comm, int *coords, int *rank )
+int MPI_Cart_rank ( MPI_Comm comm, int *coords, int *rank )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_rank(EMPI_Comm comm=%s, int *coords=%p, int *rank=%p)", comm_to_string(comm), coords, rank);
+   INFO(0, "MPI_Cart_rank(MPI_Comm comm=%s, int *coords=%p, int *rank=%p)", comm_to_string(comm), coords, rank);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2798,22 +2798,22 @@ int EMPI_Cart_rank ( EMPI_Comm comm, int *coords, int *rank )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_rank failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_rank failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_shift ( EMPI_Comm comm, int direction, int displ, int *source, int *dest )
+int MPI_Cart_shift ( MPI_Comm comm, int direction, int displ, int *source, int *dest )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_shift(EMPI_Comm comm=%s, int direction=%d, int displ=%d, int *source=%p, int *dest=%p)", comm_to_string(comm), direction, displ, source, dest);
+   INFO(0, "MPI_Cart_shift(MPI_Comm comm=%s, int direction=%d, int displ=%d, int *source=%p, int *dest=%p)", comm_to_string(comm), direction, displ, source, dest);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2828,22 +2828,22 @@ int EMPI_Cart_shift ( EMPI_Comm comm, int direction, int displ, int *source, int
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_shift failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_shift failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Cart_sub ( EMPI_Comm comm, int *remain_dims, EMPI_Comm *comm_new )
+int MPI_Cart_sub ( MPI_Comm comm, int *remain_dims, MPI_Comm *comm_new )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Cart_sub(EMPI_Comm comm=%s, int *remain_dims=%p, EMPI_Comm *comm_new=%p)", comm_to_string(comm), remain_dims, comm_new);
+   INFO(0, "MPI_Cart_sub(MPI_Comm comm=%s, int *remain_dims=%p, MPI_Comm *comm_new=%p)", comm_to_string(comm), remain_dims, comm_new);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2858,22 +2858,22 @@ int EMPI_Cart_sub ( EMPI_Comm comm, int *remain_dims, EMPI_Comm *comm_new )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Cart_sub failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Cart_sub failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Close_port ( char *port_name )
+int MPI_Close_port ( char *port_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Close_port(char *port_name=%p)", port_name);
+   INFO(0, "MPI_Close_port(char *port_name=%p)", port_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2884,26 +2884,26 @@ int EMPI_Close_port ( char *port_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Close_port failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Close_port failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_accept ( char *port_name, EMPI_Info info, int root, EMPI_Comm comm, EMPI_Comm *newcomm )
+int MPI_Comm_accept ( char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_accept(char *port_name=%p, EMPI_Info info=%s, int root=%d, EMPI_Comm comm=%s, EMPI_Comm *newcomm=%p)", port_name, info_to_string(info), root, comm_to_string(comm), newcomm);
+   INFO(0, "MPI_Comm_accept(char *port_name=%p, MPI_Info info=%s, int root=%d, MPI_Comm comm=%s, MPI_Comm *newcomm=%p)", port_name, info_to_string(info), root, comm_to_string(comm), newcomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2918,22 +2918,22 @@ int EMPI_Comm_accept ( char *port_name, EMPI_Info info, int root, EMPI_Comm comm
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_accept failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_accept failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_call_errhandler ( EMPI_Comm comm, int errorcode )
+int MPI_Comm_call_errhandler ( MPI_Comm comm, int errorcode )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_call_errhandler(EMPI_Comm comm=%s, int errorcode=%d)", comm_to_string(comm), errorcode);
+   INFO(0, "MPI_Comm_call_errhandler(MPI_Comm comm=%s, int errorcode=%d)", comm_to_string(comm), errorcode);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2948,22 +2948,22 @@ int EMPI_Comm_call_errhandler ( EMPI_Comm comm, int errorcode )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_call_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_call_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_compare ( EMPI_Comm comm1, EMPI_Comm comm2, int *result )
+int MPI_Comm_compare ( MPI_Comm comm1, MPI_Comm comm2, int *result )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_compare(EMPI_Comm comm1=%s, EMPI_Comm comm2=%s, int *result=%p)", comm_to_string(comm1), comm_to_string(comm2), result);
+   INFO(0, "MPI_Comm_compare(MPI_Comm comm1=%s, MPI_Comm comm2=%s, int *result=%p)", comm_to_string(comm1), comm_to_string(comm2), result);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2978,22 +2978,22 @@ int EMPI_Comm_compare ( EMPI_Comm comm1, EMPI_Comm comm2, int *result )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_compare failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_compare failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_connect ( char *port_name, EMPI_Info info, int root, EMPI_Comm comm, EMPI_Comm *newcomm )
+int MPI_Comm_connect ( char *port_name, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *newcomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_connect(char *port_name=%p, EMPI_Info info=%s, int root=%d, EMPI_Comm comm=%s, EMPI_Comm *newcomm=%p)", port_name, info_to_string(info), root, comm_to_string(comm), newcomm);
+   INFO(0, "MPI_Comm_connect(char *port_name=%p, MPI_Info info=%s, int root=%d, MPI_Comm comm=%s, MPI_Comm *newcomm=%p)", port_name, info_to_string(info), root, comm_to_string(comm), newcomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3008,22 +3008,22 @@ int EMPI_Comm_connect ( char *port_name, EMPI_Info info, int root, EMPI_Comm com
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_connect failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_connect failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_create_errhandler ( EMPI_Comm_errhandler_fn *function, EMPI_Errhandler *errhandler )
+int MPI_Comm_create_errhandler ( MPI_Comm_errhandler_fn *function, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_create_errhandler(EMPI_Comm_errhandler_fn *function=%p, EMPI_Errhandler *errhandler=%p)", function, errhandler);
+   INFO(0, "MPI_Comm_create_errhandler(MPI_Comm_errhandler_fn *function=%p, MPI_Errhandler *errhandler=%p)", function, errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3034,12 +3034,12 @@ int EMPI_Comm_create_errhandler ( EMPI_Comm_errhandler_fn *function, EMPI_Errhan
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_create_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_create_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3048,14 +3048,14 @@ int EMPI_Comm_create_errhandler ( EMPI_Comm_errhandler_fn *function, EMPI_Errhan
 
 
 
-int EMPI_Comm_create_keyval ( EMPI_Comm_copy_attr_function *comm_copy_attr_fn, EMPI_Comm_delete_attr_function *comm_delete_attr_fn, int *comm_keyval, void *extra_state )
+int MPI_Comm_create_keyval ( MPI_Comm_copy_attr_function *comm_copy_attr_fn, MPI_Comm_delete_attr_function *comm_delete_attr_fn, int *comm_keyval, void *extra_state )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_create_keyval(EMPI_Comm_copy_attr_function *comm_copy_attr_fn=%p, EMPI_Comm_delete_attr_function *comm_delete_attr_fn=%p, int *comm_keyval=%p, void *extra_state=%p)", comm_copy_attr_fn, comm_delete_attr_fn, comm_keyval, extra_state);
+   INFO(0, "MPI_Comm_create_keyval(MPI_Comm_copy_attr_function *comm_copy_attr_fn=%p, MPI_Comm_delete_attr_function *comm_delete_attr_fn=%p, int *comm_keyval=%p, void *extra_state=%p)", comm_copy_attr_fn, comm_delete_attr_fn, comm_keyval, extra_state);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3066,26 +3066,26 @@ int EMPI_Comm_create_keyval ( EMPI_Comm_copy_attr_function *comm_copy_attr_fn, E
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_create_keyval failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_create_keyval failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_delete_attr ( EMPI_Comm comm, int comm_keyval )
+int MPI_Comm_delete_attr ( MPI_Comm comm, int comm_keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_delete_attr(EMPI_Comm comm=%s, int comm_keyval=%d)", comm_to_string(comm), comm_keyval);
+   INFO(0, "MPI_Comm_delete_attr(MPI_Comm comm=%s, int comm_keyval=%d)", comm_to_string(comm), comm_keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3100,22 +3100,22 @@ int EMPI_Comm_delete_attr ( EMPI_Comm comm, int comm_keyval )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_delete_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_delete_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_disconnect ( EMPI_Comm *comm )
+int MPI_Comm_disconnect ( MPI_Comm *comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_disconnect(EMPI_Comm *comm=%p)", comm);
+   INFO(0, "MPI_Comm_disconnect(MPI_Comm *comm=%p)", comm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3126,12 +3126,12 @@ int EMPI_Comm_disconnect ( EMPI_Comm *comm )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_disconnect failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_disconnect failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3139,14 +3139,14 @@ int EMPI_Comm_disconnect ( EMPI_Comm *comm )
 
 
 
-int EMPI_Comm_free_keyval ( int *comm_keyval )
+int MPI_Comm_free_keyval ( int *comm_keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_free_keyval(int *comm_keyval=%p)", comm_keyval);
+   INFO(0, "MPI_Comm_free_keyval(int *comm_keyval=%p)", comm_keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3157,26 +3157,26 @@ int EMPI_Comm_free_keyval ( int *comm_keyval )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_free_keyval failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_free_keyval failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_get_attr ( EMPI_Comm comm, int comm_keyval, void *attribute_val, int *flag )
+int MPI_Comm_get_attr ( MPI_Comm comm, int comm_keyval, void *attribute_val, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_get_attr(EMPI_Comm comm=%s, int comm_keyval=%d, void *attribute_val=%p, int *flag=%p)", comm_to_string(comm), comm_keyval, attribute_val, flag);
+   INFO(0, "MPI_Comm_get_attr(MPI_Comm comm=%s, int comm_keyval=%d, void *attribute_val=%p, int *flag=%p)", comm_to_string(comm), comm_keyval, attribute_val, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3191,22 +3191,22 @@ int EMPI_Comm_get_attr ( EMPI_Comm comm, int comm_keyval, void *attribute_val, i
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_get_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_get_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_get_errhandler ( EMPI_Comm comm, EMPI_Errhandler *errhandler )
+int MPI_Comm_get_errhandler ( MPI_Comm comm, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_get_errhandler(EMPI_Comm comm=%s, EMPI_Errhandler *errhandler=%p)", comm_to_string(comm), errhandler);
+   INFO(0, "MPI_Comm_get_errhandler(MPI_Comm comm=%s, MPI_Errhandler *errhandler=%p)", comm_to_string(comm), errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3221,22 +3221,22 @@ int EMPI_Comm_get_errhandler ( EMPI_Comm comm, EMPI_Errhandler *errhandler )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_get_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_get_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_get_name ( EMPI_Comm comm, char *comm_name, int *resultlen )
+int MPI_Comm_get_name ( MPI_Comm comm, char *comm_name, int *resultlen )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_get_name(EMPI_Comm comm=%s, char *comm_name=%p, int *resultlen=%p)", comm_to_string(comm), comm_name, resultlen);
+   INFO(0, "MPI_Comm_get_name(MPI_Comm comm=%s, char *comm_name=%p, int *resultlen=%p)", comm_to_string(comm), comm_name, resultlen);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3251,22 +3251,22 @@ int EMPI_Comm_get_name ( EMPI_Comm comm, char *comm_name, int *resultlen )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_get_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_get_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_get_parent ( EMPI_Comm *parent )
+int MPI_Comm_get_parent ( MPI_Comm *parent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_get_parent(EMPI_Comm *parent=%p)", parent);
+   INFO(0, "MPI_Comm_get_parent(MPI_Comm *parent=%p)", parent);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3277,12 +3277,12 @@ int EMPI_Comm_get_parent ( EMPI_Comm *parent )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_get_parent failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_get_parent failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3291,14 +3291,14 @@ int EMPI_Comm_get_parent ( EMPI_Comm *parent )
 
 
 
-int EMPI_Comm_join ( int fd, EMPI_Comm *intercomm )
+int MPI_Comm_join ( int fd, MPI_Comm *intercomm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_join(int fd=%d, EMPI_Comm *intercomm=%p)", fd, intercomm);
+   INFO(0, "MPI_Comm_join(int fd=%d, MPI_Comm *intercomm=%p)", fd, intercomm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3309,12 +3309,12 @@ int EMPI_Comm_join ( int fd, EMPI_Comm *intercomm )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_join failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_join failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3322,14 +3322,14 @@ int EMPI_Comm_join ( int fd, EMPI_Comm *intercomm )
 
 
 
-int EMPI_Comm_remote_group ( EMPI_Comm comm, EMPI_Group *g )
+int MPI_Comm_remote_group ( MPI_Comm comm, MPI_Group *g )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_remote_group(EMPI_Comm comm=%s, EMPI_Group *g=%p)", comm_to_string(comm), g);
+   INFO(0, "MPI_Comm_remote_group(MPI_Comm comm=%s, MPI_Group *g=%p)", comm_to_string(comm), g);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3344,22 +3344,22 @@ int EMPI_Comm_remote_group ( EMPI_Comm comm, EMPI_Group *g )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_remote_group failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_remote_group failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_remote_size ( EMPI_Comm comm, int *size )
+int MPI_Comm_remote_size ( MPI_Comm comm, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_remote_size(EMPI_Comm comm=%s, int *size=%p)", comm_to_string(comm), size);
+   INFO(0, "MPI_Comm_remote_size(MPI_Comm comm=%s, int *size=%p)", comm_to_string(comm), size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3374,22 +3374,22 @@ int EMPI_Comm_remote_size ( EMPI_Comm comm, int *size )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_remote_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_remote_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_set_attr ( EMPI_Comm comm, int comm_keyval, void *attribute_val )
+int MPI_Comm_set_attr ( MPI_Comm comm, int comm_keyval, void *attribute_val )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_set_attr(EMPI_Comm comm=%s, int comm_keyval=%d, void *attribute_val=%p)", comm_to_string(comm), comm_keyval, attribute_val);
+   INFO(0, "MPI_Comm_set_attr(MPI_Comm comm=%s, int comm_keyval=%d, void *attribute_val=%p)", comm_to_string(comm), comm_keyval, attribute_val);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3404,22 +3404,22 @@ int EMPI_Comm_set_attr ( EMPI_Comm comm, int comm_keyval, void *attribute_val )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_set_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_set_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_set_errhandler ( EMPI_Comm comm, EMPI_Errhandler errhandler )
+int MPI_Comm_set_errhandler ( MPI_Comm comm, MPI_Errhandler errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_set_errhandler(EMPI_Comm comm=%s, EMPI_Errhandler errhandler=%p)", comm_to_string(comm), (void *) errhandler);
+   INFO(0, "MPI_Comm_set_errhandler(MPI_Comm comm=%s, MPI_Errhandler errhandler=%p)", comm_to_string(comm), (void *) errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3434,22 +3434,22 @@ int EMPI_Comm_set_errhandler ( EMPI_Comm comm, EMPI_Errhandler errhandler )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_set_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_set_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_set_name ( EMPI_Comm comm, char *comm_name )
+int MPI_Comm_set_name ( MPI_Comm comm, char *comm_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_set_name(EMPI_Comm comm=%s, char *comm_name=%p)", comm_to_string(comm), comm_name);
+   INFO(0, "MPI_Comm_set_name(MPI_Comm comm=%s, char *comm_name=%p)", comm_to_string(comm), comm_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3464,8 +3464,8 @@ int EMPI_Comm_set_name ( EMPI_Comm comm, char *comm_name )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_set_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_set_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3474,14 +3474,14 @@ int EMPI_Comm_set_name ( EMPI_Comm comm, char *comm_name )
 
 
 
-int EMPI_Comm_spawn ( char *command, char *argv[], int maxprocs, EMPI_Info info, int root, EMPI_Comm comm, EMPI_Comm *intercomm, int array_of_errcodes[] )
+int MPI_Comm_spawn ( char *command, char *argv[], int maxprocs, MPI_Info info, int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_spawn(char *command=%p, char *argv[]=%p, int maxprocs=%d, EMPI_Info info=%s, int root=%d, EMPI_Comm comm=%s, EMPI_Comm *intercomm=%p, int array_of_errcodes[]=%p)", command, argv, maxprocs, info_to_string(info), root, comm_to_string(comm), intercomm, array_of_errcodes);
+   INFO(0, "MPI_Comm_spawn(char *command=%p, char *argv[]=%p, int maxprocs=%d, MPI_Info info=%s, int root=%d, MPI_Comm comm=%s, MPI_Comm *intercomm=%p, int array_of_errcodes[]=%p)", command, argv, maxprocs, info_to_string(info), root, comm_to_string(comm), intercomm, array_of_errcodes);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3496,22 +3496,22 @@ int EMPI_Comm_spawn ( char *command, char *argv[], int maxprocs, EMPI_Info info,
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_spawn failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_spawn failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Comm_spawn_multiple ( int count, char *array_of_commands[], char* *array_of_argv[], int array_of_maxprocs[], EMPI_Info array_of_info[], int root, EMPI_Comm comm, EMPI_Comm *intercomm, int array_of_errcodes[] )
+int MPI_Comm_spawn_multiple ( int count, char *array_of_commands[], char* *array_of_argv[], int array_of_maxprocs[], MPI_Info array_of_info[], int root, MPI_Comm comm, MPI_Comm *intercomm, int array_of_errcodes[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_spawn_multiple(int count=%d, char *array_of_commands[]=%p, char* *array_of_argv[]=%p, int array_of_maxprocs[]=%p, EMPI_Info array_of_info[]=%p, int root=%d, EMPI_Comm comm=%s, EMPI_Comm *intercomm=%p, int array_of_errcodes[]=%p)", count, array_of_commands, array_of_argv, array_of_maxprocs, array_of_info, root, comm_to_string(comm), intercomm, array_of_errcodes);
+   INFO(0, "MPI_Comm_spawn_multiple(int count=%d, char *array_of_commands[]=%p, char* *array_of_argv[]=%p, int array_of_maxprocs[]=%p, MPI_Info array_of_info[]=%p, int root=%d, MPI_Comm comm=%s, MPI_Comm *intercomm=%p, int array_of_errcodes[]=%p)", count, array_of_commands, array_of_argv, array_of_maxprocs, array_of_info, root, comm_to_string(comm), intercomm, array_of_errcodes);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3526,8 +3526,8 @@ int EMPI_Comm_spawn_multiple ( int count, char *array_of_commands[], char* *arra
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_spawn_multiple failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_spawn_multiple failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3535,14 +3535,14 @@ int EMPI_Comm_spawn_multiple ( int count, char *array_of_commands[], char* *arra
 
 
 
-int EMPI_Comm_test_inter ( EMPI_Comm comm, int *flag )
+int MPI_Comm_test_inter ( MPI_Comm comm, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Comm_test_inter(EMPI_Comm comm=%s, int *flag=%p)", comm_to_string(comm), flag);
+   INFO(0, "MPI_Comm_test_inter(MPI_Comm comm=%s, int *flag=%p)", comm_to_string(comm), flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3557,22 +3557,22 @@ int EMPI_Comm_test_inter ( EMPI_Comm comm, int *flag )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Comm_test_inter failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Comm_test_inter failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Dims_create ( int nnodes, int ndims, int *dims )
+int MPI_Dims_create ( int nnodes, int ndims, int *dims )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Dims_create(int nnodes=%d, int ndims=%d, int *dims=%p)", nnodes, ndims, dims);
+   INFO(0, "MPI_Dims_create(int nnodes=%d, int ndims=%d, int *dims=%p)", nnodes, ndims, dims);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3583,26 +3583,26 @@ int EMPI_Dims_create ( int nnodes, int ndims, int *dims )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Dims_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Dims_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 /*
-int EMPI_Dist_graph_create_adjacent ( EMPI_Comm comm_old, int indegree, int sources[], int sourceweights[], int outdegree, int destinations[], int destweights[], EMPI_Info info, int reorder, EMPI_Comm *comm_dist_graph )
+int MPI_Dist_graph_create_adjacent ( MPI_Comm comm_old, int indegree, int sources[], int sourceweights[], int outdegree, int destinations[], int destweights[], MPI_Info info, int reorder, MPI_Comm *comm_dist_graph )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Dist_graph_create_adjacent(EMPI_Comm comm_old=%s, int indegree=%d, int sources[]=%p, int sourceweights[]=%p, int outdegree=%d, int destinations[]=%p, int destweights[]=%p, EMPI_Info info=%s, int reorder=%d, EMPI_Comm *comm_dist_graph=%p)", comm_to_string(comm_old), indegree, sources, sourceweights, outdegree, destinations, destweights, info_to_string(info), reorder, comm_dist_graph);
+   INFO(0, "MPI_Dist_graph_create_adjacent(MPI_Comm comm_old=%s, int indegree=%d, int sources[]=%p, int sourceweights[]=%p, int outdegree=%d, int destinations[]=%p, int destweights[]=%p, MPI_Info info=%s, int reorder=%d, MPI_Comm *comm_dist_graph=%p)", comm_to_string(comm_old), indegree, sources, sourceweights, outdegree, destinations, destweights, info_to_string(info), reorder, comm_dist_graph);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3617,22 +3617,22 @@ int EMPI_Dist_graph_create_adjacent ( EMPI_Comm comm_old, int indegree, int sour
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Dist_graph_create_adjacent failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Dist_graph_create_adjacent failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 /*
-int EMPI_Dist_graph_create ( EMPI_Comm comm_old, int n, int sources[], int degrees[], int destinations[], int weights[], EMPI_Info info, int reorder, EMPI_Comm *comm_dist_graph )
+int MPI_Dist_graph_create ( MPI_Comm comm_old, int n, int sources[], int degrees[], int destinations[], int weights[], MPI_Info info, int reorder, MPI_Comm *comm_dist_graph )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Dist_graph_create(EMPI_Comm comm_old=%s, int n=%d, int sources[]=%p, int degrees[]=%p, int destinations[]=%p, int weights[]=%p, EMPI_Info info=%s, int reorder=%d, EMPI_Comm *comm_dist_graph=%p)", comm_to_string(comm_old), n, sources, degrees, destinations, weights, info_to_string(info), reorder, comm_dist_graph);
+   INFO(0, "MPI_Dist_graph_create(MPI_Comm comm_old=%s, int n=%d, int sources[]=%p, int degrees[]=%p, int destinations[]=%p, int weights[]=%p, MPI_Info info=%s, int reorder=%d, MPI_Comm *comm_dist_graph=%p)", comm_to_string(comm_old), n, sources, degrees, destinations, weights, info_to_string(info), reorder, comm_dist_graph);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3647,22 +3647,22 @@ int EMPI_Dist_graph_create ( EMPI_Comm comm_old, int n, int sources[], int degre
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Dist_graph_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Dist_graph_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 /*
-int EMPI_Dist_graph_neighbors_count ( EMPI_Comm comm, int *indegree, int *outdegree, int *weighted )
+int MPI_Dist_graph_neighbors_count ( MPI_Comm comm, int *indegree, int *outdegree, int *weighted )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Dist_graph_neighbors_count(EMPI_Comm comm=%s, int *indegree=%p, int *outdegree=%p, int *weighted=%p)", comm_to_string(comm), indegree, outdegree, weighted);
+   INFO(0, "MPI_Dist_graph_neighbors_count(MPI_Comm comm=%s, int *indegree=%p, int *outdegree=%p, int *weighted=%p)", comm_to_string(comm), indegree, outdegree, weighted);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3677,22 +3677,22 @@ int EMPI_Dist_graph_neighbors_count ( EMPI_Comm comm, int *indegree, int *outdeg
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Dist_graph_neighbors_count failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Dist_graph_neighbors_count failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 /*
-int EMPI_Dist_graph_neighbors ( EMPI_Comm comm, int maxindegree, int sources[], int sourceweights[], int maxoutdegree, int destinations[], int destweights[] )
+int MPI_Dist_graph_neighbors ( MPI_Comm comm, int maxindegree, int sources[], int sourceweights[], int maxoutdegree, int destinations[], int destweights[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Dist_graph_neighbors(EMPI_Comm comm=%s, int maxindegree=%d, int sources[]=%p, int sourceweights[]=%p, int maxoutdegree=%d, int destinations[]=%p, int destweights[]=%p)", comm_to_string(comm), maxindegree, sources, sourceweights, maxoutdegree, destinations, destweights);
+   INFO(0, "MPI_Dist_graph_neighbors(MPI_Comm comm=%s, int maxindegree=%d, int sources[]=%p, int sourceweights[]=%p, int maxoutdegree=%d, int destinations[]=%p, int destweights[]=%p)", comm_to_string(comm), maxindegree, sources, sourceweights, maxoutdegree, destinations, destweights);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3707,22 +3707,22 @@ int EMPI_Dist_graph_neighbors ( EMPI_Comm comm, int maxindegree, int sources[], 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Dist_graph_neighbors failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Dist_graph_neighbors failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 
-int EMPI_Errhandler_create ( EMPI_Handler_function *function, EMPI_Errhandler *errhandler )
+int MPI_Errhandler_create ( MPI_Handler_function *function, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Errhandler_create(EMPI_Handler_function *function=%p, EMPI_Errhandler *errhandler=%p)", function, errhandler);
+   INFO(0, "MPI_Errhandler_create(MPI_Handler_function *function=%p, MPI_Errhandler *errhandler=%p)", function, errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3733,26 +3733,26 @@ int EMPI_Errhandler_create ( EMPI_Handler_function *function, EMPI_Errhandler *e
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Errhandler_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Errhandler_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Errhandler_free ( EMPI_Errhandler *errhandler )
+int MPI_Errhandler_free ( MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Errhandler_free(EMPI_Errhandler *errhandler=%p)", errhandler);
+   INFO(0, "MPI_Errhandler_free(MPI_Errhandler *errhandler=%p)", errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3763,26 +3763,26 @@ int EMPI_Errhandler_free ( EMPI_Errhandler *errhandler )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Errhandler_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Errhandler_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Errhandler_get ( EMPI_Comm comm, EMPI_Errhandler *errhandler )
+int MPI_Errhandler_get ( MPI_Comm comm, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Errhandler_get(EMPI_Comm comm=%s, EMPI_Errhandler *errhandler=%p)", comm_to_string(comm), errhandler);
+   INFO(0, "MPI_Errhandler_get(MPI_Comm comm=%s, MPI_Errhandler *errhandler=%p)", comm_to_string(comm), errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3797,22 +3797,22 @@ int EMPI_Errhandler_get ( EMPI_Comm comm, EMPI_Errhandler *errhandler )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Errhandler_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Errhandler_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Errhandler_set ( EMPI_Comm comm, EMPI_Errhandler errhandler )
+int MPI_Errhandler_set ( MPI_Comm comm, MPI_Errhandler errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Errhandler_set(EMPI_Comm comm=%s, EMPI_Errhandler errhandler=%p)", comm_to_string(comm), (void *) errhandler);
+   INFO(0, "MPI_Errhandler_set(MPI_Comm comm=%s, MPI_Errhandler errhandler=%p)", comm_to_string(comm), (void *) errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3827,22 +3827,22 @@ int EMPI_Errhandler_set ( EMPI_Comm comm, EMPI_Errhandler errhandler )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Errhandler_set failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Errhandler_set failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Error_class ( int errorcode, int *errorclass )
+int MPI_Error_class ( int errorcode, int *errorclass )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Error_class(int errorcode=%d, int *errorclass=%p)", errorcode, errorclass);
+   INFO(0, "MPI_Error_class(int errorcode=%d, int *errorclass=%p)", errorcode, errorclass);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3853,12 +3853,12 @@ int EMPI_Error_class ( int errorcode, int *errorclass )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Error_class failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Error_class failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3866,14 +3866,14 @@ int EMPI_Error_class ( int errorcode, int *errorclass )
 
 
 
-int EMPI_Exscan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
+int MPI_Exscan ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Exscan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "MPI_Exscan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -3892,22 +3892,22 @@ int EMPI_Exscan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, E
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Exscan failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Exscan failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_call_errhandler ( EMPI_File fh, int errorcode )
+int MPI_File_call_errhandler ( MPI_File fh, int errorcode )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_call_errhandler(EMPI_File fh=%s, int errorcode=%d)", file_to_string(fh), errorcode);
+   INFO(0, "MPI_File_call_errhandler(MPI_File fh=%s, int errorcode=%d)", file_to_string(fh), errorcode);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3918,12 +3918,12 @@ int EMPI_File_call_errhandler ( EMPI_File fh, int errorcode )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_call_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_call_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -3932,14 +3932,14 @@ int EMPI_File_call_errhandler ( EMPI_File fh, int errorcode )
 
 
 
-int EMPI_File_create_errhandler ( EMPI_File_errhandler_fn *function, EMPI_Errhandler *errhandler )
+int MPI_File_create_errhandler ( MPI_File_errhandler_fn *function, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_create_errhandler(EMPI_File_errhandler_fn *function=%p, EMPI_Errhandler *errhandler=%p)", function, errhandler);
+   INFO(0, "MPI_File_create_errhandler(MPI_File_errhandler_fn *function=%p, MPI_Errhandler *errhandler=%p)", function, errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3950,26 +3950,26 @@ int EMPI_File_create_errhandler ( EMPI_File_errhandler_fn *function, EMPI_Errhan
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_create_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_create_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_delete ( char *filename, EMPI_Info info )
+int MPI_File_delete ( char *filename, MPI_Info info )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_delete(char *filename=%p, EMPI_Info info=%s)", filename, info_to_string(info));
+   INFO(0, "MPI_File_delete(char *filename=%p, MPI_Info info=%s)", filename, info_to_string(info));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -3980,116 +3980,116 @@ int EMPI_File_delete ( char *filename, EMPI_Info info )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_delete failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_delete failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_amode ( EMPI_File EMPI_fh, int *amode )
+int MPI_File_get_amode ( MPI_File MPI_fh, int *amode )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_amode(EMPI_File EMPI_fh=%s, int *amode=%p)", file_to_string(EMPI_fh), amode);
+   INFO(0, "MPI_File_get_amode(MPI_File MPI_fh=%s, int *amode=%p)", file_to_string(MPI_fh), amode);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_amode(EMPI_fh, amode);
+   int error = xEMPI_File_get_amode(MPI_fh, amode);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_amode failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_amode failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_atomicity ( EMPI_File EMPI_fh, int *flag )
+int MPI_File_get_atomicity ( MPI_File MPI_fh, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_atomicity(EMPI_File EMPI_fh=%s, int *flag=%p)", file_to_string(EMPI_fh), flag);
+   INFO(0, "MPI_File_get_atomicity(MPI_File MPI_fh=%s, int *flag=%p)", file_to_string(MPI_fh), flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_atomicity(EMPI_fh, flag);
+   int error = xEMPI_File_get_atomicity(MPI_fh, flag);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_atomicity failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_atomicity failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_byte_offset ( EMPI_File EMPI_fh, EMPI_Offset offset, EMPI_Offset *disp )
+int MPI_File_get_byte_offset ( MPI_File MPI_fh, MPI_Offset offset, MPI_Offset *disp )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_byte_offset(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, EMPI_Offset *disp=%p)", file_to_string(EMPI_fh), (void *) offset, disp);
+   INFO(0, "MPI_File_get_byte_offset(MPI_File MPI_fh=%s, MPI_Offset offset=%p, MPI_Offset *disp=%p)", file_to_string(MPI_fh), (void *) offset, disp);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_byte_offset(EMPI_fh, offset, disp);
+   int error = xEMPI_File_get_byte_offset(MPI_fh, offset, disp);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_byte_offset failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_byte_offset failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_errhandler ( EMPI_File file, EMPI_Errhandler *errhandler )
+int MPI_File_get_errhandler ( MPI_File file, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_errhandler(EMPI_File file=%s, EMPI_Errhandler *errhandler=%p)", file_to_string(file), errhandler);
+   INFO(0, "MPI_File_get_errhandler(MPI_File file=%s, MPI_Errhandler *errhandler=%p)", file_to_string(file), errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -4100,176 +4100,176 @@ int EMPI_File_get_errhandler ( EMPI_File file, EMPI_Errhandler *errhandler )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_group ( EMPI_File EMPI_fh, EMPI_Group *g )
+int MPI_File_get_group ( MPI_File MPI_fh, MPI_Group *g )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_group(EMPI_File EMPI_fh=%s, EMPI_Group *g=%p)", file_to_string(EMPI_fh), g);
+   INFO(0, "MPI_File_get_group(MPI_File MPI_fh=%s, MPI_Group *g=%p)", file_to_string(MPI_fh), g);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_group(EMPI_fh, g);
+   int error = xEMPI_File_get_group(MPI_fh, g);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_group failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_group failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_info ( EMPI_File EMPI_fh, EMPI_Info *info_used )
+int MPI_File_get_info ( MPI_File MPI_fh, MPI_Info *info_used )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_info(EMPI_File EMPI_fh=%s, EMPI_Info *info_used=%p)", file_to_string(EMPI_fh), info_used);
+   INFO(0, "MPI_File_get_info(MPI_File MPI_fh=%s, MPI_Info *info_used=%p)", file_to_string(MPI_fh), info_used);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_info(EMPI_fh, info_used);
+   int error = xEMPI_File_get_info(MPI_fh, info_used);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_info failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_info failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_position ( EMPI_File EMPI_fh, EMPI_Offset *offset )
+int MPI_File_get_position ( MPI_File MPI_fh, MPI_Offset *offset )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_position(EMPI_File EMPI_fh=%s, EMPI_Offset *offset=%p)", file_to_string(EMPI_fh), offset);
+   INFO(0, "MPI_File_get_position(MPI_File MPI_fh=%s, MPI_Offset *offset=%p)", file_to_string(MPI_fh), offset);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_position(EMPI_fh, offset);
+   int error = xEMPI_File_get_position(MPI_fh, offset);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_position failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_position failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_position_shared ( EMPI_File EMPI_fh, EMPI_Offset *offset )
+int MPI_File_get_position_shared ( MPI_File MPI_fh, MPI_Offset *offset )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_position_shared(EMPI_File EMPI_fh=%s, EMPI_Offset *offset=%p)", file_to_string(EMPI_fh), offset);
+   INFO(0, "MPI_File_get_position_shared(MPI_File MPI_fh=%s, MPI_Offset *offset=%p)", file_to_string(MPI_fh), offset);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_position_shared(EMPI_fh, offset);
+   int error = xEMPI_File_get_position_shared(MPI_fh, offset);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_position_shared failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_position_shared failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_size ( EMPI_File EMPI_fh, EMPI_Offset *size )
+int MPI_File_get_size ( MPI_File MPI_fh, MPI_Offset *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_size(EMPI_File EMPI_fh=%s, EMPI_Offset *size=%p)", file_to_string(EMPI_fh), size);
+   INFO(0, "MPI_File_get_size(MPI_File MPI_fh=%s, MPI_Offset *size=%p)", file_to_string(MPI_fh), size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_size(EMPI_fh, size);
+   int error = xEMPI_File_get_size(MPI_fh, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_type_extent ( EMPI_File EMPI_fh, EMPI_Datatype type, EMPI_Aint *extent )
+int MPI_File_get_type_extent ( MPI_File MPI_fh, MPI_Datatype type, MPI_Aint *extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_type_extent(EMPI_File EMPI_fh=%s, EMPI_Datatype type=%s, EMPI_Aint *extent=%p)", file_to_string(EMPI_fh), type_to_string(datatype), extent);
+   INFO(0, "MPI_File_get_type_extent(MPI_File MPI_fh=%s, MPI_Datatype type=%s, MPI_Aint *extent=%p)", file_to_string(MPI_fh), type_to_string(datatype), extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4280,30 +4280,30 @@ int EMPI_File_get_type_extent ( EMPI_File EMPI_fh, EMPI_Datatype type, EMPI_Aint
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_type_extent(EMPI_fh, type, extent);
+   int error = xEMPI_File_get_type_extent(MPI_fh, type, extent);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_type_extent failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_type_extent failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_get_view ( EMPI_File EMPI_fh, EMPI_Offset *disp, EMPI_Datatype *etype, EMPI_Datatype *filetype, char *datarep )
+int MPI_File_get_view ( MPI_File MPI_fh, MPI_Offset *disp, MPI_Datatype *etype, MPI_Datatype *filetype, char *datarep )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_get_view(EMPI_File EMPI_fh=%s, EMPI_Offset *disp=%p, EMPI_Datatype *etype=%p, EMPI_Datatype *filetype=%p, char *datarep=%p)", file_to_string(EMPI_fh), disp, etype, filetype, datarep);
+   INFO(0, "MPI_File_get_view(MPI_File MPI_fh=%s, MPI_Offset *disp=%p, MPI_Datatype *etype=%p, MPI_Datatype *filetype=%p, char *datarep=%p)", file_to_string(MPI_fh), disp, etype, filetype, datarep);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4315,30 +4315,30 @@ int EMPI_File_get_view ( EMPI_File EMPI_fh, EMPI_Offset *disp, EMPI_Datatype *et
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_get_view(EMPI_fh, disp, etype, filetype, datarep);
+   int error = xEMPI_File_get_view(MPI_fh, disp, etype, filetype, datarep);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_get_view failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_get_view failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_iread_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, MPIO_Request *r )
+int MPI_File_iread_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type, MPIO_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iread_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
+   INFO(0, "MPI_File_iread_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4349,30 +4349,30 @@ int EMPI_File_iread_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int c
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread_at(EMPI_fh, offset, buf, count, type, r);
+   int error = xEMPI_File_iread_at(MPI_fh, offset, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_iread_at failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_iread_at failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_iread ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Request *r )
+int MPI_File_iread ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iread(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "MPI_File_iread(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Request *r=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4383,30 +4383,30 @@ int EMPI_File_iread ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype typ
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread(EMPI_fh, buf, count, type, r);
+   int error = xEMPI_File_iread(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_iread failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_iread failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_iread_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Request *r )
+int MPI_File_iread_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iread_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "MPI_File_iread_shared(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Request *r=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4417,30 +4417,30 @@ int EMPI_File_iread_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iread_shared(EMPI_fh, buf, count, type, r);
+   int error = xEMPI_File_iread_shared(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_iread_shared failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_iread_shared failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_iwrite_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, MPIO_Request *r )
+int MPI_File_iwrite_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type, MPIO_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iwrite_at(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
+   INFO(0, "MPI_File_iwrite_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4451,30 +4451,30 @@ int EMPI_File_iwrite_at ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int 
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite_at(EMPI_fh, offset, buf, count, type, r);
+   int error = xEMPI_File_iwrite_at(MPI_fh, offset, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_iwrite_at failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_iwrite_at failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_iwrite ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Request *r )
+int MPI_File_iwrite ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iwrite(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "MPI_File_iwrite(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Request *r=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4485,30 +4485,30 @@ int EMPI_File_iwrite ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype ty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite(EMPI_fh, buf, count, type, r);
+   int error = xEMPI_File_iwrite(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_iwrite failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_iwrite failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_iwrite_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, MPIO_Request *r )
+int MPI_File_iwrite_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPIO_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_iwrite_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), r);
+   INFO(0, "MPI_File_iwrite_shared(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPIO_Request *r=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4519,16 +4519,16 @@ int EMPI_File_iwrite_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_iwrite_shared(EMPI_fh, buf, count, type, r);
+   int error = xEMPI_File_iwrite_shared(MPI_fh, buf, count, type, r);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_iwrite_shared failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_iwrite_shared failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -4537,110 +4537,44 @@ int EMPI_File_iwrite_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Data
 
 
 
-int EMPI_File_preallocate ( EMPI_File EMPI_fh, EMPI_Offset size )
+int MPI_File_preallocate ( MPI_File MPI_fh, MPI_Offset size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_preallocate(EMPI_File EMPI_fh=%s, EMPI_Offset size=%p)", file_to_string(EMPI_fh), (void *) size);
+   INFO(0, "MPI_File_preallocate(MPI_File MPI_fh=%s, MPI_Offset size=%p)", file_to_string(MPI_fh), (void *) size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_preallocate(EMPI_fh, size);
+   int error = xEMPI_File_preallocate(MPI_fh, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_preallocate failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_preallocate failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_read_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
+int MPI_File_read_all_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_all_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_read_all_begin(EMPI_fh, buf, count, datatype);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_all_begin failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_File_read_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_read_all_end(EMPI_fh, buf, s);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_all_end failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-
-
-int EMPI_File_read_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at_all_begin(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype));
+   INFO(0, "MPI_File_read_all_begin(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s)", file_to_string(MPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4651,79 +4585,46 @@ int EMPI_File_read_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *b
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all_begin(EMPI_fh, offset, buf, count, datatype);
+   int error = xEMPI_File_read_all_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_at_all_begin failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_all_begin failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_read_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
+int MPI_File_read_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
+   INFO(0, "MPI_File_read_all_end(MPI_File MPI_fh=%s, void *buf=%p, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_at_all_end(EMPI_fh, buf, s);
+   int error = xEMPI_File_read_all_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_at_all_end failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-int EMPI_File_read_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_at_all(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_read_at_all(EMPI_fh, offset, buf, count, type, s);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_at_all failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_all_end failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -4732,14 +4633,14 @@ int EMPI_File_read_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, in
 
 
 
-int EMPI_File_read ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_read_at_all_begin ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_read_at_all_begin(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4750,30 +4651,59 @@ int EMPI_File_read ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_read_at_all_begin(MPI_fh, offset, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_at_all_begin failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_read_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
+int MPI_File_read_at_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_ordered_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
+   INFO(0, "MPI_File_read_at_all_end(MPI_File MPI_fh=%s, void *buf=%p, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, s);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_read_at_all_end(MPI_fh, buf, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_at_all_end failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int MPI_File_read_at_all ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type, MPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_read_at_all(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4784,60 +4714,32 @@ int EMPI_File_read_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered_begin(EMPI_fh, buf, count, datatype);
+   int error = xEMPI_File_read_at_all(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_ordered_begin failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_at_all failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_read_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
+
+
+int MPI_File_read ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_ordered_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_read_ordered_end(EMPI_fh, buf, s);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_ordered_end failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_File_read_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_ordered(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_read(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4848,30 +4750,30 @@ int EMPI_File_read_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_ordered(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_read(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_ordered failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_read_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_read_ordered_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_read_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_read_ordered_begin(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s)", file_to_string(MPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -4882,120 +4784,218 @@ int EMPI_File_read_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Dataty
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_read_shared(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_read_ordered_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_read_shared failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_ordered_begin failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_seek ( EMPI_File EMPI_fh, EMPI_Offset offset, int whence )
+int MPI_File_read_ordered_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_seek(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, int whence=%d)", file_to_string(EMPI_fh), (void *) offset, whence);
+   INFO(0, "MPI_File_read_ordered_end(MPI_File MPI_fh=%s, void *buf=%p, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_seek(EMPI_fh, offset, whence);
+   int error = xEMPI_File_read_ordered_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_seek failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_ordered_end failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_seek_shared ( EMPI_File EMPI_fh, EMPI_Offset offset, int whence )
+int MPI_File_read_ordered ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_seek_shared(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, int whence=%d)", file_to_string(EMPI_fh), (void *) offset, whence);
+   INFO(0, "MPI_File_read_ordered(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_read_ordered(MPI_fh, buf, count, type, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_ordered failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_read_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_read_shared(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_read_shared(MPI_fh, buf, count, type, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_read_shared failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_seek ( MPI_File MPI_fh, MPI_Offset offset, int whence )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_seek(MPI_File MPI_fh=%s, MPI_Offset offset=%p, int whence=%d)", file_to_string(MPI_fh), (void *) offset, whence);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_seek_shared(EMPI_fh, offset, whence);
+   int error = xEMPI_File_seek(MPI_fh, offset, whence);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_seek_shared failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_seek failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_set_atomicity ( EMPI_File EMPI_fh, int flag )
+int MPI_File_seek_shared ( MPI_File MPI_fh, MPI_Offset offset, int whence )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_set_atomicity(EMPI_File EMPI_fh=%s, int flag=%d)", file_to_string(EMPI_fh), flag);
+   INFO(0, "MPI_File_seek_shared(MPI_File MPI_fh=%s, MPI_Offset offset=%p, int whence=%d)", file_to_string(MPI_fh), (void *) offset, whence);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_atomicity(EMPI_fh, flag);
+   int error = xEMPI_File_seek_shared(MPI_fh, offset, whence);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_set_atomicity failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_seek_shared failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_set_errhandler ( EMPI_File file, EMPI_Errhandler errhandler )
+int MPI_File_set_atomicity ( MPI_File MPI_fh, int flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_set_errhandler(EMPI_File file=%s, EMPI_Errhandler errhandler=%p)", file_to_string(file), (void *) errhandler);
+   INFO(0, "MPI_File_set_atomicity(MPI_File MPI_fh=%s, int flag=%d)", file_to_string(MPI_fh), flag);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_set_atomicity(MPI_fh, flag);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_set_atomicity failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_set_errhandler ( MPI_File file, MPI_Errhandler errhandler )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_set_errhandler(MPI_File file=%s, MPI_Errhandler errhandler=%p)", file_to_string(file), (void *) errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5006,72 +5006,72 @@ int EMPI_File_set_errhandler ( EMPI_File file, EMPI_Errhandler errhandler )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_set_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_set_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_set_info ( EMPI_File EMPI_fh, EMPI_Info info )
+int MPI_File_set_info ( MPI_File MPI_fh, MPI_Info info )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_set_info(EMPI_File EMPI_fh=%s, EMPI_Info info=%s)", file_to_string(EMPI_fh), info_to_string(info));
+   INFO(0, "MPI_File_set_info(MPI_File MPI_fh=%s, MPI_Info info=%s)", file_to_string(MPI_fh), info_to_string(info));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_info(EMPI_fh, info);
+   int error = xEMPI_File_set_info(MPI_fh, info);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_set_info failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_set_info failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_set_size ( EMPI_File EMPI_fh, EMPI_Offset size )
+int MPI_File_set_size ( MPI_File MPI_fh, MPI_Offset size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_set_size(EMPI_File EMPI_fh=%s, EMPI_Offset size=%p)", file_to_string(EMPI_fh), (void *) size);
+   INFO(0, "MPI_File_set_size(MPI_File MPI_fh=%s, MPI_Offset size=%p)", file_to_string(MPI_fh), (void *) size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_set_size(EMPI_fh, size);
+   int error = xEMPI_File_set_size(MPI_fh, size);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_set_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_set_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -5079,110 +5079,44 @@ int EMPI_File_set_size ( EMPI_File EMPI_fh, EMPI_Offset size )
 
 
 
-int EMPI_File_sync ( EMPI_File EMPI_fh )
+int MPI_File_sync ( MPI_File MPI_fh )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_sync(EMPI_File EMPI_fh=%s)", file_to_string(EMPI_fh));
+   INFO(0, "MPI_File_sync(MPI_File MPI_fh=%s)", file_to_string(MPI_fh));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_sync(EMPI_fh);
+   int error = xEMPI_File_sync(MPI_fh);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_sync failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_sync failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_write_all_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
+int MPI_File_write_all_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_all_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_write_all_begin(EMPI_fh, buf, count, datatype);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_all_begin failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_File_write_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_write_all_end(EMPI_fh, buf, s);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_all_end failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-
-
-int EMPI_File_write_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at_all_begin(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype));
+   INFO(0, "MPI_File_write_all_begin(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s)", file_to_string(MPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5193,80 +5127,46 @@ int EMPI_File_write_at_all_begin ( EMPI_File EMPI_fh, EMPI_Offset offset, void *
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all_begin(EMPI_fh, offset, buf, count, datatype);
+   int error = xEMPI_File_write_all_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_at_all_begin failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_all_begin failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_write_at_all_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
+int MPI_File_write_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at_all_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
+   INFO(0, "MPI_File_write_all_end(MPI_File MPI_fh=%s, void *buf=%p, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_at_all_end(EMPI_fh, buf, s);
+   int error = xEMPI_File_write_all_end(MPI_fh, buf, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_at_all_end failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_File_write_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_at_all(EMPI_File EMPI_fh=%s, EMPI_Offset offset=%p, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_write_at_all(EMPI_fh, offset, buf, count, type, s);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_at_all failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_all_end failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -5275,14 +5175,14 @@ int EMPI_File_write_at_all ( EMPI_File EMPI_fh, EMPI_Offset offset, void *buf, i
 
 
 
-int EMPI_File_write ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_write_at_all_begin ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_write_at_all_begin(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5293,30 +5193,60 @@ int EMPI_File_write ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype typ
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_write_at_all_begin(MPI_fh, offset, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_at_all_begin failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_write_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type )
+int MPI_File_write_at_all_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_ordered_begin(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype));
+   INFO(0, "MPI_File_write_at_all_end(MPI_File MPI_fh=%s, void *buf=%p, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, s);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_write_at_all_end(MPI_fh, buf, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_at_all_end failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_write_at_all ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count, MPI_Datatype type, MPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_write_at_all(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), (void *) offset, buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5327,60 +5257,32 @@ int EMPI_File_write_ordered_begin ( EMPI_File EMPI_fh, void *buf, int count, EMP
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered_begin(EMPI_fh, buf, count, datatype);
+   int error = xEMPI_File_write_at_all(MPI_fh, offset, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_ordered_begin failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_at_all failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_write_ordered_end ( EMPI_File EMPI_fh, void *buf, EMPI_Status *s )
+
+
+int MPI_File_write ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_ordered_end(EMPI_File EMPI_fh=%s, void *buf=%p, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, s);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = xEMPI_File_write_ordered_end(EMPI_fh, buf, s);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_ordered_end failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int EMPI_File_write_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_ordered(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_write(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5391,30 +5293,30 @@ int EMPI_File_write_ordered ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Data
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_ordered(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_write(MPI_fh, buf, count, type, s);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_ordered failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_File_write_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *s )
+int MPI_File_write_ordered_begin ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_File_write_shared(EMPI_File EMPI_fh=%s, void *buf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Status *s=%p)", file_to_string(EMPI_fh), buf, count, type_to_string(datatype), s);
+   INFO(0, "MPI_File_write_ordered_begin(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s)", file_to_string(MPI_fh), buf, count, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5425,16 +5327,114 @@ int EMPI_File_write_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
    profile_start = profile_start_ticks();
 #endif // PROFILE_LEVEL
 
-   int error = xEMPI_File_write_shared(EMPI_fh, buf, count, type, s);
+   int error = xEMPI_File_write_ordered_begin(MPI_fh, buf, count, datatype);
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_File_write_shared failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_ordered_begin failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_write_ordered_end ( MPI_File MPI_fh, void *buf, MPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_write_ordered_end(MPI_File MPI_fh=%s, void *buf=%p, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, s);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_write_ordered_end(MPI_fh, buf, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_ordered_end failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_write_ordered ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_write_ordered(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_write_ordered(MPI_fh, buf, count, type, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_ordered failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_File_write_shared ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type, MPI_Status *s )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_write_shared(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(datatype), s);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = xEMPI_File_write_shared(MPI_fh, buf, count, type, s);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_File_write_shared failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -5442,14 +5442,14 @@ int EMPI_File_write_shared ( EMPI_File EMPI_fh, void *buf, int count, EMPI_Datat
 
 
 
-int EMPI_Free_mem ( void *base )
+int MPI_Free_mem ( void *base )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Free_mem(void *base=%p)", base);
+   INFO(0, "MPI_Free_mem(void *base=%p)", base);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5460,12 +5460,12 @@ int EMPI_Free_mem ( void *base )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Free_mem failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Free_mem failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -5473,14 +5473,14 @@ int EMPI_Free_mem ( void *base )
 
 
 
-int EMPI_Get_address ( void *location, EMPI_Aint *address )
+int MPI_Get_address ( void *location, MPI_Aint *address )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_address(void *location=%p, EMPI_Aint *address=%p)", location, address);
+   INFO(0, "MPI_Get_address(void *location=%p, MPI_Aint *address=%p)", location, address);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5491,26 +5491,26 @@ int EMPI_Get_address ( void *location, EMPI_Aint *address )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get_address failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get_address failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Get_count ( EMPI_Status *s, EMPI_Datatype type, int *count )
+int MPI_Get_count ( MPI_Status *s, MPI_Datatype type, int *count )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_count(EMPI_Status *s=%p, EMPI_Datatype type=%s, int *count=%p)", s, type_to_string(datatype), count);
+   INFO(0, "MPI_Get_count(MPI_Status *s=%p, MPI_Datatype type=%s, int *count=%p)", s, type_to_string(datatype), count);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5525,26 +5525,26 @@ int EMPI_Get_count ( EMPI_Status *s, EMPI_Datatype type, int *count )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get_count failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get_count failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Get_elements ( EMPI_Status *s, EMPI_Datatype type, int *elements )
+int MPI_Get_elements ( MPI_Status *s, MPI_Datatype type, int *elements )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_elements(EMPI_Status *s=%p, EMPI_Datatype type=%s, int *elements=%p)", s, type_to_string(datatype), elements);
+   INFO(0, "MPI_Get_elements(MPI_Status *s=%p, MPI_Datatype type=%s, int *elements=%p)", s, type_to_string(datatype), elements);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5559,26 +5559,26 @@ int EMPI_Get_elements ( EMPI_Status *s, EMPI_Datatype type, int *elements )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get_elements failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get_elements failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Get ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatype, int target_rank, EMPI_Aint target_disp, int target_count, EMPI_Datatype target_datatype, EMPI_Win win )
+int MPI_Get ( void *origin_addr, int origin_count, MPI_Datatype origin_datatype, int target_rank, MPI_Aint target_disp, int target_count, MPI_Datatype target_datatype, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get(void *origin_addr=%p, int origin_count=%d, EMPI_Datatype origin_datatype=%s, int target_rank=%d, EMPI_Aint target_disp=%p, int target_count=%d, EMPI_Datatype target_datatype=%s, EMPI_Win win=%s)", origin_addr, origin_count, type_to_string(origin_datatype), target_rank, (void *) target_disp, target_count, type_to_string(target_datatype), win_to_string(win));
+   INFO(0, "MPI_Get(void *origin_addr=%p, int origin_count=%d, MPI_Datatype origin_datatype=%s, int target_rank=%d, MPI_Aint target_disp=%p, int target_count=%d, MPI_Datatype target_datatype=%s, MPI_Win win=%s)", origin_addr, origin_count, type_to_string(origin_datatype), target_rank, (void *) target_disp, target_count, type_to_string(target_datatype), win_to_string(win));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -5594,12 +5594,12 @@ int EMPI_Get ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatyp
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -5608,14 +5608,14 @@ int EMPI_Get ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatyp
 
 
 
-int EMPI_Get_version ( int *version, int *subversion )
+int MPI_Get_version ( int *version, int *subversion )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Get_version(int *version=%p, int *subversion=%p)", version, subversion);
+   INFO(0, "MPI_Get_version(int *version=%p, int *subversion=%p)", version, subversion);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5626,26 +5626,26 @@ int EMPI_Get_version ( int *version, int *subversion )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Get_version failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get_version failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Graph_create ( EMPI_Comm comm_old, int nnodes, int *indx, int *edges, int reorder, EMPI_Comm *comm_graph )
+int MPI_Graph_create ( MPI_Comm comm_old, int nnodes, int *indx, int *edges, int reorder, MPI_Comm *comm_graph )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Graph_create(EMPI_Comm comm_old=%s, int nnodes=%d, int *indx=%p, int *edges=%p, int reorder=%d, EMPI_Comm *comm_graph=%p)", comm_to_string(comm_old), nnodes, indx, edges, reorder, comm_graph);
+   INFO(0, "MPI_Graph_create(MPI_Comm comm_old=%s, int nnodes=%d, int *indx=%p, int *edges=%p, int reorder=%d, MPI_Comm *comm_graph=%p)", comm_to_string(comm_old), nnodes, indx, edges, reorder, comm_graph);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5660,22 +5660,22 @@ int EMPI_Graph_create ( EMPI_Comm comm_old, int nnodes, int *indx, int *edges, i
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Graph_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Graph_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Graphdims_get ( EMPI_Comm comm, int *nnodes, int *nedges )
+int MPI_Graphdims_get ( MPI_Comm comm, int *nnodes, int *nedges )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Graphdims_get(EMPI_Comm comm=%s, int *nnodes=%p, int *nedges=%p)", comm_to_string(comm), nnodes, nedges);
+   INFO(0, "MPI_Graphdims_get(MPI_Comm comm=%s, int *nnodes=%p, int *nedges=%p)", comm_to_string(comm), nnodes, nedges);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5690,22 +5690,22 @@ int EMPI_Graphdims_get ( EMPI_Comm comm, int *nnodes, int *nedges )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Graphdims_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Graphdims_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Graph_get ( EMPI_Comm comm, int maxindex, int maxedges, int *indx, int *edges )
+int MPI_Graph_get ( MPI_Comm comm, int maxindex, int maxedges, int *indx, int *edges )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Graph_get(EMPI_Comm comm=%s, int maxindex=%d, int maxedges=%d, int *indx=%p, int *edges=%p)", comm_to_string(comm), maxindex, maxedges, indx, edges);
+   INFO(0, "MPI_Graph_get(MPI_Comm comm=%s, int maxindex=%d, int maxedges=%d, int *indx=%p, int *edges=%p)", comm_to_string(comm), maxindex, maxedges, indx, edges);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5720,22 +5720,22 @@ int EMPI_Graph_get ( EMPI_Comm comm, int maxindex, int maxedges, int *indx, int 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Graph_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Graph_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Graph_map ( EMPI_Comm comm_old, int nnodes, int *indx, int *edges, int *newrank )
+int MPI_Graph_map ( MPI_Comm comm_old, int nnodes, int *indx, int *edges, int *newrank )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Graph_map(EMPI_Comm comm_old=%s, int nnodes=%d, int *indx=%p, int *edges=%p, int *newrank=%p)", comm_to_string(comm_old), nnodes, indx, edges, newrank);
+   INFO(0, "MPI_Graph_map(MPI_Comm comm_old=%s, int nnodes=%d, int *indx=%p, int *edges=%p, int *newrank=%p)", comm_to_string(comm_old), nnodes, indx, edges, newrank);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5750,22 +5750,22 @@ int EMPI_Graph_map ( EMPI_Comm comm_old, int nnodes, int *indx, int *edges, int 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Graph_map failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Graph_map failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Graph_neighbors_count ( EMPI_Comm comm, int rank, int *nneighbors )
+int MPI_Graph_neighbors_count ( MPI_Comm comm, int rank, int *nneighbors )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Graph_neighbors_count(EMPI_Comm comm=%s, int rank=%d, int *nneighbors=%p)", comm_to_string(comm), rank, nneighbors);
+   INFO(0, "MPI_Graph_neighbors_count(MPI_Comm comm=%s, int rank=%d, int *nneighbors=%p)", comm_to_string(comm), rank, nneighbors);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5780,22 +5780,22 @@ int EMPI_Graph_neighbors_count ( EMPI_Comm comm, int rank, int *nneighbors )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Graph_neighbors_count failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Graph_neighbors_count failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Graph_neighbors ( EMPI_Comm comm, int rank, int maxneighbors, int *neighbors )
+int MPI_Graph_neighbors ( MPI_Comm comm, int rank, int maxneighbors, int *neighbors )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Graph_neighbors(EMPI_Comm comm=%s, int rank=%d, int maxneighbors=%d, int *neighbors=%p)", comm_to_string(comm), rank, maxneighbors, neighbors);
+   INFO(0, "MPI_Graph_neighbors(MPI_Comm comm=%s, int rank=%d, int maxneighbors=%d, int *neighbors=%p)", comm_to_string(comm), rank, maxneighbors, neighbors);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5810,22 +5810,22 @@ int EMPI_Graph_neighbors ( EMPI_Comm comm, int rank, int maxneighbors, int *neig
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Graph_neighbors failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Graph_neighbors failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Grequest_complete ( EMPI_Request r )
+int MPI_Grequest_complete ( MPI_Request r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Grequest_complete(EMPI_Request r=%s)", request_to_string(r));
+   INFO(0, "MPI_Grequest_complete(MPI_Request r=%s)", request_to_string(r));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5836,26 +5836,26 @@ int EMPI_Grequest_complete ( EMPI_Request r )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Grequest_complete failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Grequest_complete failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Grequest_start ( EMPI_Grequest_query_function *query_fn, EMPI_Grequest_free_function *free_fn, EMPI_Grequest_cancel_function *cancel_fn, void *extra_state, EMPI_Request *r )
+int MPI_Grequest_start ( MPI_Grequest_query_function *query_fn, MPI_Grequest_free_function *free_fn, MPI_Grequest_cancel_function *cancel_fn, void *extra_state, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Grequest_start(EMPI_Grequest_query_function *query_fn=%p, EMPI_Grequest_free_function *free_fn=%p, EMPI_Grequest_cancel_function *cancel_fn=%p, void *extra_state=%p, EMPI_Request *r=%p)", query_fn, free_fn, cancel_fn, extra_state, r);
+   INFO(0, "MPI_Grequest_start(MPI_Grequest_query_function *query_fn=%p, MPI_Grequest_free_function *free_fn=%p, MPI_Grequest_cancel_function *cancel_fn=%p, void *extra_state=%p, MPI_Request *r=%p)", query_fn, free_fn, cancel_fn, extra_state, r);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5866,26 +5866,26 @@ int EMPI_Grequest_start ( EMPI_Grequest_query_function *query_fn, EMPI_Grequest_
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Grequest_start failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Grequest_start failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Group_compare ( EMPI_Group group1, EMPI_Group group2, int *result )
+int MPI_Group_compare ( MPI_Group group1, MPI_Group group2, int *result )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_compare(EMPI_Group group1=%s, EMPI_Group group2=%s, int *result=%p)", group_to_string(group1), group_to_string(group2), result);
+   INFO(0, "MPI_Group_compare(MPI_Group group1=%s, MPI_Group group2=%s, int *result=%p)", group_to_string(group1), group_to_string(group2), result);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5896,26 +5896,26 @@ int EMPI_Group_compare ( EMPI_Group group1, EMPI_Group group2, int *result )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_compare failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_compare failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Group_difference ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup )
+int MPI_Group_difference ( MPI_Group group1, MPI_Group group2, MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_difference(EMPI_Group group1=%s, EMPI_Group group2=%s, EMPI_Group *newgroup=%p)", group_to_string(group1), group_to_string(group2), newgroup);
+   INFO(0, "MPI_Group_difference(MPI_Group group1=%s, MPI_Group group2=%s, MPI_Group *newgroup=%p)", group_to_string(group1), group_to_string(group2), newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5926,26 +5926,26 @@ int EMPI_Group_difference ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *ne
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_difference failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_difference failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Group_excl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup )
+int MPI_Group_excl ( MPI_Group g, int n, int *ranks, MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_excl(EMPI_Group g=%s, int n=%d, int *ranks=%p, EMPI_Group *newgroup=%p)", group_to_string(g), n, ranks, newgroup);
+   INFO(0, "MPI_Group_excl(MPI_Group g=%s, int n=%d, int *ranks=%p, MPI_Group *newgroup=%p)", group_to_string(g), n, ranks, newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5956,26 +5956,26 @@ int EMPI_Group_excl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_excl failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_excl failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Group_free ( EMPI_Group *g )
+int MPI_Group_free ( MPI_Group *g )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_free(EMPI_Group *g=%p)", g);
+   INFO(0, "MPI_Group_free(MPI_Group *g=%p)", g);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -5986,12 +5986,12 @@ int EMPI_Group_free ( EMPI_Group *g )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -5999,14 +5999,14 @@ int EMPI_Group_free ( EMPI_Group *g )
 
 
 
-int EMPI_Group_intersection ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup )
+int MPI_Group_intersection ( MPI_Group group1, MPI_Group group2, MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_intersection(EMPI_Group group1=%s, EMPI_Group group2=%s, EMPI_Group *newgroup=%p)", group_to_string(group1), group_to_string(group2), newgroup);
+   INFO(0, "MPI_Group_intersection(MPI_Group group1=%s, MPI_Group group2=%s, MPI_Group *newgroup=%p)", group_to_string(group1), group_to_string(group2), newgroup);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6017,12 +6017,12 @@ int EMPI_Group_intersection ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_intersection failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_intersection failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6032,14 +6032,14 @@ int EMPI_Group_intersection ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *
 
 
 
-int EMPI_Group_rank ( EMPI_Group g, int *rank )
+int MPI_Group_rank ( MPI_Group g, int *rank )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_rank(EMPI_Group g=%s, int *rank=%p)", group_to_string(g), rank);
+   INFO(0, "MPI_Group_rank(MPI_Group g=%s, int *rank=%p)", group_to_string(g), rank);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6050,26 +6050,26 @@ int EMPI_Group_rank ( EMPI_Group g, int *rank )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_rank failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_rank failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Group_size ( EMPI_Group g, int *size )
+int MPI_Group_size ( MPI_Group g, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_size(EMPI_Group g=%s, int *size=%p)", group_to_string(g), size);
+   INFO(0, "MPI_Group_size(MPI_Group g=%s, int *size=%p)", group_to_string(g), size);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6080,12 +6080,12 @@ int EMPI_Group_size ( EMPI_Group g, int *size )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6096,14 +6096,14 @@ int EMPI_Group_size ( EMPI_Group g, int *size )
 
 
 
-int EMPI_Info_dup ( EMPI_Info info, EMPI_Info *newinfo )
+int MPI_Info_dup ( MPI_Info info, MPI_Info *newinfo )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_dup(EMPI_Info info=%s, EMPI_Info *newinfo=%p)", info_to_string(info), newinfo);
+   INFO(0, "MPI_Info_dup(MPI_Info info=%s, MPI_Info *newinfo=%p)", info_to_string(info), newinfo);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6114,12 +6114,12 @@ int EMPI_Info_dup ( EMPI_Info info, EMPI_Info *newinfo )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_dup failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_dup failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6127,14 +6127,14 @@ int EMPI_Info_dup ( EMPI_Info info, EMPI_Info *newinfo )
 
 
 
-int EMPI_Info_get ( EMPI_Info info, char *key, int valuelen, char *value, int *flag )
+int MPI_Info_get ( MPI_Info info, char *key, int valuelen, char *value, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_get(EMPI_Info info=%s, char *key=%p, int valuelen=%d, char *value=%p, int *flag=%p)", info_to_string(info), key, valuelen, value, flag);
+   INFO(0, "MPI_Info_get(MPI_Info info=%s, char *key=%p, int valuelen=%d, char *value=%p, int *flag=%p)", info_to_string(info), key, valuelen, value, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6145,26 +6145,26 @@ int EMPI_Info_get ( EMPI_Info info, char *key, int valuelen, char *value, int *f
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_get failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_get failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Info_get_nkeys ( EMPI_Info info, int *nkeys )
+int MPI_Info_get_nkeys ( MPI_Info info, int *nkeys )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_get_nkeys(EMPI_Info info=%s, int *nkeys=%p)", info_to_string(info), nkeys);
+   INFO(0, "MPI_Info_get_nkeys(MPI_Info info=%s, int *nkeys=%p)", info_to_string(info), nkeys);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6175,26 +6175,26 @@ int EMPI_Info_get_nkeys ( EMPI_Info info, int *nkeys )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_get_nkeys failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_get_nkeys failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Info_get_nthkey ( EMPI_Info info, int n, char *key )
+int MPI_Info_get_nthkey ( MPI_Info info, int n, char *key )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_get_nthkey(EMPI_Info info=%s, int n=%d, char *key=%p)", info_to_string(info), n, key);
+   INFO(0, "MPI_Info_get_nthkey(MPI_Info info=%s, int n=%d, char *key=%p)", info_to_string(info), n, key);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6205,26 +6205,26 @@ int EMPI_Info_get_nthkey ( EMPI_Info info, int n, char *key )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_get_nthkey failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_get_nthkey failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Info_get_valuelen ( EMPI_Info info, char *key, int *valuelen, int *flag )
+int MPI_Info_get_valuelen ( MPI_Info info, char *key, int *valuelen, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Info_get_valuelen(EMPI_Info info=%s, char *key=%p, int *valuelen=%p, int *flag=%p)", info_to_string(info), key, valuelen, flag);
+   INFO(0, "MPI_Info_get_valuelen(MPI_Info info=%s, char *key=%p, int *valuelen=%p, int *flag=%p)", info_to_string(info), key, valuelen, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6235,12 +6235,12 @@ int EMPI_Info_get_valuelen ( EMPI_Info info, char *key, int *valuelen, int *flag
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Info_get_valuelen failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Info_get_valuelen failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6250,14 +6250,14 @@ int EMPI_Info_get_valuelen ( EMPI_Info info, char *key, int *valuelen, int *flag
 
 
 
-int EMPI_Init_thread ( int *argc, char ***argv, int required, int *provided )
+int MPI_Init_thread ( int *argc, char ***argv, int required, int *provided )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Init_thread(int *argc=%p, char ***argv=%p, int required=%d, int *provided=%p)", argc, argv, required, provided);
+   INFO(0, "MPI_Init_thread(int *argc=%p, char ***argv=%p, int required=%d, int *provided=%p)", argc, argv, required, provided);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6268,26 +6268,26 @@ int EMPI_Init_thread ( int *argc, char ***argv, int required, int *provided )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Init_thread failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Init_thread failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *s )
+int MPI_Iprobe ( int source, int tag, MPI_Comm comm, int *flag, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Iprobe(int source=%d, int tag=%d, EMPI_Comm comm=%s, int *flag=%p, EMPI_Status *s=%p)", source, tag, comm_to_string(comm), flag, s);
+   INFO(0, "MPI_Iprobe(int source=%d, int tag=%d, MPI_Comm comm=%s, int *flag=%p, MPI_Status *s=%p)", source, tag, comm_to_string(comm), flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6302,8 +6302,8 @@ int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *s
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Iprobe failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Iprobe failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6312,14 +6312,14 @@ int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *s
 
 
 
-int EMPI_Issend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Issend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Issend(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Issend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6338,22 +6338,22 @@ int EMPI_Issend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, E
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Issend failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Issend failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Is_thread_main ( int *flag )
+int MPI_Is_thread_main ( int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Is_thread_main(int *flag=%p)", flag);
+   INFO(0, "MPI_Is_thread_main(int *flag=%p)", flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6364,26 +6364,26 @@ int EMPI_Is_thread_main ( int *flag )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Is_thread_main failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Is_thread_main failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Keyval_create ( EMPI_Copy_function *copy_fn, EMPI_Delete_function *delete_fn, int *keyval, void *extra_state )
+int MPI_Keyval_create ( MPI_Copy_function *copy_fn, MPI_Delete_function *delete_fn, int *keyval, void *extra_state )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Keyval_create(EMPI_Copy_function *copy_fn=%p, EMPI_Delete_function *delete_fn=%p, int *keyval=%p, void *extra_state=%p)", copy_fn, delete_fn, keyval, extra_state);
+   INFO(0, "MPI_Keyval_create(MPI_Copy_function *copy_fn=%p, MPI_Delete_function *delete_fn=%p, int *keyval=%p, void *extra_state=%p)", copy_fn, delete_fn, keyval, extra_state);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6394,26 +6394,26 @@ int EMPI_Keyval_create ( EMPI_Copy_function *copy_fn, EMPI_Delete_function *dele
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Keyval_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Keyval_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Keyval_free ( int *keyval )
+int MPI_Keyval_free ( int *keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Keyval_free(int *keyval=%p)", keyval);
+   INFO(0, "MPI_Keyval_free(int *keyval=%p)", keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6424,26 +6424,26 @@ int EMPI_Keyval_free ( int *keyval )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Keyval_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Keyval_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Lookup_name ( char *service_name, EMPI_Info info, char *port_name )
+int MPI_Lookup_name ( char *service_name, MPI_Info info, char *port_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Lookup_name(char *service_name=%p, EMPI_Info info=%s, char *port_name=%p)", service_name, info_to_string(info), port_name);
+   INFO(0, "MPI_Lookup_name(char *service_name=%p, MPI_Info info=%s, char *port_name=%p)", service_name, info_to_string(info), port_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6454,26 +6454,26 @@ int EMPI_Lookup_name ( char *service_name, EMPI_Info info, char *port_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Lookup_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Lookup_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 /*
-int EMPI_Op_commutative ( EMPI_Op op, int *commute )
+int MPI_Op_commutative ( MPI_Op op, int *commute )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Op_commutative(EMPI_Op op=%s, int *commute=%p)", op_to_string(op), commute);
+   INFO(0, "MPI_Op_commutative(MPI_Op op=%s, int *commute=%p)", op_to_string(op), commute);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6484,26 +6484,26 @@ int EMPI_Op_commutative ( EMPI_Op op, int *commute )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Op_commutative failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Op_commutative failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 
-int EMPI_Op_create ( EMPI_User_function *function, int commute, EMPI_Op *op )
+int MPI_Op_create ( MPI_User_function *function, int commute, MPI_Op *op )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Op_create(EMPI_User_function *function=%p, int commute=%d, EMPI_Op *op=%p)", function, commute, op);
+   INFO(0, "MPI_Op_create(MPI_User_function *function=%p, int commute=%d, MPI_Op *op=%p)", function, commute, op);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6514,26 +6514,26 @@ int EMPI_Op_create ( EMPI_User_function *function, int commute, EMPI_Op *op )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Op_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Op_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Open_port ( EMPI_Info info, char *port_name )
+int MPI_Open_port ( MPI_Info info, char *port_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Open_port(EMPI_Info info=%s, char *port_name=%p)", info_to_string(info), port_name);
+   INFO(0, "MPI_Open_port(MPI_Info info=%s, char *port_name=%p)", info_to_string(info), port_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6544,26 +6544,26 @@ int EMPI_Open_port ( EMPI_Info info, char *port_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Open_port failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Open_port failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Op_free ( EMPI_Op *op )
+int MPI_Op_free ( MPI_Op *op )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Op_free(EMPI_Op *op=%p)", op);
+   INFO(0, "MPI_Op_free(MPI_Op *op=%p)", op);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6574,26 +6574,26 @@ int EMPI_Op_free ( EMPI_Op *op )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Op_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Op_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype type, void *outbuf, EMPI_Aint outcount, EMPI_Aint *position )
+int MPI_Pack_external ( char *datarep, void *inbuf, int incount, MPI_Datatype type, void *outbuf, MPI_Aint outcount, MPI_Aint *position )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack_external(char *datarep=%p, void *inbuf=%p, int incount=%d, EMPI_Datatype type=%s, void *outbuf=%p, EMPI_Aint outcount=%p, EMPI_Aint *position=%p)", datarep, inbuf, incount, type_to_string(datatype), outbuf, (void *) outcount, position);
+   INFO(0, "MPI_Pack_external(char *datarep=%p, void *inbuf=%p, int incount=%d, MPI_Datatype type=%s, void *outbuf=%p, MPI_Aint outcount=%p, MPI_Aint *position=%p)", datarep, inbuf, incount, type_to_string(datatype), outbuf, (void *) outcount, position);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6608,26 +6608,26 @@ int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype 
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Pack_external failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Pack_external failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype type, EMPI_Aint *size )
+int MPI_Pack_external_size ( char *datarep, int incount, MPI_Datatype type, MPI_Aint *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack_external_size(char *datarep=%p, int incount=%d, EMPI_Datatype type=%s, EMPI_Aint *size=%p)", datarep, incount, type_to_string(datatype), size);
+   INFO(0, "MPI_Pack_external_size(char *datarep=%p, int incount=%d, MPI_Datatype type=%s, MPI_Aint *size=%p)", datarep, incount, type_to_string(datatype), size);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6642,26 +6642,26 @@ int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype type, EM
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Pack_external_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Pack_external_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype type, void *outbuf, int outcount, int *position, EMPI_Comm comm )
+int MPI_Pack ( void *inbuf, int incount, MPI_Datatype type, void *outbuf, int outcount, int *position, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack(void *inbuf=%p, int incount=%d, EMPI_Datatype type=%s, void *outbuf=%p, int outcount=%d, int *position=%p, EMPI_Comm comm=%s)", inbuf, incount, type_to_string(datatype), outbuf, outcount, position, comm_to_string(comm));
+   INFO(0, "MPI_Pack(void *inbuf=%p, int incount=%d, MPI_Datatype type=%s, void *outbuf=%p, int outcount=%d, int *position=%p, MPI_Comm comm=%s)", inbuf, incount, type_to_string(datatype), outbuf, outcount, position, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6680,22 +6680,22 @@ int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype type, void *outbuf, int 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Pack failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Pack failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Pack_size ( int incount, EMPI_Datatype type, EMPI_Comm comm, int *size )
+int MPI_Pack_size ( int incount, MPI_Datatype type, MPI_Comm comm, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Pack_size(int incount=%d, EMPI_Datatype type=%s, EMPI_Comm comm=%s, int *size=%p)", incount, type_to_string(datatype), comm_to_string(comm), size);
+   INFO(0, "MPI_Pack_size(int incount=%d, MPI_Datatype type=%s, MPI_Comm comm=%s, int *size=%p)", incount, type_to_string(datatype), comm_to_string(comm), size);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6714,22 +6714,22 @@ int EMPI_Pack_size ( int incount, EMPI_Datatype type, EMPI_Comm comm, int *size 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Pack_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Pack_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Probe ( int source, int tag, EMPI_Comm comm, EMPI_Status *s )
+int MPI_Probe ( int source, int tag, MPI_Comm comm, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Probe(int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", source, tag, comm_to_string(comm), s);
+   INFO(0, "MPI_Probe(int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Status *s=%p)", source, tag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6744,22 +6744,22 @@ int EMPI_Probe ( int source, int tag, EMPI_Comm comm, EMPI_Status *s )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Probe failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Probe failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Publish_name ( char *service_name, EMPI_Info info, char *port_name )
+int MPI_Publish_name ( char *service_name, MPI_Info info, char *port_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Publish_name(char *service_name=%p, EMPI_Info info=%s, char *port_name=%p)", service_name, info_to_string(info), port_name);
+   INFO(0, "MPI_Publish_name(char *service_name=%p, MPI_Info info=%s, char *port_name=%p)", service_name, info_to_string(info), port_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6770,26 +6770,26 @@ int EMPI_Publish_name ( char *service_name, EMPI_Info info, char *port_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Publish_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Publish_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Put ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatype, int target_rank, EMPI_Aint target_disp, int target_count, EMPI_Datatype target_datatype, EMPI_Win win )
+int MPI_Put ( void *origin_addr, int origin_count, MPI_Datatype origin_datatype, int target_rank, MPI_Aint target_disp, int target_count, MPI_Datatype target_datatype, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Put(void *origin_addr=%p, int origin_count=%d, EMPI_Datatype origin_datatype=%s, int target_rank=%d, EMPI_Aint target_disp=%p, int target_count=%d, EMPI_Datatype target_datatype=%s, EMPI_Win win=%s)", origin_addr, origin_count, type_to_string(origin_datatype), target_rank, (void *) target_disp, target_count, type_to_string(target_datatype), win_to_string(win));
+   INFO(0, "MPI_Put(void *origin_addr=%p, int origin_count=%d, MPI_Datatype origin_datatype=%s, int target_rank=%d, MPI_Aint target_disp=%p, int target_count=%d, MPI_Datatype target_datatype=%s, MPI_Win win=%s)", origin_addr, origin_count, type_to_string(origin_datatype), target_rank, (void *) target_disp, target_count, type_to_string(target_datatype), win_to_string(win));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6805,26 +6805,26 @@ int EMPI_Put ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatyp
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Put failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Put failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Query_thread ( int *provided )
+int MPI_Query_thread ( int *provided )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Query_thread(int *provided=%p)", provided);
+   INFO(0, "MPI_Query_thread(int *provided=%p)", provided);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -6835,12 +6835,12 @@ int EMPI_Query_thread ( int *provided )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Query_thread failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Query_thread failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6848,14 +6848,14 @@ int EMPI_Query_thread ( int *provided )
 
 
 
-int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Recv_init ( void *buf, int count, MPI_Datatype type, int source, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Recv_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int source=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Recv_init(void *buf=%p, int count=%d, MPI_Datatype type=%s, int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), source, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6874,8 +6874,8 @@ int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype type, int source, int t
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Recv_init failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Recv_init failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6883,14 +6883,14 @@ int EMPI_Recv_init ( void *buf, int count, EMPI_Datatype type, int source, int t
 
 
 /*
-int EMPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, EMPI_Datatype type, EMPI_Op op )
+int MPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, MPI_Datatype type, MPI_Op op )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce_local(void *inbuf=%p, void *inoutbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s)", inbuf, inoutbuf, count, type_to_string(datatype), op_to_string(op));
+   INFO(0, "MPI_Reduce_local(void *inbuf=%p, void *inoutbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s)", inbuf, inoutbuf, count, type_to_string(datatype), op_to_string(op));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6905,26 +6905,26 @@ int EMPI_Reduce_local ( void *inbuf, void *inoutbuf, int count, EMPI_Datatype ty
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Reduce_local failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Reduce_local failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 /*
-int EMPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
+int MPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce_scatter_block(void *sendbuf=%p, void *recvbuf=%p, int recvcount=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, recvcount, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "MPI_Reduce_scatter_block(void *sendbuf=%p, void *recvbuf=%p, int recvcount=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, recvcount, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6943,22 +6943,22 @@ int EMPI_Reduce_scatter_block ( void *sendbuf, void *recvbuf, int recvcount, EMP
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Reduce_scatter_block failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Reduce_scatter_block failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 
-int EMPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
+int MPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Reduce_scatter(void *sendbuf=%p, void *recvbuf=%p, int *recvcnts=%p, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, recvcnts, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "MPI_Reduce_scatter(void *sendbuf=%p, void *recvbuf=%p, int *recvcnts=%p, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, recvcnts, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -6977,22 +6977,22 @@ int EMPI_Reduce_scatter ( void *sendbuf, void *recvbuf, int *recvcnts, EMPI_Data
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Reduce_scatter failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Reduce_scatter failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Register_datarep ( char *name, EMPI_Datarep_conversion_function *read_conv_fn, EMPI_Datarep_conversion_function *write_conv_fn, EMPI_Datarep_extent_function *extent_fn, void *state )
+int MPI_Register_datarep ( char *name, MPI_Datarep_conversion_function *read_conv_fn, MPI_Datarep_conversion_function *write_conv_fn, MPI_Datarep_extent_function *extent_fn, void *state )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Register_datarep(char *name=%p, EMPI_Datarep_conversion_function *read_conv_fn=%p, EMPI_Datarep_conversion_function *write_conv_fn=%p, EMPI_Datarep_extent_function *extent_fn=%p, void *state=%p)", name, read_conv_fn, write_conv_fn, extent_fn, state);
+   INFO(0, "MPI_Register_datarep(char *name=%p, MPI_Datarep_conversion_function *read_conv_fn=%p, MPI_Datarep_conversion_function *write_conv_fn=%p, MPI_Datarep_extent_function *extent_fn=%p, void *state=%p)", name, read_conv_fn, write_conv_fn, extent_fn, state);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7003,12 +7003,12 @@ int EMPI_Register_datarep ( char *name, EMPI_Datarep_conversion_function *read_c
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Register_datarep failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Register_datarep failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7016,14 +7016,14 @@ int EMPI_Register_datarep ( char *name, EMPI_Datarep_conversion_function *read_c
 
 
 
-int EMPI_Request_get_status ( EMPI_Request r, int *flag, EMPI_Status *s )
+int MPI_Request_get_status ( MPI_Request r, int *flag, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Request_get_status(EMPI_Request r=%s, int *flag=%p, EMPI_Status *s=%p)", request_to_string(r), flag, s);
+   INFO(0, "MPI_Request_get_status(MPI_Request r=%s, int *flag=%p, MPI_Status *s=%p)", request_to_string(r), flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7034,12 +7034,12 @@ int EMPI_Request_get_status ( EMPI_Request r, int *flag, EMPI_Status *s )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Request_get_status failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Request_get_status failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7048,14 +7048,14 @@ int EMPI_Request_get_status ( EMPI_Request r, int *flag, EMPI_Status *s )
 
 
 
-int EMPI_Rsend_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Rsend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Rsend_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Rsend_init(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7074,22 +7074,22 @@ int EMPI_Rsend_init ( void *buf, int count, EMPI_Datatype type, int dest, int ta
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Rsend_init failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Rsend_init failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm )
+int MPI_Scan ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Scan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, EMPI_Datatype type=%s, EMPI_Op op=%s, EMPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+   INFO(0, "MPI_Scan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7108,8 +7108,8 @@ int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMP
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Scan failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Scan failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7119,14 +7119,14 @@ int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, EMP
 
 
 
-int EMPI_Send_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Send_init ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Send_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Send_init(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7145,8 +7145,8 @@ int EMPI_Send_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Send_init failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Send_init failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7155,14 +7155,14 @@ int EMPI_Send_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag
 
 
 
-int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype type, int dest, int sendtag, int source, int recvtag, EMPI_Comm comm, EMPI_Status *s )
+int MPI_Sendrecv_replace ( void *buf, int count, MPI_Datatype type, int dest, int sendtag, int source, int recvtag, MPI_Comm comm, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Sendrecv_replace(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int sendtag=%d, int source=%d, int recvtag=%d, EMPI_Comm comm=%s, EMPI_Status *s=%p)", buf, count, type_to_string(datatype), dest, sendtag, source, recvtag, comm_to_string(comm), s);
+   INFO(0, "MPI_Sendrecv_replace(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int sendtag=%d, int source=%d, int recvtag=%d, MPI_Comm comm=%s, MPI_Status *s=%p)", buf, count, type_to_string(datatype), dest, sendtag, source, recvtag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7181,8 +7181,8 @@ int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype type, int dest, 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Sendrecv_replace failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Sendrecv_replace failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7191,14 +7191,14 @@ int EMPI_Sendrecv_replace ( void *buf, int count, EMPI_Datatype type, int dest, 
 
 
 
-int EMPI_Ssend_init ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r )
+int MPI_Ssend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Ssend_init(void *buf=%p, int count=%d, EMPI_Datatype type=%s, int dest=%d, int tag=%d, EMPI_Comm comm=%s, EMPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Ssend_init(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(datatype), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7217,22 +7217,22 @@ int EMPI_Ssend_init ( void *buf, int count, EMPI_Datatype type, int dest, int ta
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Ssend_init failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Ssend_init failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Startall ( int count, EMPI_Request array_of_requests[] )
+int MPI_Startall ( int count, MPI_Request array_of_requests[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Startall(int count=%d, EMPI_Request array_of_requests[]=%p)", count, array_of_requests);
+   INFO(0, "MPI_Startall(int count=%d, MPI_Request array_of_requests[]=%p)", count, array_of_requests);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7243,26 +7243,26 @@ int EMPI_Startall ( int count, EMPI_Request array_of_requests[] )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Startall failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Startall failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Start ( EMPI_Request *r )
+int MPI_Start ( MPI_Request *r )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Start(EMPI_Request *r=%p)", r);
+   INFO(0, "MPI_Start(MPI_Request *r=%p)", r);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7273,26 +7273,26 @@ int EMPI_Start ( EMPI_Request *r )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Start failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Start failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Status_set_cancelled ( EMPI_Status *s, int flag )
+int MPI_Status_set_cancelled ( MPI_Status *s, int flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Status_set_cancelled(EMPI_Status *s=%p, int flag=%d)", s, flag);
+   INFO(0, "MPI_Status_set_cancelled(MPI_Status *s=%p, int flag=%d)", s, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7303,26 +7303,26 @@ int EMPI_Status_set_cancelled ( EMPI_Status *s, int flag )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Status_set_cancelled failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Status_set_cancelled failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Status_set_elements ( EMPI_Status *s, EMPI_Datatype type, int count )
+int MPI_Status_set_elements ( MPI_Status *s, MPI_Datatype type, int count )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Status_set_elements(EMPI_Status *s=%p, EMPI_Datatype type=%s, int count=%d)", s, type_to_string(datatype), count);
+   INFO(0, "MPI_Status_set_elements(MPI_Status *s=%p, MPI_Datatype type=%s, int count=%d)", s, type_to_string(datatype), count);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7337,26 +7337,26 @@ int EMPI_Status_set_elements ( EMPI_Status *s, EMPI_Datatype type, int count )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Status_set_elements failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Status_set_elements failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Testall ( int count, EMPI_Request array_of_requests[], int *flag, EMPI_Status array_of_statuses[] )
+int MPI_Testall ( int count, MPI_Request array_of_requests[], int *flag, MPI_Status array_of_statuses[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Testall(int count=%d, EMPI_Request array_of_requests[]=%p, int *flag=%p, EMPI_Status array_of_statuses[]=%p)", count, array_of_requests, flag, array_of_statuses);
+   INFO(0, "MPI_Testall(int count=%d, MPI_Request array_of_requests[]=%p, int *flag=%p, MPI_Status array_of_statuses[]=%p)", count, array_of_requests, flag, array_of_statuses);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7367,26 +7367,26 @@ int EMPI_Testall ( int count, EMPI_Request array_of_requests[], int *flag, EMPI_
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_TESTALL, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_TESTALL, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Testall failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Testall failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Testany ( int count, EMPI_Request array_of_requests[], int *index, int *flag, EMPI_Status *s )
+int MPI_Testany ( int count, MPI_Request array_of_requests[], int *index, int *flag, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Testany(int count=%d, EMPI_Request array_of_requests[]=%p, int *index=%p, int *flag=%p, EMPI_Status *s=%p)", count, array_of_requests, index, flag, s);
+   INFO(0, "MPI_Testany(int count=%d, MPI_Request array_of_requests[]=%p, int *index=%p, int *flag=%p, MPI_Status *s=%p)", count, array_of_requests, index, flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7397,26 +7397,26 @@ int EMPI_Testany ( int count, EMPI_Request array_of_requests[], int *index, int 
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_TESTANY, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_TESTANY, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Testany failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Testany failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Test_cancelled ( EMPI_Status *s, int *flag )
+int MPI_Test_cancelled ( MPI_Status *s, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Test_cancelled(EMPI_Status *s=%p, int *flag=%p)", s, flag);
+   INFO(0, "MPI_Test_cancelled(MPI_Status *s=%p, int *flag=%p)", s, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7427,26 +7427,26 @@ int EMPI_Test_cancelled ( EMPI_Status *s, int *flag )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Test_cancelled failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Test_cancelled failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Test ( EMPI_Request *r, int *flag, EMPI_Status *s )
+int MPI_Test ( MPI_Request *r, int *flag, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Test(EMPI_Request *r=%p, int *flag=%p, EMPI_Status *s=%p)", r, flag, s);
+   INFO(0, "MPI_Test(MPI_Request *r=%p, int *flag=%p, MPI_Status *s=%p)", r, flag, s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7457,26 +7457,26 @@ int EMPI_Test ( EMPI_Request *r, int *flag, EMPI_Status *s )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_TEST, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_TEST, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Test failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Test failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Testsome ( int incount, EMPI_Request array_of_requests[], int *outcount, int array_of_indices[], EMPI_Status array_of_statuses[] )
+int MPI_Testsome ( int incount, MPI_Request array_of_requests[], int *outcount, int array_of_indices[], MPI_Status array_of_statuses[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Testsome(int incount=%d, EMPI_Request array_of_requests[]=%p, int *outcount=%p, int array_of_indices[]=%p, EMPI_Status array_of_statuses[]=%p)", incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
+   INFO(0, "MPI_Testsome(int incount=%d, MPI_Request array_of_requests[]=%p, int *outcount=%p, int array_of_indices[]=%p, MPI_Status array_of_statuses[]=%p)", incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7487,26 +7487,26 @@ int EMPI_Testsome ( int incount, EMPI_Request array_of_requests[], int *outcount
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_TESTSOME, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_TESTSOME, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Testsome failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Testsome failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Topo_test ( EMPI_Comm comm, int *topo_type )
+int MPI_Topo_test ( MPI_Comm comm, int *topo_type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Topo_test(EMPI_Comm comm=%s, int *topo_type=%p)", comm_to_string(comm), topo_type);
+   INFO(0, "MPI_Topo_test(MPI_Comm comm=%s, int *topo_type=%p)", comm_to_string(comm), topo_type);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7521,8 +7521,8 @@ int EMPI_Topo_test ( EMPI_Comm comm, int *topo_type )
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Topo_test failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Topo_test failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7530,14 +7530,14 @@ int EMPI_Topo_test ( EMPI_Comm comm, int *topo_type )
 
 
 
-int EMPI_Type_create_darray ( int size, int rank, int ndims, int array_of_gsizes[], int array_of_distribs[], int array_of_dargs[], int array_of_psizes[], int order, EMPI_Datatype oldtype, EMPI_Datatype *newtype )
+int MPI_Type_create_darray ( int size, int rank, int ndims, int array_of_gsizes[], int array_of_distribs[], int array_of_dargs[], int array_of_psizes[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_darray(int size=%d, int rank=%d, int ndims=%d, int array_of_gsizes[]=%p, int array_of_distribs[]=%p, int array_of_dargs[]=%p, int array_of_psizes[]=%p, int order=%d, EMPI_Datatype oldtype=%s, EMPI_Datatype *newtype=%p)", size, rank, ndims, array_of_gsizes, array_of_distribs, array_of_dargs, array_of_psizes, order, type_to_string(oldtype), newtype);
+   INFO(0, "MPI_Type_create_darray(int size=%d, int rank=%d, int ndims=%d, int array_of_gsizes[]=%p, int array_of_distribs[]=%p, int array_of_dargs[]=%p, int array_of_psizes[]=%p, int order=%d, MPI_Datatype oldtype=%s, MPI_Datatype *newtype=%p)", size, rank, ndims, array_of_gsizes, array_of_distribs, array_of_dargs, array_of_psizes, order, type_to_string(oldtype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7553,26 +7553,26 @@ int EMPI_Type_create_darray ( int size, int rank, int ndims, int array_of_gsizes
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_darray failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_darray failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_hindexed ( int count, int blocklengths[], EMPI_Aint displacements[], EMPI_Datatype oldtype, EMPI_Datatype *newtype )
+int MPI_Type_create_hindexed ( int count, int blocklengths[], MPI_Aint displacements[], MPI_Datatype oldtype, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_hindexed(int count=%d, int blocklengths[]=%p, EMPI_Aint displacements[]=%p, EMPI_Datatype oldtype=%s, EMPI_Datatype *newtype=%p)", count, blocklengths, displacements, type_to_string(oldtype), newtype);
+   INFO(0, "MPI_Type_create_hindexed(int count=%d, int blocklengths[]=%p, MPI_Aint displacements[]=%p, MPI_Datatype oldtype=%s, MPI_Datatype *newtype=%p)", count, blocklengths, displacements, type_to_string(oldtype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7588,26 +7588,26 @@ int EMPI_Type_create_hindexed ( int count, int blocklengths[], EMPI_Aint displac
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_hindexed failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_hindexed failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_hvector ( int count, int blocklength, EMPI_Aint stride, EMPI_Datatype oldtype, EMPI_Datatype *newtype )
+int MPI_Type_create_hvector ( int count, int blocklength, MPI_Aint stride, MPI_Datatype oldtype, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_hvector(int count=%d, int blocklength=%d, EMPI_Aint stride=%p, EMPI_Datatype oldtype=%s, EMPI_Datatype *newtype=%p)", count, blocklength, (void *) stride, type_to_string(oldtype), newtype);
+   INFO(0, "MPI_Type_create_hvector(int count=%d, int blocklength=%d, MPI_Aint stride=%p, MPI_Datatype oldtype=%s, MPI_Datatype *newtype=%p)", count, blocklength, (void *) stride, type_to_string(oldtype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7623,12 +7623,12 @@ int EMPI_Type_create_hvector ( int count, int blocklength, EMPI_Aint stride, EMP
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_hvector failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_hvector failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7636,14 +7636,14 @@ int EMPI_Type_create_hvector ( int count, int blocklength, EMPI_Aint stride, EMP
 
 
 
-int EMPI_Type_create_keyval ( EMPI_Type_copy_attr_function *type_copy_attr_fn, EMPI_Type_delete_attr_function *type_delete_attr_fn, int *type_keyval, void *extra_state )
+int MPI_Type_create_keyval ( MPI_Type_copy_attr_function *type_copy_attr_fn, MPI_Type_delete_attr_function *type_delete_attr_fn, int *type_keyval, void *extra_state )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_keyval(EMPI_Type_copy_attr_function *type_copy_attr_fn=%p, EMPI_Type_delete_attr_function *type_delete_attr_fn=%p, int *type_keyval=%p, void *extra_state=%p)", type_copy_attr_fn, type_delete_attr_fn, type_keyval, extra_state);
+   INFO(0, "MPI_Type_create_keyval(MPI_Type_copy_attr_function *type_copy_attr_fn=%p, MPI_Type_delete_attr_function *type_delete_attr_fn=%p, int *type_keyval=%p, void *extra_state=%p)", type_copy_attr_fn, type_delete_attr_fn, type_keyval, extra_state);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7654,26 +7654,26 @@ int EMPI_Type_create_keyval ( EMPI_Type_copy_attr_function *type_copy_attr_fn, E
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_keyval failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_keyval failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_resized ( EMPI_Datatype oldtype, EMPI_Aint lb, EMPI_Aint extent, EMPI_Datatype *newtype )
+int MPI_Type_create_resized ( MPI_Datatype oldtype, MPI_Aint lb, MPI_Aint extent, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_resized(EMPI_Datatype oldtype=%s, EMPI_Aint lb=%p, EMPI_Aint extent=%p, EMPI_Datatype *newtype=%p)", type_to_string(oldtype), (void *) lb, (void *) extent, newtype);
+   INFO(0, "MPI_Type_create_resized(MPI_Datatype oldtype=%s, MPI_Aint lb=%p, MPI_Aint extent=%p, MPI_Datatype *newtype=%p)", type_to_string(oldtype), (void *) lb, (void *) extent, newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7689,26 +7689,26 @@ int EMPI_Type_create_resized ( EMPI_Datatype oldtype, EMPI_Aint lb, EMPI_Aint ex
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_resized failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_resized failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_struct ( int count, int array_of_blocklengths[], EMPI_Aint array_of_displacements[], EMPI_Datatype array_of_types[], EMPI_Datatype *newtype )
+int MPI_Type_create_struct ( int count, int array_of_blocklengths[], MPI_Aint array_of_displacements[], MPI_Datatype array_of_types[], MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_struct(int count=%d, int array_of_blocklengths[]=%p, EMPI_Aint array_of_displacements[]=%p, EMPI_Datatype array_of_types[]=%p, EMPI_Datatype *newtype=%p)", count, array_of_blocklengths, array_of_displacements, array_of_types, newtype);
+   INFO(0, "MPI_Type_create_struct(int count=%d, int array_of_blocklengths[]=%p, MPI_Aint array_of_displacements[]=%p, MPI_Datatype array_of_types[]=%p, MPI_Datatype *newtype=%p)", count, array_of_blocklengths, array_of_displacements, array_of_types, newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7724,26 +7724,26 @@ int EMPI_Type_create_struct ( int count, int array_of_blocklengths[], EMPI_Aint 
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_struct failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_struct failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_create_subarray ( int ndims, int array_of_sizes[], int array_of_subsizes[], int array_of_starts[], int order, EMPI_Datatype oldtype, EMPI_Datatype *newtype )
+int MPI_Type_create_subarray ( int ndims, int array_of_sizes[], int array_of_subsizes[], int array_of_starts[], int order, MPI_Datatype oldtype, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_create_subarray(int ndims=%d, int array_of_sizes[]=%p, int array_of_subsizes[]=%p, int array_of_starts[]=%p, int order=%d, EMPI_Datatype oldtype=%s, EMPI_Datatype *newtype=%p)", ndims, array_of_sizes, array_of_subsizes, array_of_starts, order, type_to_string(oldtype), newtype);
+   INFO(0, "MPI_Type_create_subarray(int ndims=%d, int array_of_sizes[]=%p, int array_of_subsizes[]=%p, int array_of_starts[]=%p, int order=%d, MPI_Datatype oldtype=%s, MPI_Datatype *newtype=%p)", ndims, array_of_sizes, array_of_subsizes, array_of_starts, order, type_to_string(oldtype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7759,26 +7759,26 @@ int EMPI_Type_create_subarray ( int ndims, int array_of_sizes[], int array_of_su
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_create_subarray failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_create_subarray failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_delete_attr ( EMPI_Datatype type, int type_keyval )
+int MPI_Type_delete_attr ( MPI_Datatype type, int type_keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_delete_attr(EMPI_Datatype type=%s, int type_keyval=%d)", type_to_string(type), type_keyval);
+   INFO(0, "MPI_Type_delete_attr(MPI_Datatype type=%s, int type_keyval=%d)", type_to_string(type), type_keyval);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7793,26 +7793,26 @@ int EMPI_Type_delete_attr ( EMPI_Datatype type, int type_keyval )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_delete_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_delete_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_dup ( EMPI_Datatype type, EMPI_Datatype *newtype )
+int MPI_Type_dup ( MPI_Datatype type, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_dup(EMPI_Datatype type=%s, EMPI_Datatype *newtype=%p)", type_to_string(datatype), newtype);
+   INFO(0, "MPI_Type_dup(MPI_Datatype type=%s, MPI_Datatype *newtype=%p)", type_to_string(datatype), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7828,26 +7828,26 @@ int EMPI_Type_dup ( EMPI_Datatype type, EMPI_Datatype *newtype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_dup failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_dup failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_extent ( EMPI_Datatype type, EMPI_Aint *extent )
+int MPI_Type_extent ( MPI_Datatype type, MPI_Aint *extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_extent(EMPI_Datatype type=%s, EMPI_Aint *extent=%p)", type_to_string(datatype), extent);
+   INFO(0, "MPI_Type_extent(MPI_Datatype type=%s, MPI_Aint *extent=%p)", type_to_string(datatype), extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7862,12 +7862,12 @@ int EMPI_Type_extent ( EMPI_Datatype type, EMPI_Aint *extent )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_extent failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_extent failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7875,14 +7875,14 @@ int EMPI_Type_extent ( EMPI_Datatype type, EMPI_Aint *extent )
 
 
 
-int EMPI_Type_free_keyval ( int *type_keyval )
+int MPI_Type_free_keyval ( int *type_keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_free_keyval(int *type_keyval=%p)", type_keyval);
+   INFO(0, "MPI_Type_free_keyval(int *type_keyval=%p)", type_keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -7893,26 +7893,26 @@ int EMPI_Type_free_keyval ( int *type_keyval )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_free_keyval failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_free_keyval failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_get_attr ( EMPI_Datatype type, int type_keyval, void *attribute_val, int *flag )
+int MPI_Type_get_attr ( MPI_Datatype type, int type_keyval, void *attribute_val, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_attr(EMPI_Datatype type=%s, int type_keyval=%d, void *attribute_val=%p, int *flag=%p)", type_to_string(type), type_keyval, attribute_val, flag);
+   INFO(0, "MPI_Type_get_attr(MPI_Datatype type=%s, int type_keyval=%d, void *attribute_val=%p, int *flag=%p)", type_to_string(type), type_keyval, attribute_val, flag);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7927,26 +7927,26 @@ int EMPI_Type_get_attr ( EMPI_Datatype type, int type_keyval, void *attribute_va
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_get_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_get_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_get_contents ( EMPI_Datatype type, int max_integers, int max_addresses, int max_datatypes, int array_of_integers[], EMPI_Aint array_of_addresses[], EMPI_Datatype array_of_datatypes[] )
+int MPI_Type_get_contents ( MPI_Datatype type, int max_integers, int max_addresses, int max_datatypes, int array_of_integers[], MPI_Aint array_of_addresses[], MPI_Datatype array_of_datatypes[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_contents(EMPI_Datatype type=%s, int max_integers=%d, int max_addresses=%d, int max_datatypes=%d, int array_of_integers[]=%p, EMPI_Aint array_of_addresses[]=%p, EMPI_Datatype array_of_datatypes[]=%p)", type_to_string(datatype), max_integers, max_addresses, max_datatypes, array_of_integers, array_of_addresses, array_of_datatypes);
+   INFO(0, "MPI_Type_get_contents(MPI_Datatype type=%s, int max_integers=%d, int max_addresses=%d, int max_datatypes=%d, int array_of_integers[]=%p, MPI_Aint array_of_addresses[]=%p, MPI_Datatype array_of_datatypes[]=%p)", type_to_string(datatype), max_integers, max_addresses, max_datatypes, array_of_integers, array_of_addresses, array_of_datatypes);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7962,12 +7962,12 @@ int EMPI_Type_get_contents ( EMPI_Datatype type, int max_integers, int max_addre
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_get_contents failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_get_contents failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -7975,14 +7975,14 @@ int EMPI_Type_get_contents ( EMPI_Datatype type, int max_integers, int max_addre
 
 
 
-int EMPI_Type_get_extent ( EMPI_Datatype type, EMPI_Aint *lb, EMPI_Aint *extent )
+int MPI_Type_get_extent ( MPI_Datatype type, MPI_Aint *lb, MPI_Aint *extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_extent(EMPI_Datatype type=%s, EMPI_Aint *lb=%p, EMPI_Aint *extent=%p)", type_to_string(datatype), lb, extent);
+   INFO(0, "MPI_Type_get_extent(MPI_Datatype type=%s, MPI_Aint *lb=%p, MPI_Aint *extent=%p)", type_to_string(datatype), lb, extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -7997,12 +7997,12 @@ int EMPI_Type_get_extent ( EMPI_Datatype type, EMPI_Aint *lb, EMPI_Aint *extent 
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_get_extent failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_get_extent failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -8010,14 +8010,14 @@ int EMPI_Type_get_extent ( EMPI_Datatype type, EMPI_Aint *lb, EMPI_Aint *extent 
 
 
 
-int EMPI_Type_get_true_extent ( EMPI_Datatype type, EMPI_Aint *true_lb, EMPI_Aint *true_extent )
+int MPI_Type_get_true_extent ( MPI_Datatype type, MPI_Aint *true_lb, MPI_Aint *true_extent )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_get_true_extent(EMPI_Datatype type=%s, EMPI_Aint *true_lb=%p, EMPI_Aint *true_extent=%p)", type_to_string(datatype), true_lb, true_extent);
+   INFO(0, "MPI_Type_get_true_extent(MPI_Datatype type=%s, MPI_Aint *true_lb=%p, MPI_Aint *true_extent=%p)", type_to_string(datatype), true_lb, true_extent);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8032,26 +8032,26 @@ int EMPI_Type_get_true_extent ( EMPI_Datatype type, EMPI_Aint *true_lb, EMPI_Ain
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_get_true_extent failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_get_true_extent failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_hindexed ( int count, int blocklens[], EMPI_Aint indices[], EMPI_Datatype old_type, EMPI_Datatype *newtype )
+int MPI_Type_hindexed ( int count, int blocklens[], MPI_Aint indices[], MPI_Datatype old_type, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_hindexed(int count=%d, int blocklens[]=%p, EMPI_Aint indices[]=%p, EMPI_Datatype old_type=%s, EMPI_Datatype *newtype=%p)", count, blocklens, indices, type_to_string(old_type), newtype);
+   INFO(0, "MPI_Type_hindexed(int count=%d, int blocklens[]=%p, MPI_Aint indices[]=%p, MPI_Datatype old_type=%s, MPI_Datatype *newtype=%p)", count, blocklens, indices, type_to_string(old_type), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8067,26 +8067,26 @@ int EMPI_Type_hindexed ( int count, int blocklens[], EMPI_Aint indices[], EMPI_D
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_hindexed failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_hindexed failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_hvector ( int count, int blocklen, EMPI_Aint stride, EMPI_Datatype old_type, EMPI_Datatype *newtype_p )
+int MPI_Type_hvector ( int count, int blocklen, MPI_Aint stride, MPI_Datatype old_type, MPI_Datatype *newtype_p )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_hvector(int count=%d, int blocklen=%d, EMPI_Aint stride=%p, EMPI_Datatype old_type=%s, EMPI_Datatype *newtype_p=%p)", count, blocklen, (void *) stride, type_to_string(old_type), newtype_p);
+   INFO(0, "MPI_Type_hvector(int count=%d, int blocklen=%d, MPI_Aint stride=%p, MPI_Datatype old_type=%s, MPI_Datatype *newtype_p=%p)", count, blocklen, (void *) stride, type_to_string(old_type), newtype_p);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8102,26 +8102,26 @@ int EMPI_Type_hvector ( int count, int blocklen, EMPI_Aint stride, EMPI_Datatype
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_hvector failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_hvector failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_indexed ( int count, int blocklens[], int indices[], EMPI_Datatype old_type, EMPI_Datatype *newtype )
+int MPI_Type_indexed ( int count, int blocklens[], int indices[], MPI_Datatype old_type, MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_indexed(int count=%d, int blocklens[]=%p, int indices[]=%p, EMPI_Datatype old_type=%s, EMPI_Datatype *newtype=%p)", count, blocklens, indices, type_to_string(old_type), newtype);
+   INFO(0, "MPI_Type_indexed(int count=%d, int blocklens[]=%p, int indices[]=%p, MPI_Datatype old_type=%s, MPI_Datatype *newtype=%p)", count, blocklens, indices, type_to_string(old_type), newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8137,26 +8137,26 @@ int EMPI_Type_indexed ( int count, int blocklens[], int indices[], EMPI_Datatype
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_indexed failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_indexed failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_lb ( EMPI_Datatype type, EMPI_Aint *displacement )
+int MPI_Type_lb ( MPI_Datatype type, MPI_Aint *displacement )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_lb(EMPI_Datatype type=%s, EMPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
+   INFO(0, "MPI_Type_lb(MPI_Datatype type=%s, MPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8171,26 +8171,26 @@ int EMPI_Type_lb ( EMPI_Datatype type, EMPI_Aint *displacement )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_lb failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_lb failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_match_size ( int typeclass, int size, EMPI_Datatype *datatype )
+int MPI_Type_match_size ( int typeclass, int size, MPI_Datatype *datatype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_match_size(int typeclass=%d, int size=%d, EMPI_Datatype *datatype=%p)", typeclass, size, datatype);
+   INFO(0, "MPI_Type_match_size(int typeclass=%d, int size=%d, MPI_Datatype *datatype=%p)", typeclass, size, datatype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8205,26 +8205,26 @@ int EMPI_Type_match_size ( int typeclass, int size, EMPI_Datatype *datatype )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_match_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_match_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_set_attr ( EMPI_Datatype type, int type_keyval, void *attribute_val )
+int MPI_Type_set_attr ( MPI_Datatype type, int type_keyval, void *attribute_val )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_set_attr(EMPI_Datatype type=%s, int type_keyval=%d, void *attribute_val=%p)", type_to_string(type), type_keyval, attribute_val);
+   INFO(0, "MPI_Type_set_attr(MPI_Datatype type=%s, int type_keyval=%d, void *attribute_val=%p)", type_to_string(type), type_keyval, attribute_val);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8239,26 +8239,26 @@ int EMPI_Type_set_attr ( EMPI_Datatype type, int type_keyval, void *attribute_va
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_set_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_set_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_set_name ( EMPI_Datatype type, char *type_name )
+int MPI_Type_set_name ( MPI_Datatype type, char *type_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_set_name(EMPI_Datatype type=%s, char *type_name=%p)", type_to_string(type), type_name);
+   INFO(0, "MPI_Type_set_name(MPI_Datatype type=%s, char *type_name=%p)", type_to_string(type), type_name);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8273,26 +8273,26 @@ int EMPI_Type_set_name ( EMPI_Datatype type, char *type_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_set_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_set_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_size ( EMPI_Datatype type, int *size )
+int MPI_Type_size ( MPI_Datatype type, int *size )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_size(EMPI_Datatype type=%s, int *size=%p)", type_to_string(datatype), size);
+   INFO(0, "MPI_Type_size(MPI_Datatype type=%s, int *size=%p)", type_to_string(datatype), size);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8307,26 +8307,26 @@ int EMPI_Type_size ( EMPI_Datatype type, int *size )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_size failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_size failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_struct ( int count, int blocklens[], EMPI_Aint indices[], EMPI_Datatype old_types[], EMPI_Datatype *newtype )
+int MPI_Type_struct ( int count, int blocklens[], MPI_Aint indices[], MPI_Datatype old_types[], MPI_Datatype *newtype )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_struct(int count=%d, int blocklens[]=%p, EMPI_Aint indices[]=%p, EMPI_Datatype old_types[]=%p, EMPI_Datatype *newtype=%p)", count, blocklens, indices, old_types, newtype);
+   INFO(0, "MPI_Type_struct(int count=%d, int blocklens[]=%p, MPI_Aint indices[]=%p, MPI_Datatype old_types[]=%p, MPI_Datatype *newtype=%p)", count, blocklens, indices, old_types, newtype);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8342,26 +8342,26 @@ int EMPI_Type_struct ( int count, int blocklens[], EMPI_Aint indices[], EMPI_Dat
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_struct failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_struct failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_ub ( EMPI_Datatype type, EMPI_Aint *displacement )
+int MPI_Type_ub ( MPI_Datatype type, MPI_Aint *displacement )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_ub(EMPI_Datatype type=%s, EMPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
+   INFO(0, "MPI_Type_ub(MPI_Datatype type=%s, MPI_Aint *displacement=%p)", type_to_string(datatype), displacement);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8376,26 +8376,26 @@ int EMPI_Type_ub ( EMPI_Datatype type, EMPI_Aint *displacement )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_ub failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_ub failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Type_vector ( int count, int blocklength, int stride, EMPI_Datatype old_type, EMPI_Datatype *newtype_p )
+int MPI_Type_vector ( int count, int blocklength, int stride, MPI_Datatype old_type, MPI_Datatype *newtype_p )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Type_vector(int count=%d, int blocklength=%d, int stride=%d, EMPI_Datatype old_type=%s, EMPI_Datatype *newtype_p=%p)", count, blocklength, stride, type_to_string(old_type), newtype_p);
+   INFO(0, "MPI_Type_vector(int count=%d, int blocklength=%d, int stride=%d, MPI_Datatype old_type=%s, MPI_Datatype *newtype_p=%p)", count, blocklength, stride, type_to_string(old_type), newtype_p);
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8411,26 +8411,26 @@ int EMPI_Type_vector ( int count, int blocklength, int stride, EMPI_Datatype old
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Type_vector failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_vector failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Unpack_external ( char *datarep, void *inbuf, EMPI_Aint insize, EMPI_Aint *position, void *outbuf, int outcount, EMPI_Datatype type )
+int MPI_Unpack_external ( char *datarep, void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype type )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Unpack_external(char *datarep=%p, void *inbuf=%p, EMPI_Aint insize=%p, EMPI_Aint *position=%p, void *outbuf=%p, int outcount=%d, EMPI_Datatype type=%s)", datarep, inbuf, (void *) insize, position, outbuf, outcount, type_to_string(datatype));
+   INFO(0, "MPI_Unpack_external(char *datarep=%p, void *inbuf=%p, MPI_Aint insize=%p, MPI_Aint *position=%p, void *outbuf=%p, int outcount=%d, MPI_Datatype type=%s)", datarep, inbuf, (void *) insize, position, outbuf, outcount, type_to_string(datatype));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8445,26 +8445,26 @@ int EMPI_Unpack_external ( char *datarep, void *inbuf, EMPI_Aint insize, EMPI_Ai
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Unpack_external failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Unpack_external failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, EMPI_Datatype type, EMPI_Comm comm )
+int MPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, MPI_Datatype type, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Unpack(void *inbuf=%p, int insize=%d, int *position=%p, void *outbuf=%p, int outcount=%d, EMPI_Datatype type=%s, EMPI_Comm comm=%s)", inbuf, insize, position, outbuf, outcount, type_to_string(datatype), comm_to_string(comm));
+   INFO(0, "MPI_Unpack(void *inbuf=%p, int insize=%d, int *position=%p, void *outbuf=%p, int outcount=%d, MPI_Datatype type=%s, MPI_Comm comm=%s)", inbuf, insize, position, outbuf, outcount, type_to_string(datatype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #ifdef CATCH_DERIVED_TYPES
@@ -8483,22 +8483,22 @@ int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outc
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Unpack failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Unpack failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Unpublish_name ( char *service_name, EMPI_Info info, char *port_name )
+int MPI_Unpublish_name ( char *service_name, MPI_Info info, char *port_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Unpublish_name(char *service_name=%p, EMPI_Info info=%s, char *port_name=%p)", service_name, info_to_string(info), port_name);
+   INFO(0, "MPI_Unpublish_name(char *service_name=%p, MPI_Info info=%s, char *port_name=%p)", service_name, info_to_string(info), port_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8509,12 +8509,12 @@ int EMPI_Unpublish_name ( char *service_name, EMPI_Info info, char *port_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Unpublish_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Unpublish_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -8526,14 +8526,14 @@ int EMPI_Unpublish_name ( char *service_name, EMPI_Info info, char *port_name )
 
 
 
-int EMPI_Waitsome ( int incount, EMPI_Request array_of_requests[], int *outcount, int array_of_indices[], EMPI_Status array_of_statuses[] )
+int MPI_Waitsome ( int incount, MPI_Request array_of_requests[], int *outcount, int array_of_indices[], MPI_Status array_of_statuses[] )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Waitsome(int incount=%d, EMPI_Request array_of_requests[]=%p, int *outcount=%p, int array_of_indices[]=%p, EMPI_Status array_of_statuses[]=%p)", incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
+   INFO(0, "MPI_Waitsome(int incount=%d, MPI_Request array_of_requests[]=%p, int *outcount=%p, int array_of_indices[]=%p, MPI_Status array_of_statuses[]=%p)", incount, array_of_requests, outcount, array_of_indices, array_of_statuses);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8544,26 +8544,26 @@ int EMPI_Waitsome ( int incount, EMPI_Request array_of_requests[], int *outcount
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_WAITSOME, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_WAITSOME, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Waitsome failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Waitsome failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_call_errhandler ( EMPI_Win win, int errorcode )
+int MPI_Win_call_errhandler ( MPI_Win win, int errorcode )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_call_errhandler(EMPI_Win win=%s, int errorcode=%d)", win_to_string(win), errorcode);
+   INFO(0, "MPI_Win_call_errhandler(MPI_Win win=%s, int errorcode=%d)", win_to_string(win), errorcode);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8574,26 +8574,26 @@ int EMPI_Win_call_errhandler ( EMPI_Win win, int errorcode )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_call_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_call_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_complete ( EMPI_Win win )
+int MPI_Win_complete ( MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_complete(EMPI_Win win=%s)", win_to_string(win));
+   INFO(0, "MPI_Win_complete(MPI_Win win=%s)", win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8604,26 +8604,26 @@ int EMPI_Win_complete ( EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_complete failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_complete failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_create_errhandler ( EMPI_Win_errhandler_fn *function, EMPI_Errhandler *errhandler )
+int MPI_Win_create_errhandler ( MPI_Win_errhandler_fn *function, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_create_errhandler(EMPI_Win_errhandler_fn *function=%p, EMPI_Errhandler *errhandler=%p)", function, errhandler);
+   INFO(0, "MPI_Win_create_errhandler(MPI_Win_errhandler_fn *function=%p, MPI_Errhandler *errhandler=%p)", function, errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8634,26 +8634,26 @@ int EMPI_Win_create_errhandler ( EMPI_Win_errhandler_fn *function, EMPI_Errhandl
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_create_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_create_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_create ( void *base, EMPI_Aint size, int disp_unit, EMPI_Info info, EMPI_Comm comm, EMPI_Win *win )
+int MPI_Win_create ( void *base, MPI_Aint size, int disp_unit, MPI_Info info, MPI_Comm comm, MPI_Win *win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_create(void *base=%p, EMPI_Aint size=%p, int disp_unit=%d, EMPI_Info info=%s, EMPI_Comm comm=%s, EMPI_Win *win=%p)", base, (void *) size, disp_unit, info_to_string(info), comm_to_string(comm), win);
+   INFO(0, "MPI_Win_create(void *base=%p, MPI_Aint size=%p, int disp_unit=%d, MPI_Info info=%s, MPI_Comm comm=%s, MPI_Win *win=%p)", base, (void *) size, disp_unit, info_to_string(info), comm_to_string(comm), win);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8668,22 +8668,22 @@ int EMPI_Win_create ( void *base, EMPI_Aint size, int disp_unit, EMPI_Info info,
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_create_keyval ( EMPI_Win_copy_attr_function *win_copy_attr_fn, EMPI_Win_delete_attr_function *win_delete_attr_fn, int *win_keyval, void *extra_state )
+int MPI_Win_create_keyval ( MPI_Win_copy_attr_function *win_copy_attr_fn, MPI_Win_delete_attr_function *win_delete_attr_fn, int *win_keyval, void *extra_state )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_create_keyval(EMPI_Win_copy_attr_function *win_copy_attr_fn=%p, EMPI_Win_delete_attr_function *win_delete_attr_fn=%p, int *win_keyval=%p, void *extra_state=%p)", win_copy_attr_fn, win_delete_attr_fn, win_keyval, extra_state);
+   INFO(0, "MPI_Win_create_keyval(MPI_Win_copy_attr_function *win_copy_attr_fn=%p, MPI_Win_delete_attr_function *win_delete_attr_fn=%p, int *win_keyval=%p, void *extra_state=%p)", win_copy_attr_fn, win_delete_attr_fn, win_keyval, extra_state);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8694,26 +8694,26 @@ int EMPI_Win_create_keyval ( EMPI_Win_copy_attr_function *win_copy_attr_fn, EMPI
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_create_keyval failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_create_keyval failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_delete_attr ( EMPI_Win win, int win_keyval )
+int MPI_Win_delete_attr ( MPI_Win win, int win_keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_delete_attr(EMPI_Win win=%s, int win_keyval=%d)", win_to_string(win), win_keyval);
+   INFO(0, "MPI_Win_delete_attr(MPI_Win win=%s, int win_keyval=%d)", win_to_string(win), win_keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8724,25 +8724,25 @@ int EMPI_Win_delete_attr ( EMPI_Win win, int win_keyval )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_delete_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_delete_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
-int EMPI_Win_fence ( int assert, EMPI_Win win )
+int MPI_Win_fence ( int assert, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_fence(int assert=%d, EMPI_Win win=%s)", assert, win_to_string(win));
+   INFO(0, "MPI_Win_fence(int assert=%d, MPI_Win win=%s)", assert, win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8753,26 +8753,26 @@ int EMPI_Win_fence ( int assert, EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_fence failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_fence failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_free ( EMPI_Win *win )
+int MPI_Win_free ( MPI_Win *win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_free(EMPI_Win *win=%p)", win);
+   INFO(0, "MPI_Win_free(MPI_Win *win=%p)", win);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8783,26 +8783,26 @@ int EMPI_Win_free ( EMPI_Win *win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_free failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_free failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_free_keyval ( int *win_keyval )
+int MPI_Win_free_keyval ( int *win_keyval )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_free_keyval(int *win_keyval=%p)", win_keyval);
+   INFO(0, "MPI_Win_free_keyval(int *win_keyval=%p)", win_keyval);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8813,26 +8813,26 @@ int EMPI_Win_free_keyval ( int *win_keyval )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_free_keyval failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_free_keyval failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_get_attr ( EMPI_Win win, int win_keyval, void *attribute_val, int *flag )
+int MPI_Win_get_attr ( MPI_Win win, int win_keyval, void *attribute_val, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_get_attr(EMPI_Win win=%s, int win_keyval=%d, void *attribute_val=%p, int *flag=%p)", win_to_string(win), win_keyval, attribute_val, flag);
+   INFO(0, "MPI_Win_get_attr(MPI_Win win=%s, int win_keyval=%d, void *attribute_val=%p, int *flag=%p)", win_to_string(win), win_keyval, attribute_val, flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8843,26 +8843,26 @@ int EMPI_Win_get_attr ( EMPI_Win win, int win_keyval, void *attribute_val, int *
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_get_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_get_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_get_errhandler ( EMPI_Win win, EMPI_Errhandler *errhandler )
+int MPI_Win_get_errhandler ( MPI_Win win, MPI_Errhandler *errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_get_errhandler(EMPI_Win win=%s, EMPI_Errhandler *errhandler=%p)", win_to_string(win), errhandler);
+   INFO(0, "MPI_Win_get_errhandler(MPI_Win win=%s, MPI_Errhandler *errhandler=%p)", win_to_string(win), errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8873,26 +8873,26 @@ int EMPI_Win_get_errhandler ( EMPI_Win win, EMPI_Errhandler *errhandler )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_get_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_get_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_get_group ( EMPI_Win win, EMPI_Group *g )
+int MPI_Win_get_group ( MPI_Win win, MPI_Group *g )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_get_group(EMPI_Win win=%s, EMPI_Group *g=%p)", win_to_string(win), g);
+   INFO(0, "MPI_Win_get_group(MPI_Win win=%s, MPI_Group *g=%p)", win_to_string(win), g);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8903,26 +8903,26 @@ int EMPI_Win_get_group ( EMPI_Win win, EMPI_Group *g )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_get_group failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_get_group failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_get_name ( EMPI_Win win, char *win_name, int *resultlen )
+int MPI_Win_get_name ( MPI_Win win, char *win_name, int *resultlen )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_get_name(EMPI_Win win=%s, char *win_name=%p, int *resultlen=%p)", win_to_string(win), win_name, resultlen);
+   INFO(0, "MPI_Win_get_name(MPI_Win win=%s, char *win_name=%p, int *resultlen=%p)", win_to_string(win), win_name, resultlen);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8933,26 +8933,26 @@ int EMPI_Win_get_name ( EMPI_Win win, char *win_name, int *resultlen )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_get_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_get_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_lock ( int lock_type, int rank, int assert, EMPI_Win win )
+int MPI_Win_lock ( int lock_type, int rank, int assert, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_lock(int lock_type=%d, int rank=%d, int assert=%d, EMPI_Win win=%s)", lock_type, rank, assert, win_to_string(win));
+   INFO(0, "MPI_Win_lock(int lock_type=%d, int rank=%d, int assert=%d, MPI_Win win=%s)", lock_type, rank, assert, win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8963,26 +8963,26 @@ int EMPI_Win_lock ( int lock_type, int rank, int assert, EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_lock failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_lock failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_post ( EMPI_Group g, int assert, EMPI_Win win )
+int MPI_Win_post ( MPI_Group g, int assert, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_post(EMPI_Group g=%s, int assert=%d, EMPI_Win win=%s)", group_to_string(g), assert, win_to_string(win));
+   INFO(0, "MPI_Win_post(MPI_Group g=%s, int assert=%d, MPI_Win win=%s)", group_to_string(g), assert, win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -8993,26 +8993,26 @@ int EMPI_Win_post ( EMPI_Group g, int assert, EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_post failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_post failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_set_attr ( EMPI_Win win, int win_keyval, void *attribute_val )
+int MPI_Win_set_attr ( MPI_Win win, int win_keyval, void *attribute_val )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_set_attr(EMPI_Win win=%s, int win_keyval=%d, void *attribute_val=%p)", win_to_string(win), win_keyval, attribute_val);
+   INFO(0, "MPI_Win_set_attr(MPI_Win win=%s, int win_keyval=%d, void *attribute_val=%p)", win_to_string(win), win_keyval, attribute_val);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9023,26 +9023,26 @@ int EMPI_Win_set_attr ( EMPI_Win win, int win_keyval, void *attribute_val )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_set_attr failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_set_attr failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_set_errhandler ( EMPI_Win win, EMPI_Errhandler errhandler )
+int MPI_Win_set_errhandler ( MPI_Win win, MPI_Errhandler errhandler )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_set_errhandler(EMPI_Win win=%s, EMPI_Errhandler errhandler=%p)", win_to_string(win), (void *) errhandler);
+   INFO(0, "MPI_Win_set_errhandler(MPI_Win win=%s, MPI_Errhandler errhandler=%p)", win_to_string(win), (void *) errhandler);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9053,26 +9053,26 @@ int EMPI_Win_set_errhandler ( EMPI_Win win, EMPI_Errhandler errhandler )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_set_errhandler failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_set_errhandler failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_set_name ( EMPI_Win win, char *win_name )
+int MPI_Win_set_name ( MPI_Win win, char *win_name )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_set_name(EMPI_Win win=%s, char *win_name=%p)", win_to_string(win), win_name);
+   INFO(0, "MPI_Win_set_name(MPI_Win win=%s, char *win_name=%p)", win_to_string(win), win_name);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9083,26 +9083,26 @@ int EMPI_Win_set_name ( EMPI_Win win, char *win_name )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_set_name failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_set_name failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_start ( EMPI_Group g, int assert, EMPI_Win win )
+int MPI_Win_start ( MPI_Group g, int assert, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_start(EMPI_Group g=%s, int assert=%d, EMPI_Win win=%s)", group_to_string(g), assert, win_to_string(win));
+   INFO(0, "MPI_Win_start(MPI_Group g=%s, int assert=%d, MPI_Win win=%s)", group_to_string(g), assert, win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9113,26 +9113,26 @@ int EMPI_Win_start ( EMPI_Group g, int assert, EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_start failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_start failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_test ( EMPI_Win win, int *flag )
+int MPI_Win_test ( MPI_Win win, int *flag )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_test(EMPI_Win win=%s, int *flag=%p)", win_to_string(win), flag);
+   INFO(0, "MPI_Win_test(MPI_Win win=%s, int *flag=%p)", win_to_string(win), flag);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9143,26 +9143,26 @@ int EMPI_Win_test ( EMPI_Win win, int *flag )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_test failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_test failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_unlock ( int rank, EMPI_Win win )
+int MPI_Win_unlock ( int rank, MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_unlock(int rank=%d, EMPI_Win win=%s)", rank, win_to_string(win));
+   INFO(0, "MPI_Win_unlock(int rank=%d, MPI_Win win=%s)", rank, win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9173,26 +9173,26 @@ int EMPI_Win_unlock ( int rank, EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_unlock failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_unlock failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 
-int EMPI_Win_wait ( EMPI_Win win )
+int MPI_Win_wait ( MPI_Win win )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Win_wait(EMPI_Win win=%s)", win_to_string(win));
+   INFO(0, "MPI_Win_wait(MPI_Win win=%s)", win_to_string(win));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9203,26 +9203,26 @@ int EMPI_Win_wait ( EMPI_Win win )
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
-   profile_add_statistics(EMPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Win_wait failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Win_wait failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 
 /*
-int EMPI_Group_comm_create ( EMPI_Comm old_comm, EMPI_Group g, int tag, EMPI_Comm *new_comm )
+int MPI_Group_comm_create ( MPI_Comm old_comm, MPI_Group g, int tag, MPI_Comm *new_comm )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "EMPI_Group_comm_create(EMPI_Comm old_comm=%s, EMPI_Group g=%s, int tag=%d, EMPI_Comm *new_comm=%p)", comm_to_string(old_comm), group_to_string(g), tag, new_comm);
+   INFO(0, "MPI_Group_comm_create(MPI_Comm old_comm=%s, MPI_Group g=%s, int tag=%d, MPI_Comm *new_comm=%p)", comm_to_string(old_comm), group_to_string(g), tag, new_comm);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -9237,120 +9237,120 @@ int EMPI_Group_comm_create ( EMPI_Comm old_comm, EMPI_Group g, int tag, EMPI_Com
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_ERRORS
-   if (error != EMPI_SUCCESS) {
-      ERROR(0, "EMPI_Group_comm_create failed (%d)!", error);
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_comm_create failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
 }
 */
 
-EMPI_Comm EMPI_Comm_f2c ( EMPI_Fint comm )
+MPI_Comm MPI_Comm_f2c ( MPI_Fint comm )
 {
    return xEMPI_Comm_f2c(comm);
 }
 
 
-EMPI_Group EMPI_Group_f2c ( EMPI_Fint g )
+MPI_Group MPI_Group_f2c ( MPI_Fint g )
 {
    return xEMPI_Group_f2c(g);
 
 }
 
 
-EMPI_Request EMPI_Request_f2c ( EMPI_Fint r )
+MPI_Request MPI_Request_f2c ( MPI_Fint r )
 {
    return xEMPI_Request_f2c(r);
 
 }
 
 
-EMPI_Info EMPI_Info_f2c ( EMPI_Fint info )
+MPI_Info MPI_Info_f2c ( MPI_Fint info )
 {
 
    return xEMPI_Info_f2c(info);
 }
 
 
-EMPI_File EMPI_File_f2c ( EMPI_Fint file )
+MPI_File MPI_File_f2c ( MPI_Fint file )
 {
    return xEMPI_File_f2c(file);
 }
 
 
-EMPI_Op EMPI_Op_f2c ( EMPI_Fint op )
+MPI_Op MPI_Op_f2c ( MPI_Fint op )
 {
    return xEMPI_Op_f2c(op);
 }
 
 
-EMPI_Win EMPI_Win_f2c ( EMPI_Fint Win )
+MPI_Win MPI_Win_f2c ( MPI_Fint Win )
 {
    return xEMPI_Win_f2c(Win);
 }
 
 
-EMPI_Errhandler EMPI_Errhandler_f2c ( EMPI_Fint Errhandler )
+MPI_Errhandler MPI_Errhandler_f2c ( MPI_Fint Errhandler )
 {
    return xEMPI_Errhandler_f2c(Errhandler);
 }
 
 
-EMPI_Datatype EMPI_Type_f2c ( EMPI_Fint Type )
+MPI_Datatype MPI_Type_f2c ( MPI_Fint Type )
 {
    return xEMPI_Type_f2c(Type);
 }
 
 
-EMPI_Fint EMPI_Comm_c2f ( EMPI_Comm comm )
+MPI_Fint MPI_Comm_c2f ( MPI_Comm comm )
 {
    return xEMPI_Comm_c2f(comm);
 }
 
 
-EMPI_Fint EMPI_Group_c2f ( EMPI_Group g )
+MPI_Fint MPI_Group_c2f ( MPI_Group g )
 {
    return xEMPI_Group_c2f(g);
 }
 
 
-EMPI_Fint EMPI_Request_c2f ( EMPI_Request r )
+MPI_Fint MPI_Request_c2f ( MPI_Request r )
 {
    return xEMPI_Request_c2f(r);
 }
 
 
-EMPI_Fint EMPI_Info_c2f ( EMPI_Info info )
+MPI_Fint MPI_Info_c2f ( MPI_Info info )
 {
    return xEMPI_Info_c2f(info);
 }
 
 
-EMPI_Fint EMPI_File_c2f ( EMPI_File file )
+MPI_Fint MPI_File_c2f ( MPI_File file )
 {
    return xEMPI_File_c2f(file);
 }
 
 
-EMPI_Fint EMPI_Op_c2f ( EMPI_Op op )
+MPI_Fint MPI_Op_c2f ( MPI_Op op )
 {
    return xEMPI_Op_c2f(op);
 }
 
 
-EMPI_Fint EMPI_Win_c2f ( EMPI_Win Win )
+MPI_Fint MPI_Win_c2f ( MPI_Win Win )
 {
    return xEMPI_Win_c2f(Win);
 }
 
 
-EMPI_Fint EMPI_Errhandler_c2f ( EMPI_Errhandler Errhandler )
+MPI_Fint MPI_Errhandler_c2f ( MPI_Errhandler Errhandler )
 {
    return xEMPI_Errhandler_c2f(Errhandler);
 }
 
 
-EMPI_Fint EMPI_Type_c2f ( EMPI_Datatype Type )
+MPI_Fint MPI_Type_c2f ( MPI_Datatype Type )
 {
    return xEMPI_Type_c2f(Type);
 }

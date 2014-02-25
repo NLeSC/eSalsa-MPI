@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "empi.h"
+#include "mpi.h"
 
 //#include "generated_header.h"
 // #include "messaging.h"
@@ -62,17 +62,9 @@ uint64_t current_start_ticks;
 
 uint32_t current_interval;
 
-//static EMPI_Comm profile_comm;
-
 void profile_init()
 {
    int i; //, error;
-
-//   error = EMPI_Comm_dup(EMPI_COMM_WORLD, &profile_comm);
-
-//   if (error != MPI_SUCCESS) {
-//      ERROR(1, "Failed to initialize profiling! (%d)", error);
-//   }
 
    for (i=0;i<MAX_COMMUNICATORS;i++) {
       total_use[i] = NULL;
@@ -172,15 +164,10 @@ void profile_finalize()
 
    printf("Total profiled ticks in %d intervals - total: %ld mpi: %ld calls: %d\n", current_interval, end_ticks-start_ticks, ticks, use);
 
-//   EMPI_Comm_rank(profile_comm, &rank);
-//   EMPI_Comm_size(profile_comm, &size);
-
-//   GPTLpr(current_interval*size + rank);
-
    INFO(1, "Profiling done!");
 }
 
-void profile_add_statistics(EMPI_Comm comm, int field, uint64_t ticks)
+void profile_add_statistics(MPI_Comm comm, int field, uint64_t ticks)
 {
    int index;
 

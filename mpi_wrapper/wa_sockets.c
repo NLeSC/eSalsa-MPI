@@ -34,8 +34,8 @@ uint32_t my_pid;
 
 // The size of each cluster, and the offset of each cluster in the
 // total set of machines.
-static int *cluster_sizes;
-static int *cluster_offsets;
+int *cluster_sizes;
+int *cluster_offsets;
 
 /*****************************************************************************/
 /*                      Initialization / Finalization                        */

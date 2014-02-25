@@ -202,6 +202,42 @@ int xEMPI_Abort(EMPI_Comm comm, int errorcode)
    return TRANSLATE_ERROR(MPI_Abort(c->comm, errorcode));
 }
 
+#define __xEMPI_Initialized
+int xEMPI_Initialized ( int *flag )
+{
+   return TRANSLATE_ERROR(MPI_Initialized(flag));
+}
+
+#define __xEMPI_Finalized
+int xEMPI_Finalized ( int *flag )
+{
+   return TRANSLATE_ERROR(MPI_Finalized(flag));
+}
+
+#define __xEMPI_Wtime
+double xEMPI_Wtime ( void )
+{
+   return MPI_Wtime();
+}
+
+#define __xEMPI_Error_string
+int xEMPI_Error_string ( int errorcode, char *string, int *resultlen )
+{
+   // FIXME: Use own error codes ?
+   return TRANSLATE_ERROR(MPI_Error_string(errorcode, string, resultlen));
+}
+
+#define __xEMPI_Get_processor_name
+int xEMPI_Get_processor_name ( char *name, int *resultlen )
+{
+   return TRANSLATE_ERROR(MPI_Get_processor_name(name, resultlen));
+}
+
+
+
+
+
+
 /*****************************************************************************/
 /*                             Send / Receive                                */
 /*****************************************************************************/
@@ -597,7 +633,6 @@ int xEMPI_Sendrecv(void *sendbuf, int sendcount, EMPI_Datatype sendtype, int des
 
    return EMPI_SUCCESS;
 }
-
 
 /*****************************************************************************/
 /*                             Waits / Polling                               */
@@ -2105,6 +2140,14 @@ int xEMPI_Scan(void* sendbuf, void* recvbuf, int count,
    return EMPI_SUCCESS;
 }
 
+static int WA_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls, datatype **sendtype,
+                        void *recvbuf, int *recvcounts, int *rdispls, datatype **recvtype,
+                        communicator *c)
+{
+   ERROR(1, "INTERNAL ERROR: WA_Alltoallw not implemented yet!");
+   return EMPI_ERR_INTERN;
+}
+
 static int WA_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls, datatype *sendtype,
                         void *recvbuf, int *recvcounts, int *rdispls, datatype *recvtype,
                         communicator *c)
@@ -2307,6 +2350,132 @@ int xEMPI_Alltoallv(void *sendbuf, int *sendcounts, int *sdispls, EMPI_Datatype 
    }
 
    return WA_Alltoallv(sendbuf, sendcounts, sdispls, stype, recvbuf, recvcounts, rdispls, rtype, c);
+}
+
+
+#define __xEMPI_Alltoallw
+int xEMPI_Alltoallw(void *sendbuf, int *sendcounts, int *sdispls, EMPI_Datatype *sendtypes,
+                    void *recvbuf, int *recvcounts, int *rdispls, EMPI_Datatype *recvtypes,
+                    EMPI_Comm comm)
+{
+   int i, error;
+   communicator *c;
+
+   datatype *type;
+
+   datatype **empi_send_types;
+   datatype **empi_recv_types;
+
+   MPI_Datatype *mpi_send_types;
+   MPI_Datatype *mpi_recv_types;
+
+   c = handle_to_communicator(comm);
+
+   if (c == NULL) {
+      ERROR(1, "Communicator %d not found!", comm);
+      return EMPI_ERR_COMM;
+   }
+
+   if (comm_is_local(c)) {
+      // simply perform an all-to-all in local cluster
+      mpi_send_types = malloc(c->global_size * sizeof(MPI_Comm));
+
+      if (mpi_send_types == NULL) {
+         ERROR(1, "Failed to allocate space for MPI types!");
+         return EMPI_ERR_INTERN;
+      }
+
+      mpi_recv_types = malloc(c->global_size * sizeof(MPI_Comm));
+
+      if (mpi_recv_types == NULL) {
+         ERROR(1, "Failed to allocate space for MPI types!");
+         free(mpi_send_types);
+         return EMPI_ERR_INTERN;
+      }
+
+      for (i=0;i<c->global_size;i++) {
+
+         type = handle_to_datatype(sendtypes[i]);
+
+         if (type == NULL) {
+            ERROR(1, "Datatype %d not found!", sendtypes[i]);
+            free(mpi_send_types);
+            free(mpi_recv_types);
+            return EMPI_ERR_TYPE;
+         }
+
+         mpi_send_types[i] = type->type;
+      }
+
+      for (i=0;i<c->global_size;i++) {
+
+         type = handle_to_datatype(recvtypes[i]);
+
+         if (type == NULL) {
+            ERROR(1, "Datatype %d not found!", recvtypes[i]);
+            free(mpi_send_types);
+            free(mpi_recv_types);
+            return EMPI_ERR_TYPE;
+         }
+
+         mpi_recv_types[i] = type->type;
+      }
+
+      error = TRANSLATE_ERROR(MPI_Alltoallw(sendbuf, sendcounts, sdispls, mpi_send_types, recvbuf, recvcounts, rdispls, mpi_recv_types, c->comm));
+
+      free(mpi_send_types);
+      free(mpi_recv_types);
+
+   } else {
+
+      // simply perform an all-to-all in local cluster
+      empi_send_types = malloc(c->global_size * sizeof(datatype *));
+
+      if (empi_send_types == NULL) {
+         ERROR(1, "Failed to allocate space for EMPI types!");
+         return EMPI_ERR_INTERN;
+      }
+
+      empi_recv_types = malloc(c->global_size * sizeof(datatype *));
+
+      if (empi_recv_types == NULL) {
+         ERROR(1, "Failed to allocate space for EMPI types!");
+         free(empi_send_types);
+         return EMPI_ERR_INTERN;
+      }
+
+      for (i=0;i<c->global_size;i++) {
+
+         empi_send_types[i] = handle_to_datatype(sendtypes[i]);
+
+         if (empi_send_types[i] == NULL) {
+            ERROR(1, "Datatype %d not found!", sendtypes[i]);
+            free(empi_send_types);
+            free(empi_recv_types);
+            return EMPI_ERR_TYPE;
+         }
+      }
+
+      for (i=0;i<c->global_size;i++) {
+
+         empi_recv_types[i] = handle_to_datatype(recvtypes[i]);
+
+         if (empi_recv_types[i] == NULL) {
+            ERROR(1, "Datatype %d not found!", recvtypes[i]);
+            free(empi_send_types);
+            free(empi_recv_types);
+            return EMPI_ERR_TYPE;
+         }
+      }
+
+
+      error = WA_Alltoallw(sendbuf, sendcounts, sdispls, empi_send_types, recvbuf, recvcounts, rdispls, empi_recv_types, c);
+
+      free(empi_send_types);
+      free(empi_recv_types);
+   }
+
+   return error;
 }
 
 /*****************************************************************************/
@@ -2873,6 +3042,31 @@ int xEMPI_Group_range_incl(EMPI_Group mg, int n, int ranges[][3], EMPI_Group *ne
    return error;
 }
 
+#define __xEMPI_Group_range_excl
+int xEMPI_Group_range_excl(EMPI_Group mg, int n, int ranges[][3], EMPI_Group *newgroup)
+{
+   group *res;
+   group *g;
+
+   g = handle_to_group(mg);
+
+   if (g == NULL) {
+      ERROR(1, "Group %d not found!", mg);
+      return EMPI_ERR_GROUP;
+   }
+
+   int error = group_range_excl(g, n, ranges, &res);
+
+   if (error == EMPI_SUCCESS) {
+      *newgroup = res->handle;
+   } else {
+      ERROR(1, "Failed to include group range!");
+   }
+
+   return error;
+}
+
+
 #define __xEMPI_Group_union
 int xEMPI_Group_union(EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup)
 {
@@ -2959,6 +3153,143 @@ int xEMPI_Group_translate_ranks(EMPI_Group group1, int n, int *ranks1,
 
    return EMPI_SUCCESS;
 }
+
+/*****************************************************************************/
+/*                                Datatypes                                  */
+/*****************************************************************************/
+
+#define __xEMPI_Type_free
+int xEMPI_Type_free ( EMPI_Datatype *datatype )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+#define __xEMPI_Type_get_envelope
+int xEMPI_Type_get_envelope ( EMPI_Datatype type, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+#define __xEMPI_Type_create_indexed_block
+int xEMPI_Type_create_indexed_block ( int count, int blocklength, int array_of_displacements[], EMPI_Datatype oldtype, EMPI_Datatype *newtype )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+#define __xEMPI_Type_contiguous
+int xEMPI_Type_contiguous ( int count, EMPI_Datatype old_type, EMPI_Datatype *new_type_p )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+#define __xEMPI_Type_commit
+int xEMPI_Type_commit ( EMPI_Datatype *type )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_Type_get_name ( EMPI_Datatype type, char *type_name, int *resultlen )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+/*****************************************************************************/
+/*                                  Files                                    */
+/*****************************************************************************/
+
+int xEMPI_File_open ( EMPI_Comm comm, char *filename, int amode, EMPI_Info info, EMPI_File *fh )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_File_close ( EMPI_File *fh )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_File_read_all ( EMPI_File fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *stat )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_File_read_at ( EMPI_File fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *stat )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_File_write_at ( EMPI_File fh, EMPI_Offset offset, void *buf, int count, EMPI_Datatype type, EMPI_Status *stat )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_File_set_view ( EMPI_File fh, EMPI_Offset disp, EMPI_Datatype etype, EMPI_Datatype filetype, char *datarep, EMPI_Info info )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_File_write_all ( EMPI_File fh, void *buf, int count, EMPI_Datatype type, EMPI_Status *stat )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+/*****************************************************************************/
+/*                                   Info                                    */
+/*****************************************************************************/
+
+int xEMPI_Info_create ( EMPI_Info *info )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_Info_delete ( EMPI_Info info, char *key )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_Info_set ( EMPI_Info info, char *key, char *value )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_Info_free ( EMPI_Info *info )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+/*****************************************************************************/
+/*                                Intercomm                                  */
+/*****************************************************************************/
+
+
+int xEMPI_Intercomm_create ( EMPI_Comm local_comm, int local_leader, EMPI_Comm peer_comm, int remote_leader, int tag, EMPI_Comm *newintercomm )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
+int xEMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracomm )
+{
+   ERROR(1, "NOT IMPLEMENTED!");
+   return EMPI_ERR_INTERN;
+}
+
 
 /*****************************************************************************/
 /*                                Utilities                                  */
