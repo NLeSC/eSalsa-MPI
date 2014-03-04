@@ -1,15 +1,27 @@
 TODO
 ----
 
+FIX!!! -> Check special values!
+
+FIX!!! -> Check error translation
+
+FIX!!! -> Fortran MPI_Init not implemented
+
+FIX!!! -> File API  not implemented
+
+FIX!!! -> Info API  not implemented
+
+FIX!!! -> Intercomm API  not implemented
+
+FIX!!! -> Request cancellation ?
+
 FIX!!! -> MPI_Request_test_status only polls remote network?
 
-FIX!!! -> impl of operations doesn't make sense! 
+FIX!!! -> impl of operations doesn't make sense! Can we use MPI_reduce ops directly ?
 
 FIX!!! -> local_comm_create
 
 FIX!!! -> MPI_Recv cannot handle MPI_ANY_SOURCE yet!
-
-CHECK on MPI_TYPE* + MPI_TYPE_EXTENT + MPI_TYPE_SIZE
 
 CORRECTLY IMPLEMENT synchronous sending
 

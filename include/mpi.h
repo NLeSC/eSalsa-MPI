@@ -1,6 +1,8 @@
 #ifndef __MPI_H_
 #define __MPI_H_
 
+#include <unistd.h>
+
 // FIXME: do we need this ?
 #define FALSE 0
 #define TRUE  1
@@ -14,7 +16,6 @@ typedef int MPI_Op;
 typedef int MPI_Aint;
 typedef int MPI_Win;
 typedef int MPI_File;
-typedef int MPI_Offset;
 
 typedef int MPI_Comm_errhandler_fn;
 typedef int MPI_Comm_copy_attr_function;
@@ -49,9 +50,11 @@ typedef struct {
   int a, b, c;
 } MPI_Status;
 
+typedef size_t MPI_Offset;
+
 typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Datatype *datatype);
 
-/* BASIC C Datatypes -- as defined in MPI 2.2 standard. */
+/* BASIC C Datatypes -- as defined in MPI 2.1 standard. */
 
 #define MPI_DATATYPE_NULL         (0)
 #define MPI_CHAR                  (1)
@@ -59,7 +62,7 @@ typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Dat
 #define MPI_INT                   (3)
 #define MPI_LONG                  (4)
 #define MPI_LONG_LONG_INT         (5)
-#define MPI_LONG_LONG             (MPI_LONG_LONG_INT)
+#define MPI_LONG_LONG             (MPI_LONG_LONG_INT) // Official synonym since MPI 2.1
 
 #define MPI_SIGNED_CHAR           (6)
 #define MPI_UNSIGNED_CHAR         (7)
@@ -74,6 +77,49 @@ typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Dat
 
 #define MPI_WCHAR                 (15)
 
+#define MPI_BYTE                  (16)
+#define MPI_PACKED                (17)
+
+/* Special datatypes for C reduction operations -- as defined in MPI 2.1 standard. */
+
+#define MPI_FLOAT_INT             (18)
+#define MPI_DOUBLE_INT            (19)
+#define MPI_LONG_INT              (20)
+#define MPI_2INT                  (21)
+#define MPI_SHORT_INT             (22)
+#define MPI_LONG_DOUBLE_INT       (23)
+
+/* BASIC Fortran Datatypes -- as defined in MPI 2.1 standard. */
+
+#define MPI_INTEGER               (24)
+#define MPI_REAL                  (25)
+#define MPI_DOUBLE_PRECISION      (26)
+#define MPI_COMPLEX               (27)
+#define MPI_LOGICAL               (28)
+#define MPI_CHARACTER             (29)
+
+/* Optional Fortran Datatypes -- as defined in MPI 2.1 standard. */
+
+#define MPI_DOUBLE_COMPLEX        (30)
+
+#define MPI_INTEGER1              (31)
+#define MPI_INTEGER2              (32)
+#define MPI_INTEGER4              (33)
+#define MPI_INTEGER8              (34)
+
+#define MPI_REAL2                 (35)
+#define MPI_REAL4                 (36)
+#define MPI_REAL8                 (37)
+
+/* Special datatypes for Fortran reduction operations -- as defined in MPI 2.1 standard. */
+
+#define MPI_2REAL                 (38)
+#define MPI_2DOUBLE_PRECISION     (39)
+#define MPI_2INTEGER              (40)
+
+#define MPI_DEFINED_DATATYPES     (41)
+
+/*
 #ifdef HAVE_MPI_2_2
 
 #define MPI_C_BOOL                (16)
@@ -95,109 +141,8 @@ typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Dat
 #define MPI_COMPLEX32             (MPI_C_LONG_DOUBLE_COMPLEX)
 
 #endif
+*/
 
-#define MPI_BYTE                  (28)
-
-#define MPI_PACKED                (29)
-
-/* Special datatypes for reduction operations -- as defined in MPI 2.2 standard. */
-
-#define MPI_FLOAT_INT             (30)
-#define MPI_DOUBLE_INT            (31)
-#define MPI_LONG_INT              (32)
-#define MPI_2INT                  (33)
-#define MPI_SHORT_INT             (34)
-#define MPI_LONG_DOUBLE_INT       (35)
-
-/* BASIC Fortran Datatypes -- as defined in MPI 2.1 standard. */
-
-#define MPI_INTEGER               (MPI_INT)
-#define MPI_REAL                  (MPI_FLOAT)
-#define MPI_DOUBLE_PRECISION      (MPI_DOUBLE)
-#define MPI_LOGICAL               (MPI_INT) // FIXME -- check!
-#define MPI_CHARACTER             (MPI_CHAR)
-#define MPI_COMPLEX               (36)
-#define MPI_DOUBLE_COMPLEX        (37)
-
-#define MPI_INTEGER1              (MPI_SIGNED_CHAR)
-#define MPI_INTEGER2              (MPI_SHORT)
-#define MPI_INTEGER4              (MPI_INT)
-#define MPI_INTEGER8              (MPI_LONG_LONG_INT)
-
-#define MPI_UNSIGNED_INTEGER1     (MPI_UNSIGNED_CHAR)
-#define MPI_UNSIGNED_INTEGER2     (MPI_UNSIGNED_SHORT)
-#define MPI_UNSIGNED_INTEGER4     (MPI_UNSIGNED)
-#define MPI_UNSIGNED_INTEGER8     (MPI_UNSIGNED_LONG_LONG)
-
-#define MPI_REAL4                 (MPI_FLOAT)
-#define MPI_REAL8                 (MPI_DOUBLE)
-#define MPI_REAL16                (MPI_LONG_DOUBLE)
-
-#define MPI_2REAL                 (38)
-#define MPI_2DOUBLE_PRECISION     (39)
-#define MPI_2INTEGER              (MPI_2INT)
-
-#define MPI_DEFINED_DATATYPES     (40)
-
-
-/* Type names */
-
-#define MPI_DATATYPE_NULL_NAME         "MPI_DATATYPE_NULL"
-#define MPI_CHAR_NAME                  "MPI_CHAR"
-#define MPI_SHORT_NAME                 "MPI_SHORT"
-#define MPI_INT_NAME                   "MPI_INT"
-#define MPI_LONG_NAME                  "MPI_LONG"
-#define MPI_LONG_LONG_INT_NAME         "MPI_LONG_LONG_INT"
-
-#define MPI_SIGNED_CHAR_NAME           "MPI_SIGNED_CHAR"
-#define MPI_UNSIGNED_CHAR_NAME         "MPI_UNSIGNED_CHAR"
-#define MPI_UNSIGNED_SHORT_NAME        "MPI_UNSIGNED_SHORT"
-#define MPI_UNSIGNED_NAME              "MPI_UNSIGNED"
-#define MPI_UNSIGNED_LONG_NAME         "MPI_UNSIGNED_LONG"
-#define MPI_UNSIGNED_LONG_LONG_NAME    "MPI_UNSIGNED_LONG_LONG"
-
-#define MPI_FLOAT_NAME                 "MPI_FLOAT"
-#define MPI_DOUBLE_NAME                "MPI_DOUBLE"
-#define MPI_LONG_DOUBLE_NAME           "MPI_LONG_DOUBLE"
-
-#define MPI_WCHAR_NAME                 "MPI_WCHAR"
-
-#ifdef HAVE_MPI_2_2
-
-#define MPI_C_BOOL_NAME                "MPI_C_BOOL"
-#define MPI_INT8_T_NAME                "MPI_INT8_T"
-#define MPI_INT16_T_NAME               "MPI_INT16_T"
-#define MPI_INT32_T_NAME               "MPI_INT32_T"
-#define MPI_INT64_T_NAME               "MPI_INT64_T"
-#define MPI_UINT8_T_NAME               "MPI_UINT8_T"
-#define MPI_UINT16_T_NAME              "MPI_UINT16_T"
-#define MPI_UINT32_T_NAME              "MPI_UINT32_T"
-#define MPI_UINT64_T_NAME              "MPI_UINT64_T"
-#define MPI_C_COMPLEX_NAME             "MPI_C_COMPLEX"
-#define MPI_C_DOUBLE_COMPLEX_NAME      "MPI_C_DOUBLE_COMPLEX"
-#define MPI_C_LONG_DOUBLE_COMPLEX_NAME "MPI_C_LONG_DOUBLE_COMPLEX"
-
-#endif
-
-#define MPI_BYTE_NAME                  "MPI_BYTE"
-#define MPI_PACKED_NAME                "MPI_PACKED"
-
-/* Special datatypes for reduction operations -- as defined in MPI 2.2 standard. */
-
-#define MPI_FLOAT_INT_NAME             "MPI_FLOAT_INT"
-#define MPI_DOUBLE_INT_NAME            "MPI_DOUBLE_INT"
-#define MPI_LONG_INT_NAME              "MPI_LONG_INT"
-#define MPI_2INT_NAME                  "MPI_2INT"
-#define MPI_SHORT_INT_NAME             "MPI_SHORT_INT"
-#define MPI_LONG_DOUBLE_INT_NAME       "MPI_LONG_DOUBLE_INT"
-
-/* BASIC Fortran Datatypes -- as defined in MPI 2.1 standard. */
-
-#define MPI_COMPLEX_NAME               "MPI_COMPLEX"
-#define MPI_DOUBLE_COMPLEX_NAME        "MPI_DOUBLE_COMPLEX"
-
-#define MPI_2REAL_NAME                 "MPI_2REAL"
-#define MPI_2DOUBLE_PRECISION_NAME     "MPI_2DOUBLE_PRECISION"
 
 /* Communicators */
 
@@ -226,7 +171,9 @@ typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Dat
 #define MPI_TAG_UB     (32767)  // minimum as defined by MPI standard
 #define MPI_UNDEFINED  (-32766) // borrowed from openmpi
 
-/* File modes */
+/* Files */
+#define MPI_FILE_NULL  (-1)
+
 #define MPI_MODE_CREATE              1
 #define MPI_MODE_RDONLY              2
 #define MPI_MODE_WRONLY              4
@@ -236,6 +183,9 @@ typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Dat
 #define MPI_MODE_EXCL               64
 #define MPI_MODE_APPEND            128
 #define MPI_MODE_SEQUENTIAL        256
+
+/* Info */
+#define MPI_INFO_NULL  (-1)
 
 /*
  * Error codes borrowed from OpenMPI.
