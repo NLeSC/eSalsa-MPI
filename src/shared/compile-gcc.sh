@@ -12,5 +12,7 @@ ar -cr ../../lib/libempi-logging.a \
 logging.o \
 profiling.o
 
+# gcc logging.o profiling.o -shared -o ../../lib/libmpi-logging.so
+
 rm -f *.o
 

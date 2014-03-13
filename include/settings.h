@@ -5,7 +5,7 @@
 // Switch features off by commenting a define.
 
 // Print every call ?
-#define TRACE_CALLS
+// #define TRACE_CALLS
 
 // Print error and terminate when an MPI_ERROR is caught ?
 #define TRACE_ERRORS
@@ -43,7 +43,7 @@
 #define MAX_OPERATIONS 256
 
 // Maximum number of datatypes that can be created (at once, for each individual process).
-#define MAX_DATATYPES 128
+#define MAX_DATATYPES 10240
 
 // Maximum number of files that can be created (at once, for each individual process).
 #define MAX_FILES 64

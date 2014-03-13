@@ -329,19 +329,23 @@ void EMPI_REDUCE_MAX(void *invec, void *inoutvec, int *len, EMPI_Datatype *type)
       CALL_FUNC(MAX, CHAR, char)
       break;
    case EMPI_SHORT:
+   case EMPI_INTEGER2:
       CALL_FUNC(MAX, SHORT, short)
       break;
    case EMPI_INT:
    case EMPI_INTEGER:
+   case EMPI_INTEGER4:
       CALL_FUNC(MAX, INT, int)
       break;
    case EMPI_LONG:
       CALL_FUNC(MAX, LONG, long)
       break;
    case EMPI_LONG_LONG_INT:
+   case EMPI_INTEGER8:
       CALL_FUNC(MAX, LONG_LONG, long long)
       break;
    case EMPI_SIGNED_CHAR:
+   case EMPI_INTEGER1:
       CALL_FUNC(MAX, SIGNED_CHAR, signed char)
       break;
    case EMPI_UNSIGNED_CHAR:
@@ -362,13 +366,16 @@ void EMPI_REDUCE_MAX(void *invec, void *inoutvec, int *len, EMPI_Datatype *type)
       break;
    case EMPI_FLOAT:
    case EMPI_REAL:
+   case EMPI_REAL4:
       CALL_FUNC(MAX, FLOAT, float)
       break;
    case EMPI_DOUBLE:
    case EMPI_DOUBLE_PRECISION:
+   case EMPI_REAL8:
       CALL_FUNC(MAX, DOUBLE, double)
       break;
    case EMPI_LONG_DOUBLE:
+   case EMPI_REAL16:
       CALL_FUNC(MAX, LONG_DOUBLE, long double)
       break;
    default:
@@ -387,19 +394,23 @@ void EMPI_REDUCE_MIN(void *invec, void *inoutvec, int *len, EMPI_Datatype *type)
       CALL_FUNC(MIN, CHAR, char)
       break;
    case EMPI_SHORT:
+   case EMPI_INTEGER2:
       CALL_FUNC(MIN, SHORT, short)
       break;
    case EMPI_INT:
    case EMPI_INTEGER:
+   case EMPI_INTEGER4:
       CALL_FUNC(MIN, INT, int)
       break;
    case EMPI_LONG:
       CALL_FUNC(MIN, LONG, long)
       break;
    case EMPI_LONG_LONG_INT:
+   case EMPI_INTEGER8:
       CALL_FUNC(MIN, LONG_LONG, long long)
       break;
    case EMPI_SIGNED_CHAR:
+   case EMPI_INTEGER1:
       CALL_FUNC(MIN, SIGNED_CHAR, signed char)
       break;
    case EMPI_UNSIGNED_CHAR:
@@ -420,13 +431,16 @@ void EMPI_REDUCE_MIN(void *invec, void *inoutvec, int *len, EMPI_Datatype *type)
       break;
    case EMPI_FLOAT:
    case EMPI_REAL:
+   case EMPI_REAL4:
       CALL_FUNC(MIN, FLOAT, float)
       break;
    case EMPI_DOUBLE:
    case EMPI_DOUBLE_PRECISION:
+   case EMPI_REAL8:
       CALL_FUNC(MIN, DOUBLE, double)
       break;
    case EMPI_LONG_DOUBLE:
+   case EMPI_REAL16:
       CALL_FUNC(MIN, LONG_DOUBLE, long double)
       break;
    default:
@@ -445,16 +459,19 @@ void EMPI_REDUCE_SUM(void *invec, void *inoutvec, int *len, EMPI_Datatype *type)
       CALL_FUNC(SUM, CHAR, char)
       break;
    case EMPI_SHORT:
+   case EMPI_INTEGER2:
       CALL_FUNC(SUM, SHORT, short)
       break;
    case EMPI_INT:
    case EMPI_INTEGER:
+   case EMPI_INTEGER4:
       CALL_FUNC(SUM, INT, int)
       break;
    case EMPI_LONG:
       CALL_FUNC(SUM, LONG, long)
       break;
    case EMPI_LONG_LONG_INT:
+   case EMPI_INTEGER8:
       CALL_FUNC(SUM, LONG_LONG, long long)
       break;
    case EMPI_SIGNED_CHAR:
@@ -478,13 +495,16 @@ void EMPI_REDUCE_SUM(void *invec, void *inoutvec, int *len, EMPI_Datatype *type)
       break;
    case EMPI_FLOAT:
    case EMPI_REAL:
+   case EMPI_REAL4:
       CALL_FUNC(SUM, FLOAT, float)
       break;
    case EMPI_DOUBLE:
    case EMPI_DOUBLE_PRECISION:
+   case EMPI_REAL8:
       CALL_FUNC(SUM, DOUBLE, double)
       break;
    case EMPI_LONG_DOUBLE:
+   case EMPI_REAL16:
       CALL_FUNC(SUM, LONG_DOUBLE, long double)
       break;
    case EMPI_COMPLEX:
@@ -509,16 +529,19 @@ void EMPI_REDUCE_PROD(void *invec, void *inoutvec, int *len, EMPI_Datatype *type
       CALL_FUNC(PROD, CHAR, char)
       break;
    case EMPI_SHORT:
+   case EMPI_INTEGER2:
       CALL_FUNC(PROD, SHORT, short)
       break;
    case EMPI_INT:
    case EMPI_INTEGER:
+   case EMPI_INTEGER4:
       CALL_FUNC(PROD, INT, int)
       break;
    case EMPI_LONG:
       CALL_FUNC(PROD, LONG, long)
       break;
    case EMPI_LONG_LONG_INT:
+   case EMPI_INTEGER8:
       CALL_FUNC(PROD, LONG_LONG, long long)
       break;
    case EMPI_SIGNED_CHAR:
@@ -542,13 +565,16 @@ void EMPI_REDUCE_PROD(void *invec, void *inoutvec, int *len, EMPI_Datatype *type
       break;
    case EMPI_FLOAT:
    case EMPI_REAL:
+   case EMPI_REAL4:
       CALL_FUNC(PROD, FLOAT, float)
       break;
    case EMPI_DOUBLE:
    case EMPI_DOUBLE_PRECISION:
+   case EMPI_REAL8:
       CALL_FUNC(PROD, DOUBLE, double)
       break;
    case EMPI_LONG_DOUBLE:
+   case EMPI_REAL16:
       CALL_FUNC(PROD, LONG_DOUBLE, long double)
       break;
    case EMPI_COMPLEX:

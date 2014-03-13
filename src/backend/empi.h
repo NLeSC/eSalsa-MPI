@@ -26,7 +26,6 @@ typedef int EMPI_Errhandler;
 
 typedef int EMPI_Handler_function;
 typedef int EMPI_File_errhandler_fn;
-typedef int EMPI_Request;
 typedef int EMPI_Grequest_query_function;
 typedef int EMPI_Grequest_free_function;
 typedef int EMPI_Grequest_cancel_function;
@@ -57,6 +56,8 @@ typedef struct s_status {
 typedef size_t EMPI_Offset;
 
 typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_Datatype *datatype);
+
+// FIXME: Use values defined in empi_constants here!
 
 /* BASIC C Datatypes -- as defined in MPI 2.1 standard. */
 
@@ -114,14 +115,15 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 #define EMPI_REAL2                 (35)
 #define EMPI_REAL4                 (36)
 #define EMPI_REAL8                 (37)
+#define EMPI_REAL16                (38)
 
 /* Special datatypes for Fortran reduction operations -- as defined in MPI 2.1 standard. */
 
-#define EMPI_2REAL                 (38)
-#define EMPI_2DOUBLE_PRECISION     (39)
-#define EMPI_2INTEGER              (40)
+#define EMPI_2REAL                 (39)
+#define EMPI_2DOUBLE_PRECISION     (40)
+#define EMPI_2INTEGER              (41)
 
-#define EMPI_DEFINED_DATATYPES     (41)
+#define EMPI_DEFINED_DATATYPES     (42)
 
 /*
 #ifdef HAVE_MPI_2_2
@@ -327,6 +329,8 @@ int EMPI_Send ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMP
 int EMPI_Sendrecv ( void *sendbuf, int sendcount, EMPI_Datatype sendtype, int dest, int sendtag, void *recvbuf, int recvcount, EMPI_Datatype recvtype, int source, int recvtag, EMPI_Comm comm, EMPI_Status *stat );
 int EMPI_Ssend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm );
 int EMPI_Recv ( void *buf, int count, EMPI_Datatype type, int source, int tag, EMPI_Comm comm, EMPI_Status *stat );
+int EMPI_Issend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI_Comm comm, EMPI_Request *r );
+
 
 // Request and status handling.
 
@@ -343,6 +347,10 @@ int EMPI_Type_commit ( EMPI_Datatype *type );
 int EMPI_Type_contiguous ( int count, EMPI_Datatype old_type, EMPI_Datatype *new_type_p );
 int EMPI_Type_create_indexed_block ( int count, int blocklength, int array_of_displacements[], EMPI_Datatype oldtype, EMPI_Datatype *newtype );
 int EMPI_Type_get_envelope ( EMPI_Datatype type, int *num_integers, int *num_addresses, int *num_datatypes, int *combiner );
+int EMPI_Type_size ( EMPI_Datatype type, int *size );
+int EMPI_Type_hvector ( int count, int blocklen, EMPI_Aint stride, EMPI_Datatype old_type, EMPI_Datatype *newtype );
+int EMPI_Type_indexed ( int count, int blocklens[], int indices[], EMPI_Datatype old_type, EMPI_Datatype *newtype );
+int EMPI_Type_ub ( EMPI_Datatype type, EMPI_Aint *displacement );
 
 // Info
 
@@ -365,6 +373,14 @@ int EMPI_File_write_all ( EMPI_File fh, void *buf, int count, EMPI_Datatype type
 
 int EMPI_Intercomm_create ( EMPI_Comm local_comm, int local_leader, EMPI_Comm peer_comm, int remote_leader, int tag, EMPI_Comm *newintercomm );
 int EMPI_Intercomm_merge ( EMPI_Comm intercomm, int high, EMPI_Comm *newintracomm );
+
+// Operators
+int EMPI_Op_create ( EMPI_User_function *function, int commute, EMPI_Op *op );
+
+// Pack
+int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype type, void *outbuf, int outcount, int *position, EMPI_Comm comm );
+int EMPI_Pack_size ( int incount, EMPI_Datatype type, EMPI_Comm comm, int *size );
+int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, EMPI_Datatype type, EMPI_Comm comm );
 
 
 
@@ -533,19 +549,15 @@ int EMPI_Iprobe ( int source, int tag, EMPI_Comm comm, int *flag, EMPI_Status *s
 int EMPI_Irecv ( void *buf, int count, EMPI_Datatype datatype, int source, int tag, EMPI_Comm comm, EMPI_Request *r );
 int EMPI_Irsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r );
 int EMPI_Isend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r );
-int EMPI_Issend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r );
 int EMPI_Is_thread_main ( int *flag );
 int EMPI_Keyval_create ( EMPI_Copy_function *copy_fn, EMPI_Delete_function *delete_fn, int *keyval, void *extra_state );
 int EMPI_Keyval_free ( int *keyval );
 int EMPI_Lookup_name ( char *service_name, EMPI_Info info, char *port_name );
 int EMPI_Op_commutative ( EMPI_Op op, int *commute );
-int EMPI_Op_create ( EMPI_User_function *function, int commute, EMPI_Op *op );
 int EMPI_Open_port ( EMPI_Info info, char *port_name );
 int EMPI_Op_free ( EMPI_Op *op );
 int EMPI_Pack_external ( char *datarep, void *inbuf, int incount, EMPI_Datatype datatype, void *outbuf, EMPI_Aint outcount, EMPI_Aint *position );
 int EMPI_Pack_external_size ( char *datarep, int incount, EMPI_Datatype datatype, EMPI_Aint *size );
-int EMPI_Pack ( void *inbuf, int incount, EMPI_Datatype datatype, void *outbuf, int outcount, int *position, EMPI_Comm comm );
-int EMPI_Pack_size ( int incount, EMPI_Datatype datatype, EMPI_Comm comm, int *size );
 int EMPI_Probe ( int source, int tag, EMPI_Comm comm, EMPI_Status *status );
 int EMPI_Publish_name ( char *service_name, EMPI_Info info, char *port_name );
 int EMPI_Put ( void *origin_addr, int origin_count, EMPI_Datatype origin_datatype, int target_rank, EMPI_Aint target_disp, int target_count, EMPI_Datatype target_datatype, EMPI_Win win );
@@ -595,18 +607,13 @@ int EMPI_Type_get_contents ( EMPI_Datatype datatype, int max_integers, int max_a
 int EMPI_Type_get_extent ( EMPI_Datatype datatype, EMPI_Aint *lb, EMPI_Aint *extent );
 int EMPI_Type_get_true_extent ( EMPI_Datatype datatype, EMPI_Aint *true_lb, EMPI_Aint *true_extent );
 int EMPI_Type_hindexed ( int count, int blocklens[], EMPI_Aint indices[], EMPI_Datatype old_type, EMPI_Datatype *newtype );
-int EMPI_Type_hvector ( int count, int blocklen, EMPI_Aint stride, EMPI_Datatype old_type, EMPI_Datatype *newtype_p );
-int EMPI_Type_indexed ( int count, int blocklens[], int indices[], EMPI_Datatype old_type, EMPI_Datatype *newtype );
 int EMPI_Type_lb ( EMPI_Datatype datatype, EMPI_Aint *displacement );
 int EMPI_Type_match_size ( int typeclass, int size, EMPI_Datatype *datatype );
 int EMPI_Type_set_attr ( EMPI_Datatype type, int type_keyval, void *attribute_val );
 int EMPI_Type_set_name ( EMPI_Datatype type, char *type_name );
-int EMPI_Type_size ( EMPI_Datatype datatype, int *size );
 int EMPI_Type_struct ( int count, int blocklens[], EMPI_Aint indices[], EMPI_Datatype old_types[], EMPI_Datatype *newtype );
-int EMPI_Type_ub ( EMPI_Datatype datatype, EMPI_Aint *displacement );
 int EMPI_Type_vector ( int count, int blocklength, int stride, EMPI_Datatype old_type, EMPI_Datatype *newtype_p );
 int EMPI_Unpack_external ( char *datarep, void *inbuf, EMPI_Aint insize, EMPI_Aint *position, void *outbuf, int outcount, EMPI_Datatype datatype );
-int EMPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, EMPI_Datatype datatype, EMPI_Comm comm );
 int EMPI_Unpublish_name ( char *service_name, EMPI_Info info, char *port_name );
 int EMPI_Waitall ( int count, EMPI_Request array_of_requests[], EMPI_Status array_of_statuses[] );
 int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI_Status *status );

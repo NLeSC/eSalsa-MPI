@@ -134,6 +134,179 @@ static int debug_buf_pos = 0;
 /*                        Conversion functions                             */
 /***************************************************************************/
 
+#define CRC16 0x8005
+
+uint16_t gen_crc16(const uint8_t *data, int size)
+{
+    uint16_t out = 0;
+    int bits_read = 0, bit_flag;
+
+    /* Sanity check: */
+    if(data == NULL)
+        return 0;
+
+    while(size > 0)
+    {
+        bit_flag = out >> 15;
+
+        /* Get next bit: */
+        out <<= 1;
+        out |= (*data >> bits_read) & 1; // item a) work from the least significant bits
+
+        /* Increment bit counter: */
+        bits_read++;
+        if(bits_read > 7)
+        {
+            bits_read = 0;
+            data++;
+            size--;
+        }
+
+        /* Cycle check: */
+        if(bit_flag)
+            out ^= CRC16;
+
+    }
+
+    // item b) "push out" the last 16 bits
+    int i;
+    for (i = 0; i < 16; ++i) {
+        bit_flag = out >> 15;
+        out <<= 1;
+        if(bit_flag)
+            out ^= CRC16;
+    }
+
+    // item c) reverse the bits
+    uint16_t crc = 0;
+    i = 0x8000;
+    int j = 0x0001;
+    for (; i != 0; i >>=1, j <<= 1) {
+        if (i & out) crc |= j;
+    }
+
+    return crc;
+}
+
+uint16_t crc16(void *data, int count, MPI_Datatype t)
+{
+   int size;
+   int error;
+
+   error = EMPI_Type_size(t, &size);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve type size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   return gen_crc16((uint8_t *)data, count * size);
+}
+
+
+uint16_t crc16_vect(void *data, int *counts, int *displs, MPI_Datatype t, MPI_Comm comm)
+{
+   int typesize, size, error, i;
+   uint16_t result, tmp;
+
+   error = MPI_Comm_size(comm, &size);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve comm size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   error = MPI_Type_size(t, &typesize);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve type size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   result = 0;
+
+   for (i=0;i<size;i++) {
+      tmp = gen_crc16((uint8_t *) (data + (typesize * displs[i])), typesize * counts[i]);
+      result = result ^ tmp;
+   }
+
+   return result;
+}
+
+uint16_t crc16_selective_vect(void *data, int *counts, int *displs, MPI_Datatype t, int root, MPI_Comm comm)
+{
+   int typesize, rank, size, error, i;
+   uint16_t result, tmp;
+
+   error = MPI_Comm_size(comm, &size);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve comm size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   error = MPI_Comm_size(comm, &rank);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve comm rank for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   if (rank != root) {
+      return (uint16_t) 0;
+   }
+
+   error = MPI_Type_size(t, &typesize);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve type size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   result = 0;
+
+   for (i=0;i<size;i++) {
+      tmp = gen_crc16((uint8_t *) (data + (typesize * displs[i])), typesize * counts[i]);
+      result = result ^ tmp;
+   }
+
+   return result;
+}
+
+
+uint16_t crc16_selective(void *data, int count, MPI_Datatype t, int root, MPI_Comm comm)
+{
+   int typesize, rank, size, error;
+
+   error = MPI_Comm_size(comm, &size);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve comm size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   error = MPI_Comm_size(comm, &rank);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve comm rank for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   if (rank != root) {
+      return (uint16_t) 0;
+   }
+
+   error = MPI_Type_size(t, &typesize);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "Failed to retrieve type size for CRC16 (error=%d)!", error);
+      return (uint16_t) 0;
+   }
+
+   return gen_crc16((uint8_t *)data, count * size);
+}
+
+
 static char *copy_to_debug_buf(const char *tmp, int len)
 {
    char *res;
@@ -215,16 +388,137 @@ static char *type_to_string(MPI_Datatype type)
    int len = 0;
    char tmp[1024];
 
-// FIXME!
-
-//   int error = get_type_name(type, tmp, &len);
-
-//   if (error != MPI_SUCCESS || len <= 0) {
-//      len = sprintf(tmp, "<UNKNOWN>");
-//   }
-
-   tmp[0] = '\0';
-   len = 0;
+   switch (type) {
+   case MPI_DATATYPE_NULL:
+      len = sprintf(tmp, "NULL");
+      break;
+   case MPI_CHAR:
+      len = sprintf(tmp, "CHAR");
+      break;
+   case MPI_SHORT:
+      len = sprintf(tmp, "SHORT");
+      break;
+   case MPI_INT:
+      len = sprintf(tmp, "INT");
+      break;
+   case MPI_LONG:
+      len = sprintf(tmp, "LONG");
+      break;
+   case MPI_LONG_LONG_INT:
+      len = sprintf(tmp, "LONG_LONG_INT");
+      break;
+   case MPI_SIGNED_CHAR:
+      len = sprintf(tmp, "SIGNED_CHAR");
+      break;
+   case MPI_UNSIGNED_CHAR:
+      len = sprintf(tmp, "UNSIGNED_CHAR");
+      break;
+   case MPI_UNSIGNED_SHORT:
+      len = sprintf(tmp, "UNSIGNED_SHORT");
+      break;
+   case MPI_UNSIGNED:
+      len = sprintf(tmp, "UNSIGNED");
+      break;
+   case MPI_UNSIGNED_LONG:
+      len = sprintf(tmp, "UNSIGNED_LONG");
+      break;
+   case MPI_UNSIGNED_LONG_LONG:
+      len = sprintf(tmp, "UNSIGNED_LONG_LONG");
+      break;
+   case MPI_FLOAT:
+      len = sprintf(tmp, "FLOAT");
+      break;
+   case MPI_DOUBLE:
+      len = sprintf(tmp, "DOUBLE");
+      break;
+   case MPI_LONG_DOUBLE:
+      len = sprintf(tmp, "LONG_DOUBLE");
+      break;
+   case MPI_WCHAR:
+      len = sprintf(tmp, "WCHAR");
+      break;
+   case MPI_BYTE:
+      len = sprintf(tmp, "BYTE");
+      break;
+   case MPI_PACKED:
+      len = sprintf(tmp, "PACKED");
+      break;
+   case MPI_FLOAT_INT:
+      len = sprintf(tmp, "FLOAT_INT");
+      break;
+   case MPI_DOUBLE_INT:
+      len = sprintf(tmp, "DOUBLE_INT");
+      break;
+   case MPI_LONG_INT:
+      len = sprintf(tmp, "LONG_INT");
+      break;
+   case MPI_2INT:
+      len = sprintf(tmp, "2INT");
+      break;
+   case MPI_SHORT_INT:
+      len = sprintf(tmp, "SHORT_INT");
+      break;
+   case MPI_LONG_DOUBLE_INT:
+      len = sprintf(tmp, "LONG_DOUBLE_INT");
+      break;
+   case MPI_INTEGER:
+      len = sprintf(tmp, "INTEGER");
+      break;
+   case MPI_REAL:
+      len = sprintf(tmp, "REAL");
+      break;
+   case MPI_DOUBLE_PRECISION:
+      len = sprintf(tmp, "DOUBLE_PRECISION");
+      break;
+   case MPI_COMPLEX:
+      len = sprintf(tmp, "COMPLEX");
+      break;
+   case MPI_LOGICAL:
+      len = sprintf(tmp, "LOGICAL");
+      break;
+   case MPI_CHARACTER:
+      len = sprintf(tmp, "CHARACTER");
+      break;
+   case MPI_DOUBLE_COMPLEX:
+      len = sprintf(tmp, "DOUBLE_COMPLEX");
+      break;
+   case MPI_INTEGER1:
+      len = sprintf(tmp, "INTEGER1");
+      break;
+   case MPI_INTEGER2:
+      len = sprintf(tmp, "INTEGER2");
+      break;
+   case MPI_INTEGER4:
+      len = sprintf(tmp, "INTEGER4");
+      break;
+   case MPI_INTEGER8:
+      len = sprintf(tmp, "INTEGER8");
+      break;
+   case MPI_REAL2:
+      len = sprintf(tmp, "REAL2");
+      break;
+   case MPI_REAL4:
+      len = sprintf(tmp, "REAL4");
+      break;
+   case MPI_REAL8:
+      len = sprintf(tmp, "REAL8");
+      break;
+   case MPI_REAL16:
+      len = sprintf(tmp, "REAL16");
+      break;
+   case MPI_2REAL:
+      len = sprintf(tmp, "2REAL");
+      break;
+   case MPI_2DOUBLE_PRECISION:
+      len = sprintf(tmp, "2DOUBLE_PRECISION");
+      break;
+   case MPI_2INTEGER:
+      len = sprintf(tmp, "2INTEGER");
+      break;
+   default:
+      len = sprintf(tmp, "UNKNOWN(%d)", type);
+      break;
+   }
 
    return copy_to_debug_buf(tmp, len+1);
 }
@@ -234,10 +528,50 @@ static char *op_to_string(MPI_Op o)
    int len;
    char tmp[64];
 
-   // FIXME
-
-   tmp[0] = '\0';
-   len = 0;
+   switch(o) {
+   case MPI_OP_NULL:
+      len = sprintf(tmp, "NULL");
+      break;
+   case MPI_MAX:
+      len = sprintf(tmp, "MAX");
+      break;
+   case MPI_MIN:
+      len = sprintf(tmp, "MIN");
+      break;
+   case MPI_SUM:
+      len = sprintf(tmp, "SUM");
+      break;
+   case MPI_PROD:
+      len = sprintf(tmp, "PROD");
+      break;
+   case MPI_MAXLOC:
+      len = sprintf(tmp, "MAXLOC");
+      break;
+   case MPI_MINLOC:
+      len = sprintf(tmp, "MINLOC");
+      break;
+   case MPI_BOR:
+      len = sprintf(tmp, "BOR");
+      break;
+   case MPI_BAND:
+      len = sprintf(tmp, "BAND");
+      break;
+   case MPI_BXOR:
+      len = sprintf(tmp, "BXOR");
+      break;
+   case MPI_LOR:
+      len = sprintf(tmp, "LOR");
+      break;
+   case MPI_LAND:
+      len = sprintf(tmp, "LAND");
+      break;
+   case MPI_LXOR:
+      len = sprintf(tmp, "LXOR");
+      break;
+   default:
+      len = sprintf(tmp, "UNKNOWN(%d)", o);
+      break;
+   }
 
    return copy_to_debug_buf(tmp, len+1);
 }
@@ -317,7 +651,9 @@ int MPI_Init ( int *argc, char ***argv )
 {
    // NOTE: library will fail if any other MPI function is called before MPI_Init!
    init_logging();
+#ifdef TRACE_CALLS
    debug_buf[DEBUG_BUF_SIZE] = '\0';
+#endif // TRACE_CALLS
 
 #ifdef TRACE_CALLS
    INFO(0, "MPI_Init(int *argc=%p, char ***argv=%p)", argc, argv);
@@ -885,7 +1221,7 @@ int MPI_Allgather ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *r
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Allgather(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Allgather(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -893,6 +1229,10 @@ int MPI_Allgather ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *r
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Allgather(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Allgather(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) OUT", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), recvbuf, crc16(recvbuf, recvcount, recvtype), recvcount, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -915,7 +1255,7 @@ int MPI_Allgatherv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Allgatherv(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcounts=%p, int *displs=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Allgatherv(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcounts=%p, int *displs=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), recvbuf, recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -923,6 +1263,11 @@ int MPI_Allgatherv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Allgatherv(sendbuf, sendcount, sendtype, recvbuf, recvcounts, displs, recvtype, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Allgatherv(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int *recvcounts=%p, int *displs=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) OUT", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), recvbuf, crc16_vect(recvbuf, recvcounts, displs, recvtype, comm), recvcounts, displs, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
+
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -944,7 +1289,7 @@ int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, 
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Allreduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(type), op_to_string(op), comm_to_string(comm));
+   INFO(0, "MPI_Allreduce(void *sendbuf=%p (CRC=%hx), void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, count, type), recvbuf, count, type_to_string(type), op_to_string(op), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -952,6 +1297,10 @@ int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, 
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Allreduce(sendbuf, recvbuf, count, type, op, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Allreduce(void *sendbuf=%p (CRC=%hx), void *recvbuf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, count, type), recvbuf, crc16(recvbuf, count, type), count, type_to_string(type), op_to_string(op), comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -974,7 +1323,7 @@ int MPI_Alltoall ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *re
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Alltoall(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Alltoall(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), recvbuf, recvcount, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -982,6 +1331,10 @@ int MPI_Alltoall ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *re
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Alltoall(sendbuf, sendcount, sendtype, recvbuf, recvcount, recvtype, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Alltoall(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int recvcount=%d, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) OUT", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), recvbuf, crc16(recvbuf, recvcount, recvtype), recvcount, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -996,7 +1349,6 @@ int MPI_Alltoall ( void *sendbuf, int sendcount, MPI_Datatype sendtype, void *re
    return error;
 }
 
-
 int MPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype sendtype, void *recvbuf, int *recvcnts, int *rdispls, MPI_Datatype recvtype, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
@@ -1004,7 +1356,7 @@ int MPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype sen
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Alltoallv(void *sendbuf=%p, int *sendcnts=%p, int *sdispls=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s)", sendbuf, sendcnts, sdispls, type_to_string(sendtype), recvbuf, recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
+   INFO(0, "MPI_Alltoallv(void *sendbuf=%p (CRC=%hx), int *sendcnts=%p, int *sdispls=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *rdispls=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) IN", sendbuf, crc16_vect(sendbuf, sendcnts, sdispls, sendtype, comm), sendcnts, sdispls, type_to_string(sendtype), recvbuf, recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1012,6 +1364,10 @@ int MPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, MPI_Datatype sen
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Alltoallv(sendbuf, sendcnts, sdispls, sendtype, recvbuf, recvcnts, rdispls, recvtype, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Alltoallv(void *sendbuf=%p (CRC=%hx), int *sendcnts=%p, int *sdispls=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int *recvcnts=%p, int *rdispls=%p, MPI_Datatype recvtype=%s, MPI_Comm comm=%s) OUT", sendbuf, crc16_vect(sendbuf, sendcnts, sdispls, sendtype, comm), sendcnts, sdispls, type_to_string(sendtype), recvbuf, crc16_vect(recvbuf, recvcnts, rdispls, recvtype, comm), recvcnts, rdispls, type_to_string(recvtype), comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1063,7 +1419,7 @@ int MPI_Scatter ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Scatter(void *sendbuf=%p, int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Scatter(void *sendbuf=%p (CRC=%hx), int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) IN", sendbuf, crc16_selective(sendbuf, sendcnt, sendtype, root, comm), sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1071,6 +1427,10 @@ int MPI_Scatter ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Scatter(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Scatter(void *sendbuf=%p (CRC=%hx), int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) OUT", sendbuf, crc16_selective(sendbuf, sendcnt, sendtype, root, comm), sendcnt, type_to_string(sendtype), recvbuf, crc16(recvbuf, recvcnt, recvtype), recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1085,7 +1445,6 @@ int MPI_Scatter ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
    return error;
 }
 
-
 int MPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, MPI_Datatype sendtype, void *recvbuf, int recvcnt, MPI_Datatype recvtype, int root, MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
@@ -1093,7 +1452,7 @@ int MPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, MPI_Datatype sendt
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Scatterv(void *sendbuf=%p, int *sendcnts=%p, int *displs=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnts, displs, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Scatterv(void *sendbuf=%p (CRC=%hx), int *sendcnts=%p, int *displs=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) IN", sendbuf, crc16_selective_vect(sendbuf, sendcnts, displs, sendtype, root, comm), sendcnts, displs, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1101,6 +1460,10 @@ int MPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, MPI_Datatype sendt
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Scatterv(sendbuf, sendcnts, displs, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Scatterv(void *sendbuf=%p (CRC=%hx), int *sendcnts=%p, int *displs=%p, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) OUT", sendbuf, crc16_selective_vect(sendbuf, sendcnts, displs, sendtype, root, comm), sendcnts, displs, type_to_string(sendtype), recvbuf, crc16(recvbuf, recvcnt, recvtype), recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1152,7 +1515,7 @@ int MPI_Bcast ( void *buffer, int count, MPI_Datatype type, int root, MPI_Comm c
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Bcast(void *buffer=%p, int count=%d, MPI_Datatype type=%s, int root=%d, MPI_Comm comm=%s)", buffer, count, type_to_string(type), root, comm_to_string(comm));
+   INFO(0, "MPI_Bcast(void *buffer=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int root=%d, MPI_Comm comm=%s) IN", buffer, crc16_selective(buffer, count, type, root, comm), count, type_to_string(type), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1160,6 +1523,11 @@ int MPI_Bcast ( void *buffer, int count, MPI_Datatype type, int root, MPI_Comm c
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Bcast(buffer, count, type, root, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Bcast(void *buffer=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int root=%d, MPI_Comm comm=%s) OUT", buffer, crc16(buffer, count, type), count, type_to_string(type), root, comm_to_string(comm));
+#endif // TRACE_CALLS
+
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1181,7 +1549,7 @@ int MPI_Gather ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvbu
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Gather(void *sendbuf=%p, int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Gather(void *sendbuf=%p (CRC=%hx), int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, sendcnt, sendtype), sendcnt, type_to_string(sendtype), recvbuf, recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1189,6 +1557,10 @@ int MPI_Gather ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvbu
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Gather(sendbuf, sendcnt, sendtype, recvbuf, recvcnt, recvtype, root, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Gather(void *sendbuf=%p (CRC=%hx), int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC=%hx), int recvcnt=%d, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) OUT", sendbuf, crc16(sendbuf, sendcnt, sendtype), sendcnt, type_to_string(sendtype), recvbuf, crc16_selective(recvbuf, recvcnt, recvtype, root, comm), recvcnt, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1211,7 +1583,7 @@ int MPI_Gatherv ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Gatherv(void *sendbuf=%p, int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *displs=%p, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, sendcnt, type_to_string(sendtype), recvbuf, recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
+   INFO(0, "MPI_Gatherv(void *sendbuf=%p (CRC=%hx), int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p, int *recvcnts=%p, int *displs=%p, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, sendcnt, sendtype), sendcnt, type_to_string(sendtype), recvbuf, recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1219,6 +1591,10 @@ int MPI_Gatherv ( void *sendbuf, int sendcnt, MPI_Datatype sendtype, void *recvb
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Gatherv(sendbuf, sendcnt, sendtype, recvbuf, recvcnts, displs, recvtype, root, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Gatherv(void *sendbuf=%p (CRC=%hx), int sendcnt=%d, MPI_Datatype sendtype=%s, void *recvbuf=%p (CRC16=%hx), int *recvcnts=%p, int *displs=%p, MPI_Datatype recvtype=%s, int root=%d, MPI_Comm comm=%s) OUT", sendbuf, crc16(sendbuf, sendcnt, sendtype), sendcnt, type_to_string(sendtype), recvbuf, crc16_selective_vect(recvbuf, recvcnts, displs, recvtype, root, comm), recvcnts, displs, type_to_string(recvtype), root, comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1241,7 +1617,7 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Reduce(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, int root=%d, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(type), op_to_string(op), root, comm_to_string(comm));
+   INFO(0, "MPI_Reduce(void *sendbuf=%p (CRC=%hx), void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, int root=%d, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, count, type), recvbuf, count, type_to_string(type), op_to_string(op), root, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1249,6 +1625,10 @@ int MPI_Reduce ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Reduce(sendbuf, recvbuf, count, type, op, root, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Reduce(void *sendbuf=%p (CRC=%hx), void *recvbuf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, int root=%d, MPI_Comm comm=%s) IN", sendbuf, crc16(sendbuf, count, type), recvbuf, crc16_selective(recvbuf, count, type, root, comm), count, type_to_string(type), op_to_string(op), root, comm_to_string(comm));
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1336,7 +1716,7 @@ int MPI_Irsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Irsend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(type), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Irsend(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, crc16(buf, count, type), count, type_to_string(type), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1366,7 +1746,7 @@ int MPI_Isend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Isend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, count, type_to_string(type), dest, tag, comm_to_string(comm), r);
+   INFO(0, "MPI_Isend(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, crc16(buf, count, type), count, type_to_string(type), dest, tag, comm_to_string(comm), r);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1396,7 +1776,7 @@ int MPI_Rsend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Rsend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(type), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Rsend(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, crc16(buf, count, type), count, type_to_string(type), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1426,7 +1806,7 @@ int MPI_Send ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_C
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Send(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(type), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Send(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, crc16(buf, count, type), count, type_to_string(type), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1456,7 +1836,7 @@ int MPI_Sendrecv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, int dest
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Sendrecv(void *sendbuf=%p, int sendcount=%d, MPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, MPI_Comm comm=%s, MPI_Status *s=%p)", sendbuf, sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), s);
+   INFO(0, "MPI_Sendrecv(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p, int recvcount=%d, MPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, MPI_Comm comm=%s, MPI_Status *s=%p) IN", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1464,6 +1844,10 @@ int MPI_Sendrecv ( void *sendbuf, int sendcount, MPI_Datatype sendtype, int dest
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Sendrecv(sendbuf, sendcount, sendtype, dest, sendtag, recvbuf, recvcount, recvtype, source, recvtag, comm, (EMPI_Status *)s);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Sendrecv(void *sendbuf=%p (CRC=%hx), int sendcount=%d, MPI_Datatype sendtype=%s, int dest=%d, int sendtag=%d, void *recvbuf=%p (CRC=%hx), int recvcount=%d, MPI_Datatype recvtype=%s, int source=%d, int recvtag=%d, MPI_Comm comm=%s, MPI_Status *s=%p) IN", sendbuf, crc16(sendbuf, sendcount, sendtype), sendcount, type_to_string(sendtype), dest, sendtag, recvbuf, crc16(recvbuf, recvcount, recvtype), recvcount, type_to_string(recvtype), source, recvtag, comm_to_string(comm), s);
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1485,7 +1869,7 @@ int MPI_Ssend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Ssend(void *buf=%p, int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, count, type_to_string(type), dest, tag, comm_to_string(comm));
+   INFO(0, "MPI_Ssend(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s)", buf, crc16(buf, count, type), count, type_to_string(type), dest, tag, comm_to_string(comm));
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1515,7 +1899,7 @@ int MPI_Recv ( void *buf, int count, MPI_Datatype type, int source, int tag, MPI
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_Recv(void *buf=%p, int count=%d, MPI_Datatype type=%s, int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Status *s=%p)", buf, count, type_to_string(type), source, tag, comm_to_string(comm), s);
+   INFO(0, "MPI_Recv(void *buf=%p, int count=%d, MPI_Datatype type=%s, int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Status *s=%p) IN", buf, count, type_to_string(type), source, tag, comm_to_string(comm), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1523,6 +1907,10 @@ int MPI_Recv ( void *buf, int count, MPI_Datatype type, int source, int tag, MPI
 #endif // PROFILE_LEVEL
 
    int error = EMPI_Recv(buf, count, type, source, tag, comm, (EMPI_Status *)s);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Recv(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int source=%d, int tag=%d, MPI_Comm comm=%s, MPI_Status *s=%p) OUT", buf, crc16(buf, count, type), count, type_to_string(type), source, tag, comm_to_string(comm), s);
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1842,6 +2230,39 @@ int MPI_Type_get_name ( MPI_Datatype type, char *type_name, int *resultlen )
    return error;
 }
 
+int MPI_Type_size ( MPI_Datatype type, int *size )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Type_size(MPI_Datatype type=%s, int *size=%p)", type_to_string(type), size);
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Type_size(type, size);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_size failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
 /* ------------------------ Files ------------------------ */
 
 int MPI_File_set_view ( MPI_File MPI_fh, MPI_Offset disp, MPI_Datatype etype, MPI_Datatype filetype, char *datarep, MPI_Info info )
@@ -1939,7 +2360,7 @@ int MPI_File_write_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_File_write_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), offset, buf, count, type_to_string(type), s);
+   INFO(0, "MPI_File_write_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), offset, buf, crc16(buf, count, type), count, type_to_string(type), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1968,7 +2389,7 @@ int MPI_File_read_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count,
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_File_read_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), offset, buf, count, type_to_string(type), s);
+   INFO(0, "MPI_File_read_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p) IN", file_to_string(MPI_fh), offset, buf, count, type_to_string(type), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -1976,6 +2397,11 @@ int MPI_File_read_at ( MPI_File MPI_fh, MPI_Offset offset, void *buf, int count,
 #endif // PROFILE_LEVEL
 
    int error = EMPI_File_read_at(MPI_fh, offset, buf, count, type, (EMPI_Status *)s);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_read_at(MPI_File MPI_fh=%s, MPI_Offset offset=%p, void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p) OUT", file_to_string(MPI_fh), offset, buf, crc16(buf, count, type), count, type_to_string(type), s);
+#endif // TRACE_CALLS
+
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -1997,7 +2423,7 @@ int MPI_File_read_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_File_read_all(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(type), s);
+   INFO(0, "MPI_File_read_all(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p) IN", file_to_string(MPI_fh), buf, count, type_to_string(type), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2005,6 +2431,10 @@ int MPI_File_read_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype type
 #endif // PROFILE_LEVEL
 
    int error = EMPI_File_read_all(MPI_fh, buf, count, type, (EMPI_Status *)s);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_File_read_all(MPI_File MPI_fh=%s, void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p) OUT", file_to_string(MPI_fh), buf, crc16(buf, count, type), count, type_to_string(type), s);
+#endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
    profile_end = profile_stop_ticks();
@@ -2027,7 +2457,7 @@ int MPI_File_write_all ( MPI_File MPI_fh, void *buf, int count, MPI_Datatype typ
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS
-   INFO(0, "MPI_File_write_all(MPI_File MPI_fh=%s, void *buf=%p, int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, count, type_to_string(type), s);
+   INFO(0, "MPI_File_write_all(MPI_File MPI_fh=%s, void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, MPI_Status *s=%p)", file_to_string(MPI_fh), buf, crc16(buf, count, type), count, type_to_string(type), s);
 #endif // TRACE_CALLS
 
 #if PROFILE_LEVEL > 0
@@ -2232,6 +2662,251 @@ int MPI_Intercomm_merge ( MPI_Comm intercomm, int high, MPI_Comm *newintracomm )
 #ifdef TRACE_ERRORS
    if (error != MPI_SUCCESS) {
       ERROR(0, "MPI_Intercomm_merge failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+// HIERO
+
+int MPI_Issend ( void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm, MPI_Request *r )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Issend(void *buf=%p (CRC=%hx), int count=%d, MPI_Datatype type=%s, int dest=%d, int tag=%d, MPI_Comm comm=%s, MPI_Request *r=%p)", buf, crc16(buf, count, type), count, type_to_string(type), dest, tag, comm_to_string(comm), r);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Issend(buf, count, type, dest, tag, comm, r);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_ISSEND, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Issend failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int MPI_Type_hvector ( int count, int blocklen, MPI_Aint stride, MPI_Datatype old_type, MPI_Datatype *newtype_p )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Type_hvector(int count=%d, int blocklen=%d, MPI_Aint stride=%d, MPI_Datatype old_type=%s, MPI_Datatype *newtype_p=%p)", count, blocklen, stride, type_to_string(old_type), newtype_p);
+#endif // TRACE_CALLS
+
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Type_hvector(count, blocklen, stride, old_type, newtype_p);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_hvector failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int MPI_Type_indexed ( int count, int blocklens[], int indices[], MPI_Datatype old_type, MPI_Datatype *newtype )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Type_indexed(int count=%d, int blocklens[]=%p, int indices[]=%p, MPI_Datatype old_type=%s, MPI_Datatype *newtype=%p)", count, blocklens, indices, type_to_string(old_type), newtype);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Type_indexed(count, blocklens, indices, old_type, newtype);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_indexed failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_Type_ub ( MPI_Datatype type, MPI_Aint *displacement )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Type_ub(MPI_Datatype type=%s, MPI_Aint *displacement=%p)", type_to_string(type), displacement);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Type_ub(type, displacement);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Type_ub failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+
+int MPI_Op_create ( MPI_User_function *function, int commute, MPI_Op *op )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Op_create(MPI_User_function *function=%p, int commute=%d, MPI_Op *op=%p)", function, commute, op);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Op_create(function, commute, op);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Op_create failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+int MPI_Pack ( void *inbuf, int incount, MPI_Datatype type, void *outbuf, int outcount, int *position, MPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Pack(void *inbuf=%p (CRC=%hx), int incount=%d, MPI_Datatype type=%s, void *outbuf=%p, int outcount=%d, int *position=%p, MPI_Comm comm=%s)", inbuf, crc16(inbuf, incount, type), incount, type_to_string(type), outbuf, outcount, position, comm_to_string(comm));
+#endif // TRACE_CALLS
+
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Pack(inbuf, incount, type, outbuf, outcount, position, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Pack failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_Pack_size ( int incount, MPI_Datatype type, MPI_Comm comm, int *size )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Pack_size(int incount=%d, MPI_Datatype type=%s, MPI_Comm comm=%s, int *size=%p)", incount, type_to_string(type), comm_to_string(comm), size);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Pack_size(incount, type, comm, size);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Pack_size failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outcount, MPI_Datatype type, MPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Unpack(void *inbuf=%p, int insize=%d, int *position=%p, void *outbuf=%p, int outcount=%d, MPI_Datatype type=%s, MPI_Comm comm=%s) IN", inbuf, insize, position, outbuf, outcount, type_to_string(type), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Unpack(inbuf, insize, position, outbuf, outcount, type, comm);
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Unpack(void *inbuf=%p, int insize=%d, int *position=%p, void *outbuf=%p (CRC=%hx), int outcount=%d, MPI_Datatype type=%s, MPI_Comm comm=%s) OUT", inbuf, insize, position, outbuf, crc16(outbuf, outcount, type), outcount, type_to_string(type), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Unpack failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -8393,39 +9068,6 @@ int MPI_Type_set_name ( MPI_Datatype type, char *type_name )
    return error;
 }
 
-
-int MPI_Type_size ( MPI_Datatype type, int *size )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "MPI_Type_size(MPI_Datatype type=%s, int *size=%p)", type_to_string(datatype), size);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = EMPI_Type_size(datatype, size);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != MPI_SUCCESS) {
-      ERROR(0, "MPI_Type_size failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int MPI_Type_struct ( int count, int blocklens[], MPI_Aint indices[], MPI_Datatype old_types[], MPI_Datatype *newtype )

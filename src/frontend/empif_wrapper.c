@@ -4,9 +4,17 @@
 
 /* Misc. utilities */
 
+// These are the C-equivalents of the Fortran common block defined in mpif.h.
+int empi_fortran_in_place;
+int empi_fortran_status_ignore[6];
+int empi_fortran_statuses_ignore;
+
 void FORT_NAME( mpi_init , MPI_INIT ) ( int *ierr )
 {
-	// TODO!!!
+   int argc = 0;
+   char **argv = NULL;
+
+   *ierr = MPI_Init(&argc, &argv);
 }
 
 void FORT_NAME( mpi_initialized , MPI_INITIALIZED ) ( int *flag , int *ierr )
@@ -215,7 +223,18 @@ void FORT_NAME( mpi_send , MPI_SEND ) ( void *buf, int *count, int *type, int *d
 
 void FORT_NAME( mpi_sendrecv , MPI_SENDRECV ) ( void *sendbuf, int *sendcount, int *sendtype, int *dest, int *sendtag, void *recvbuf, int *recvcount, int *recvtype, int *source, int *recvtag, int *comm, int *stat , int *ierr )
 {
-   *ierr = MPI_Sendrecv(sendbuf, *sendcount, *sendtype, *dest, *sendtag, recvbuf, *recvcount, *recvtype, *source, *recvtag, *comm, (MPI_Status *) stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_Sendrecv(sendbuf, *sendcount, *sendtype, *dest, *sendtag, recvbuf, *recvcount, *recvtype, *source, *recvtag, *comm, s);
+}
+
+void FORT_NAME( mpi_issend , MPI_ISSEND ) ( void *buf, int *count, int *type, int *dest, int *tag, int *comm, int *r , int *ierr )
+{
+   *ierr = MPI_Issend(buf, *count, *type, *dest, *tag, *comm, r);
 }
 
 void FORT_NAME( mpi_ssend , MPI_SSEND ) ( void *buf, int *count, int *type, int *dest, int *tag, int *comm , int *ierr )
@@ -225,7 +244,13 @@ void FORT_NAME( mpi_ssend , MPI_SSEND ) ( void *buf, int *count, int *type, int 
 
 void FORT_NAME( mpi_recv , MPI_RECV ) ( void *buf, int *count, int *type, int *source, int *tag, int *comm, int *stat, int *ierr )
 {
-   *ierr = MPI_Recv(buf, *count, *type, *source, *tag, *comm, (MPI_Status *)stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_Recv(buf, *count, *type, *source, *tag, *comm, s);
 }
 
 
@@ -233,17 +258,44 @@ void FORT_NAME( mpi_recv , MPI_RECV ) ( void *buf, int *count, int *type, int *s
 
 void FORT_NAME( mpi_wait , MPI_WAIT ) ( int *r, int *stat , int *ierr )
 {
-   *ierr = MPI_Wait(r, (MPI_Status *)stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_Wait(r, s);
 }
 
 void FORT_NAME( mpi_waitall , MPI_WAITALL ) ( int *count, int *array_of_requests, int *array_of_statuses , int *ierr )
 {
-   *ierr = MPI_Waitall(*count, array_of_requests, (MPI_Status *)array_of_statuses);
+   MPI_Status *s = MPI_STATUSES_IGNORE;
+
+   if ((void *)array_of_statuses != &empi_fortran_statuses_ignore) {
+      s = (MPI_Status *) array_of_statuses;
+   }
+
+   *ierr = MPI_Waitall(*count, array_of_requests, s);
 }
 
 void FORT_NAME( mpi_waitany , MPI_WAITANY ) ( int *count, int *array_of_requests, int *index, MPI_Status *stat , int *ierr )
 {
-   *ierr = MPI_Waitany(*count, array_of_requests, index, (MPI_Status *)stat);
+   int cindex;
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_Waitany(*count, array_of_requests, &cindex, s);
+
+   if (*ierr == MPI_SUCCESS) {
+      if (cindex == MPI_UNDEFINED) {
+         *index = MPI_UNDEFINED;
+      } else {
+         *index = cindex+1;
+      }
+   }
 }
 
 void FORT_NAME( mpi_request_free , MPI_REQUEST_FREE ) ( int *r , int *ierr )
@@ -269,17 +321,35 @@ void FORT_NAME( mpi_file_close , MPI_FILE_CLOSE ) ( int *fh , int *ierr )
 
 void FORT_NAME( mpi_file_read_all , MPI_FILE_READ_ALL ) ( int *fh, void *buf, int *count, int *type, int *stat , int *ierr )
 {
-   *ierr = MPI_File_read_all(*fh, buf, *count, *type, (MPI_Status *)stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_File_read_all(*fh, buf, *count, *type, s);
 }
 
 void FORT_NAME( mpi_file_read_at , MPI_FILE_READ_AT ) ( int *fh, int *offset, void *buf, int *count, int *type, int *stat , int *ierr )
 {
-   *ierr = MPI_File_read_at(*fh, *offset, buf, *count, *type, (MPI_Status *)stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_File_read_at(*fh, *offset, buf, *count, *type, s);
 }
 
 void FORT_NAME( mpi_file_write_at , MPI_FILE_WRITE_AT ) ( int *fh, int *offset, void *buf, int *count, int *type, int *stat , int *ierr )
 {
-   *ierr = MPI_File_write_at(*fh, *offset, buf, *count, *type, (MPI_Status *) stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_File_write_at(*fh, *offset, buf, *count, *type, s);
 }
 
 void FORT_NAME( mpi_file_set_view , MPI_FILE_SET_VIEW ) ( int *fh, int *disp, int *etype, int *filetype, char *datarep, int *info , int *ierr )
@@ -289,7 +359,13 @@ void FORT_NAME( mpi_file_set_view , MPI_FILE_SET_VIEW ) ( int *fh, int *disp, in
 
 void FORT_NAME( mpi_file_write_all , MPI_FILE_WRITE_ALL ) ( int *fh, void *buf, int *count, int *type, int *stat , int *ierr )
 {
-   *ierr = MPI_File_write_all(*fh, buf, *count, *type, (MPI_Status *) stat);
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_File_write_all(*fh, buf, *count, *type, s);
 }
 
 /* Info */
@@ -343,6 +419,21 @@ void FORT_NAME( mpi_type_get_envelope , MPI_TYPE_GET_ENVELOPE ) ( int *type, int
    *ierr = MPI_Type_get_envelope(*type, num_integers, num_addresses, num_datatypes, combiner);
 }
 
+void FORT_NAME( mpi_type_hvector , MPI_TYPE_HVECTOR ) ( int *count, int *blocklen, int *stride, int *old_type, int *newtype, int *ierr )
+{
+   *ierr = MPI_Type_hvector(*count, *blocklen, *stride, *old_type, newtype);
+}
+
+void FORT_NAME( mpi_type_indexed , MPI_TYPE_INDEXED ) ( int *count, int *blocklens, int *indices, int *old_type, int *newtype , int *ierr )
+{
+   *ierr = MPI_Type_indexed(*count, blocklens, indices, *old_type, newtype);
+}
+
+void FORT_NAME( mpi_type_ub , MPI_TYPE_UB ) ( int *type, int *displacement , int *ierr )
+{
+   // FIXME: is this displacement OK?
+   *ierr = MPI_Type_ub(*type, (MPI_Aint*)displacement);
+}
 
 /* Intercomm */
 
@@ -356,6 +447,29 @@ void FORT_NAME( mpi_intercomm_merge , MPI_INTERCOMM_MERGE ) ( int *intercomm, in
    *ierr = MPI_Intercomm_merge(*intercomm, *high, newintracomm);
 }
 
+/* Operations */
+
+void FORT_NAME( mpi_op_create , MPI_OP_CREATE ) ( void *function, int *commute, int *op , int *ierr )
+{
+   *ierr = MPI_Op_create(function, *commute, op);
+}
+
+/* Pack */
+
+void FORT_NAME( mpi_pack , MPI_PACK ) ( void *inbuf, int *incount, int *type, void *outbuf, int *outcount, int *position, int *comm , int *ierr )
+{
+   *ierr = MPI_Pack(inbuf, *incount, *type, outbuf, *outcount, position, *comm);
+}
+
+void FORT_NAME( mpi_pack_size , MPI_PACK_SIZE ) ( int *incount, int *type, int *comm, int *size , int *ierr )
+{
+   *ierr = MPI_Pack_size(*incount, *type, *comm, size);
+}
+
+void FORT_NAME( mpi_unpack , MPI_UNPACK ) ( void *inbuf, int *insize, int *position, void *outbuf, int *outcount, int *type, int *comm , int *ierr )
+{
+   *ierr = MPI_Unpack(inbuf, *insize, position, outbuf, *outcount, *type, *comm);
+}
 
 
 
@@ -956,10 +1070,6 @@ FORT_NAME( mpi_op_commutative , MPI_OP_COMMUTATIVE ) ( MPI_Op op, int *commute ,
 {
 }
 
-FORT_NAME( mpi_op_create , MPI_OP_CREATE ) ( MPI_User_function *function, int commute, MPI_Op *op , int *ierr )
-{
-}
-
 FORT_NAME( mpi_open_port , MPI_OPEN_PORT ) ( MPI_Info info, char *port_name , int *ierr )
 {
 }
@@ -973,14 +1083,6 @@ FORT_NAME( mpi_pack_external , MPI_PACK_EXTERNAL ) ( char *datarep, void *inbuf,
 }
 
 FORT_NAME( mpi_pack_external_size , MPI_PACK_EXTERNAL_SIZE ) ( char *datarep, int incount, MPI_Datatype datatype, MPI_Aint *size , int *ierr )
-{
-}
-
-FORT_NAME( mpi_pack , MPI_PACK ) ( void *inbuf, int incount, MPI_Datatype datatype, void *outbuf, int outcount, int *position, MPI_Comm comm , int *ierr )
-{
-}
-
-FORT_NAME( mpi_pack_size , MPI_PACK_SIZE ) ( int incount, MPI_Datatype datatype, MPI_Comm comm, int *size , int *ierr )
 {
 }
 
@@ -1198,10 +1300,6 @@ FORT_NAME( mpi_type_vector , MPI_TYPE_VECTOR ) ( int count, int blocklength, int
 }
 
 FORT_NAME( mpi_unpack_external , MPI_UNPACK_EXTERNAL ) ( char *datarep, void *inbuf, MPI_Aint insize, MPI_Aint *position, void *outbuf, int outcount, MPI_Datatype datatype , int *ierr )
-{
-}
-
-FORT_NAME( mpi_unpack , MPI_UNPACK ) ( void *inbuf, int insize, int *position, void *outbuf, int outcount, MPI_Datatype datatype, MPI_Comm comm , int *ierr )
 {
 }
 

@@ -117,3 +117,21 @@ EMPI_Op operation_to_handle(operation *o)
    return o->handle;
 }
 
+operation *create_operation(EMPI_User_function *function, MPI_Op op, int commute)
+{
+   int handle, error;
+
+   handle = next_operation;
+   next_operation++;
+
+   error = init_operation(handle, function, op, commute);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "create_operation failed(%d)!\n", error);
+      return NULL;
+   }
+
+   return ops[handle];
+}
+
+

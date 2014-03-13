@@ -391,7 +391,7 @@ int wa_init(int local_rank, int local_count, int *argc, char ***argv)
 
    if (status != CONNECT_OK) {
       ERROR(1, "Failed to connect to hub!");
-      return 0;
+      return EMPI_ERR_INTERN;
    }
 
    error = handshake(local_rank, local_count, cluster_rank, cluster_count,
@@ -400,10 +400,10 @@ int wa_init(int local_rank, int local_count, int *argc, char ***argv)
    if (error != CONNECT_OK) {
       ERROR(1, "Failed to perform handshake with hub!");
       close(socketfd);
-      return 0;
+      return EMPI_ERR_INTERN;
    }
 
-   return 1;
+   return EMPI_SUCCESS;
 }
 
 int wa_finalize() {

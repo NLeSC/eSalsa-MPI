@@ -93,8 +93,8 @@ static int intern_add_datatype(EMPI_Datatype handle, MPI_Datatype type)
 
    d->handle = handle;
    d->type = type;
-
    all_types[handle] = d;
+
    return EMPI_SUCCESS;
 }
 
@@ -374,6 +374,14 @@ int init_datatypes()
       return error;
    }
 
+   /* NOTE: Needed because MPI on DAS4 is ancient! */
+   error = intern_add_datatype(EMPI_REAL16, MPI_LONG_DOUBLE);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "init_datatypes() Failed to init type EMPI_REAL16!");
+      return error;
+   }
+
    error = intern_add_datatype(EMPI_2REAL, MPI_2REAL);
 
    if (error != EMPI_SUCCESS) {
@@ -528,8 +536,17 @@ int free_datatype(datatype *type)
       return EMPI_ERR_TYPE;
    }
 
-   free(all_types[type->handle]);
+   if (type != all_types[type->handle]) {
+      ERROR(1, "free_datatype(type=%d) Pointer mismatch in type %d!", type->handle);
+      return EMPI_ERR_TYPE;
+   }
+
+   DEBUG(1, "Freeing datatype %d", type->handle);
+
    all_types[type->handle] = NULL;
+
+   free(type);
+
    return EMPI_SUCCESS;
 }
 

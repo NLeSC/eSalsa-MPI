@@ -1,14 +1,8 @@
 #!/bin/bash
 
-#module purge
-#module list
-
-#MPI=/var/scratch/jason/OpenMPI/openmpi-1.4.2-fixed-gnu
-
 SHARED=../shared
 
-MPI=/usr/lib/openmpi
-MPICC=/usr/bin/mpicc
+MPICC=mpicc         
 
 echo using `which $MPICC`
 
@@ -48,4 +42,3 @@ wa_sockets.o \
 empi.o
 
 rm -f *.o
-
