@@ -27,15 +27,15 @@
 #include "communicator.h"
 #include "group.h"
 #include "messaging.h"
-#include "wa_sockets.h"
+//#include "wa_sockets.h"
 #include "util.h"
 #include "debugging.h"
 #include "operation.h"
 //#include "profiling.h"
 
 // The number of processes in our cluster and our process' rank in this set.
-int local_count;
-int local_rank;
+//int local_count;
+//int local_rank;
 
 /* The following external fields are provided by the WA implementation */
 
@@ -53,7 +53,6 @@ extern char *cluster_name;
 // total set of machines.
 extern int *cluster_sizes;
 extern int *cluster_offsets;
-
 
 // Value of various Fortan MPI constants.
 // DO WE NEED THESE ?
@@ -109,9 +108,13 @@ static void init_constants()
 #define __EMPI_Init
 int EMPI_Init(int *argc, char **argv[])
 {
+   int rank, size;
+   int empi_rank, empi_size;
    int i=0;
 
-   INFO(0, "Init MPI...");
+   INFO(0, "Init EMPI...");
+
+   init_constants();
 
    int status = PMPI_Init(argc, argv);
 
@@ -120,16 +123,50 @@ int EMPI_Init(int *argc, char **argv[])
        return EMPI_ERR_INTERN;
    }
 
-   PMPI_Comm_rank(MPI_COMM_WORLD, &local_rank);
-   PMPI_Comm_size(MPI_COMM_WORLD, &local_count);
+   PMPI_Comm_rank(MPI_COMM_WORLD, &rank);
+   PMPI_Comm_size(MPI_COMM_WORLD, &size);
 
-   INFO(1, "START EMPI on %d of %d", local_rank, local_count);
+   INFO(1, "START EMPI on %d of %d", rank, size);
 
    for (i=0;i<*argc;i++) {
       INFO(4, "argv[%d] = %s", i, (*argv)[i]);
    }
 
-   init_constants();
+   status = messaging_init(rank, size, &empi_rank, &empi_size, argc, argv);
+
+   if (status != EMPI_SUCCESS) {
+      PMPI_Finalize();
+      ERROR(1, "Failed to initialize EMPI MESSAGING %d!", status);
+      return EMPI_ERR_INTERN;
+   }
+
+   INFO(1, "Init EMPI messaging on (MPI) %d of %d -> (EMPI) %d of %d", rank, size, empi_rank, empi_size);
+
+   status = init_communicators(rank, size, empi_rank, empi_size,
+                               cluster_rank, cluster_count,
+                               cluster_sizes, cluster_offsets);
+
+   if (status != EMPI_SUCCESS) {
+      messaging_finalize();
+      PMPI_Finalize();
+      ERROR(1, "Failed to initialize communicators! (error=%d)", status);
+      return status;
+   }
+
+   if (empi_rank == -1) {
+      // If this is a messaging gateway, we hijack the process and run the gateway instead!
+      INFO(1, "Starting EMPI gateway on (MPI) %d of %d -> (EMPI) %d of %d", rank, size, empi_rank, empi_size);
+
+      status = messaging_run_gateway(rank, size, empi_size);
+
+      if (status != EMPI_SUCCESS) {
+         ERROR(1, "Failed to run EMPI gateway (error=%d)!", status);
+      }
+
+      // Once the gateway if finished, we terminate MPI and return a special error to the application.
+      PMPI_Finalize();
+      return EMPI_ERR_GATEWAY;
+   }
 
    status = init_groups();
 
@@ -179,23 +216,6 @@ int EMPI_Init(int *argc, char **argv[])
       return status;
    }
 
-   status = wa_init(local_rank, local_count, argc, argv);
-
-   if (status != EMPI_SUCCESS) {
-      PMPI_Finalize();
-      ERROR(1, "Failed to initialize WA link!");
-      return EMPI_ERR_INTERN;
-   }
-
-   status = init_communicators(cluster_rank, cluster_count,
-                                  cluster_sizes, cluster_offsets);
-
-   if (status != EMPI_SUCCESS) {
-      wa_finalize();
-      PMPI_Finalize();
-      ERROR(1, "Failed to initialize communicators! (error=%d)", status);
-      return status;
-   }
 
    return EMPI_SUCCESS;
 }
@@ -206,14 +226,14 @@ int EMPI_Finalize(void)
    int error;
 
    // We tell the system to shut down by terminating EMPI_COMM_WORLD.
-   error = messaging_send_terminate_request(handle_to_communicator(EMPI_COMM_WORLD));
+   error = messaging_comm_free_send(handle_to_communicator(EMPI_COMM_WORLD));
 
    if (error != EMPI_SUCCESS) {
       ERROR(1, "Failed to terminate EMPI_COMM_WORLD! (error=%d)", error);
       return error;
    }
 
-   wa_finalize();
+   messaging_finalize();
 
    return TRANSLATE_ERROR(PMPI_Finalize());
 }
@@ -2642,14 +2662,14 @@ int EMPI_Comm_dup(EMPI_Comm comm, EMPI_Comm *newcomm)
 
    H2C(comm, c)
 
-   error = messaging_send_dup_request(c);
+   error = messaging_comm_dup_send(c);
 
    if (error != EMPI_SUCCESS) {
       IERROR(1, "MPI_Comm_dup send failed! (comm=%d, error=%d)", c->handle, error);
       return error;
    }
 
-   error = messaging_receive_dup_reply(&reply);
+   error = messaging_comm_dup_receive(&reply);
 
    if (error != EMPI_SUCCESS) {
       IERROR(1, "MPI_Comm_dup receive failed! (comm=%d, error=%d)", c->handle, error);
@@ -2827,7 +2847,7 @@ int EMPI_Comm_create(EMPI_Comm mc, EMPI_Group mg, EMPI_Comm *newcomm)
    H2G(mg, g);
 
    // Request the create at the server
-   error = messaging_send_group_request(c, g);
+   error = messaging_comm_create_send(c, g);
 
    if (error != EMPI_SUCCESS) {
       IERROR(1, "Failed to send comm_create! (comm=%d, error=%d)", c->handle, error);
@@ -2835,7 +2855,7 @@ int EMPI_Comm_create(EMPI_Comm mc, EMPI_Group mg, EMPI_Comm *newcomm)
    }
 
    // Wait for the reply.
-   error = messaging_receive_group_reply(&reply);
+   error = messaging_comm_create_receive(&reply);
 
    if (error != EMPI_SUCCESS) {
       IERROR(1, "Failed to receive comm_create! (comm=%d, error=%d)", c->handle, error);
@@ -2915,14 +2935,14 @@ int EMPI_Comm_split(EMPI_Comm comm, int color, int key, EMPI_Comm *newcomm)
       key = -1;
    }
 
-   error = messaging_send_comm_request(c, color, key);
+   error = messaging_comm_split_send(c, color, key);
 
    if (error != EMPI_SUCCESS) {
       IERROR(1, "Failed to send comm_split! (comm=%d, error=%d)", c->handle, error);
       return error;
    }
 
-   error = messaging_receive_comm_reply(&reply);
+   error = messaging_comm_split_receive(&reply);
 
    if (error != EMPI_SUCCESS) {
       IERROR(1, "Failed to receive comm_split! (comm=%d, error=%d)", c->handle, error);
@@ -3009,7 +3029,7 @@ int EMPI_Comm_group(EMPI_Comm comm, EMPI_Group *g)
 #define __EMPI_Comm_free
 int EMPI_Comm_free ( EMPI_Comm *comm )
 {
-   communicator *c; 
+   communicator *c;
 
    if (*comm == EMPI_COMM_WORLD) {
       // ignored

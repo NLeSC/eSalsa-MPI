@@ -10,8 +10,8 @@ extern uint32_t cluster_count;
 extern uint32_t cluster_rank;
 
 // The number of processes in our cluster and our process' rank in this set.
-extern int local_count;
-extern int local_rank;
+//extern int local_count;
+//extern int local_rank;
 
 // The pid of my machine.
 extern uint32_t my_pid;

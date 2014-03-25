@@ -198,7 +198,8 @@
 #define EMPI_CONST_ERR_UNSUPPORTED_DATAREP   51
 #define EMPI_CONST_ERR_UNSUPPORTED_OPERATION 52
 #define EMPI_CONST_ERR_WIN                   53
-#define EMPI_CONST_ERR_LASTCODE              54
+#define EMPI_CONST_ERR_GATEWAY               54
+#define EMPI_CONST_ERR_LASTCODE              55
 
 #define EMPI_CONST_ERR_SYSRESOURCE          -2
 

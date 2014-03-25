@@ -250,6 +250,7 @@ typedef void (MPI_User_function)( void *invec, void *inoutvec, int *len, MPI_Dat
 #define MPI_ERR_UNSUPPORTED_OPERATION (EMPI_CONST_ERR_UNSUPPORTED_OPERATION)
 #define MPI_ERR_WIN                   (EMPI_CONST_ERR_WIN)
 #define MPI_ERR_LASTCODE              (EMPI_CONST_ERR_LASTCODE)
+#define MPI_ERR_GATEWAY               (EMPI_CONST_ERR_GATEWAY)
 #define MPI_ERR_SYSRESOURCE           (EMPI_CONST_ERR_SYSRESOURCE)
 
 /* Predefined operations */

@@ -139,6 +139,7 @@
         integer MPI_ERR_UNSUPPORTED_DATAREP   
         integer MPI_ERR_UNSUPPORTED_OPERATION 
         integer MPI_ERR_WIN                   
+        integer MPI_ERR_GATEWAY                   
         integer MPI_ERR_LASTCODE              
 
         parameter(MPI_SUCCESS=EMPI_CONST_SUCCESS)
@@ -195,6 +196,7 @@
         parameter(MPI_ERR_UNSUPPORTED_DATAREP=EMPI_CONST_ERR_UNSUPPORTED_DATAREP)
         parameter(MPI_ERR_UNSUPPORTED_OPERATION=EMPI_CONST_ERR_UNSUPPORTED_OPERATION)
         parameter(MPI_ERR_WIN=EMPI_CONST_ERR_WIN)
+        parameter(MPI_ERR_GATEWAY=EMPI_CONST_ERR_GATEWAY)
         parameter(MPI_ERR_LASTCODE=EMPI_CONST_ERR_LASTCODE)
 
 ! Types

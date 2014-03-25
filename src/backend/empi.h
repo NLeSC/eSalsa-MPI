@@ -250,7 +250,8 @@ typedef void (EMPI_User_function)( void *invec, void *inoutvec, int *len, EMPI_D
 #define EMPI_ERR_UNSUPPORTED_DATAREP   51
 #define EMPI_ERR_UNSUPPORTED_OPERATION 52
 #define EMPI_ERR_WIN                   53
-#define EMPI_ERR_LASTCODE              54
+#define EMPI_ERR_GATEWAY               55
+#define EMPI_ERR_LASTCODE              55
 
 #define EMPI_ERR_SYSRESOURCE          -2
 

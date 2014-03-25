@@ -75,7 +75,9 @@ struct s_communicator {
 };
 
 // Communicator mapping
-int init_communicators(int cluster_rank, int cluster_count,
+int init_communicators(int rank, int size,
+                       int empi_rank, int empi_size,
+                       int cluster_rank, int cluster_count,
                        int* cluster_sizes, int *cluster_offsets);
 
 int create_communicator(int handle, MPI_Comm comm,

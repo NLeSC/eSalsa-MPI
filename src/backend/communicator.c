@@ -91,7 +91,7 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
 }
 
 
-int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes, int *cluster_offsets)
+int init_communicators(int rank, int size, int empi_rank, int empi_size, int cluster_rank, int cluster_count,  int *cluster_sizes, int *cluster_offsets)
 {
    // We create three special communicators here for
    // EMPI_COMM_WORLD, EMPI_COMM_SELF and EMPI_COMM_NULL.
@@ -105,8 +105,104 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
    uint32_t *member_cluster_index;
    uint32_t *local_ranks;
 
+   MPI_Comm world;
+   MPI_Group group_world, group_empi_world;
+
+   int *excluded;
+   int gateways;
+   int new_rank, new_size;
+
+   // We first need to check if we must create an alternative MPI Communicator to replace
+   // MPI_COMM_WORLD. Some of the MPI processes may not participate in the application, but
+   // serve as gateways instead. These processes will NOT be visible to the application. It
+   // depends on the implementation of wide area messaging ig gateways are used.
+
+   if (size == empi_size) {
+      // We do not need to replace MPI_COMM_WORLD.
+      world = MPI_COMM_WORLD;
+   } else {
+
+      gateways = size - empi_size;
+
+      if (gateways <= 0) {
+         ERROR(1, "Failed to create EMPI_COMM_WORLD, negative number of gateways processes! (%d)", gateways);
+         return EMPI_ERR_INTERN;
+      }
+
+      error = MPI_Comm_group(MPI_COMM_WORLD, &group_world);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to create EMPI_COMM_WORLD, could not retrieve group! (error=%d)", error);
+         return EMPI_ERR_INTERN;
+      }
+
+      excluded = malloc(sizeof(int) * gateways);
+
+      if (excluded == NULL) {
+         ERROR(1, "Failed to create EMPI_COMM_WORLD, no space left for allocation!");
+         return EMPI_ERR_INTERN;
+      }
+
+      for (i=0;i<gateways;i++) {
+         excluded[i] = empi_size + i;
+      }
+
+      error = MPI_Group_excl(group_world, gateways, excluded, &group_empi_world);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to create EMPI_COMM_WORLD, could not exclude gateway nodes! (error=%d)", error);
+         return EMPI_ERR_INTERN;
+      }
+
+      error = MPI_Comm_create(MPI_COMM_WORLD, group_empi_world, &world);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to create EMPI_COMM_WORLD, could not create communicator without gateway nodes! (error=%d)", error);
+         return EMPI_ERR_INTERN;
+      }
+
+      // Intercept all gateway processes here, as they do not need to continue initalization.
+      if (empi_rank == -1) {
+
+         if (world == MPI_COMM_NULL) {
+            return EMPI_SUCCESS;
+         }
+
+         // EMPI and MPI disagree on the status of this process!
+         ERROR(1, "Inconsistent EMPI_COMM_WORLD: mismatch between EMPI and MPI!");
+         return EMPI_ERR_INTERN;
+      }
+
+      // Sanity check to ensure MPI and MPI agree on the new ranks and size.
+      error = MPI_Comm_rank(world, &new_rank);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to retrieve rank from WORLD! (error=%d)", error);
+         return EMPI_ERR_INTERN;
+      }
+
+      if (empi_rank != new_rank) {
+         ERROR(1, "Rank mismatch between EMPI_COMM_WORLD (%d) and WORLD (%d)!", empi_rank, new_rank);
+         return EMPI_ERR_INTERN;
+      }
+
+      error = MPI_Comm_size(world, &new_size);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to retrieve size from WORLD! (error=%d)", error);
+         return EMPI_ERR_INTERN;
+      }
+
+      if (empi_size != new_size) {
+         ERROR(1, "Size mismatch between EMPI_COMM_WORLD (%d) and WORLD (%d)!", empi_size, new_size);
+         return EMPI_ERR_INTERN;
+      }
+
+      // Succesfully created a subset of MPI_COMM_WORLD!
+   }
+
    // Create EMPI_COMM_WORLD
-   global_rank = cluster_offsets[cluster_rank]+local_rank;
+   global_rank = cluster_offsets[cluster_rank]+empi_rank;
    global_count = cluster_offsets[cluster_count];
 
    coordinators = malloc(cluster_count * sizeof(int));
@@ -190,8 +286,8 @@ int init_communicators(int cluster_rank, int cluster_count,  int *cluster_sizes,
    }
 
    // FIXME: this will fail hopelessly if FORTRAN_MPI_COMM_WORLD has a weird value!
-   error = add_communicator(EMPI_COMM_WORLD, MPI_COMM_WORLD, 1,
-                            local_rank, local_count, global_rank, global_count,
+   error = add_communicator(EMPI_COMM_WORLD, world, 1,
+                            empi_rank, empi_size, global_rank, global_count,
                             cluster_count, coordinators, cluster_sizes,
                             flags, members,
                             cluster_ranks, member_cluster_index, local_ranks,

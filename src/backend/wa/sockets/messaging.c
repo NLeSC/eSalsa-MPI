@@ -19,8 +19,9 @@
 #include "communicator.h"
 #include "group.h"
 #include "request.h"
-#include "wa_sockets.h"
+
 #include "logging.h"
+#include "wa_sockets.h"
 
 #define BYTE_ORDER_UNDEFINED 0
 #define BYTE_ORDER_HOST      1
@@ -358,6 +359,23 @@ FIXME!
 }
 */
 
+int messaging_init(int rank, int size, int *adjusted_rank, int *adjusted_size, int *argc, char ***argv)
+{
+   *adjusted_rank = rank;
+   *adjusted_size = size;
+   return wa_init(rank, size, argc, argv);
+}
+
+int messaging_finalize()
+{
+   return wa_finalize();
+}
+
+int messaging_run_gateway(int rank, int size, int empi_size)
+{
+   // Should not be used!
+   return EMPI_ERR_INTERN;
+}
 
 static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c)
 {
@@ -536,7 +554,7 @@ static int *alloc_and_receive_int_array(int len)
    return tmp;
 }
 
-int messaging_receive_comm_reply(comm_reply *reply)
+int messaging_comm_split_receive(comm_reply *reply)
 {
    // Since operations on communicators are collective operations, we can
    // assume here that the reply has not be received yet. There is a chance,
@@ -621,7 +639,7 @@ int messaging_receive_comm_reply(comm_reply *reply)
    return EMPI_SUCCESS;
 }
 
-int messaging_send_comm_request(communicator* c, int color, int key)
+int messaging_comm_split_send(communicator* c, int color, int key)
 {
    comm_request req;
 
@@ -641,7 +659,7 @@ int messaging_send_comm_request(communicator* c, int color, int key)
    return EMPI_SUCCESS;
 }
 
-int messaging_send_group_request(communicator* c, group *g)
+int messaging_comm_create_send(communicator* c, group *g)
 {
    int i;
    group_request req;
@@ -676,7 +694,7 @@ int messaging_send_group_request(communicator* c, group *g)
    return EMPI_SUCCESS;
 }
 
-int messaging_receive_group_reply(group_reply *reply)
+int messaging_comm_create_receive(group_reply *reply)
 {
    // Since operations on communicators are collective operations, we can
    // assume here that the reply has not be received yet. There is a chance,
@@ -764,7 +782,7 @@ DEBUG(1, "*Received group reply (comm=%d src=%d newComm=%d rank=%d size=%d type=
    return EMPI_SUCCESS;
 }
 
-int messaging_send_dup_request(communicator* c)
+int messaging_comm_dup_send(communicator* c)
 {
    dup_request req;
 
@@ -782,7 +800,7 @@ int messaging_send_dup_request(communicator* c)
    return EMPI_SUCCESS;
 }
 
-int messaging_send_terminate_request(communicator* c)
+int messaging_comm_free_send(communicator* c)
 {
    terminate_request req;
 
@@ -801,7 +819,7 @@ int messaging_send_terminate_request(communicator* c)
 }
 
 
-int messaging_receive_dup_reply(dup_reply *reply)
+int messaging_comm_dup_receive(dup_reply *reply)
 {
    // Since operations on communicators are collective operations, we can
    // assume here that the reply has not be received yet. There is a chance,

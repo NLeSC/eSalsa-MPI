@@ -135,6 +135,13 @@ struct s_msg_buffer {
     message_buffer *next;       // Next message in queue
 };
 
+// Initialize and finalize the messaging layer
+int messaging_init(int rank, int size, int *adjusted_rank, int *adjusted_size, int *argc, char ***argv);
+int messaging_finalize();
+
+// Run the messaging gateway (if applicable).
+int messaging_run_gateway(int rank, int size, int empi_size);
+
 // Send and receive messages (to any remote participant).
 int messaging_send(void* buf, int count, datatype *t, int dest, int tag, communicator* c);
 int messaging_receive(void *buf, int count, datatype *t, int source, int tag, status *s, communicator* c);
@@ -143,9 +150,6 @@ int messaging_receive(void *buf, int count, datatype *t, int source, int tag, st
 int messaging_bcast(void* buf, int count, datatype *t, int root, communicator* c);
 int messaging_bcast_receive(void *buf, int count, datatype *t, int root, communicator* c);
 
-//int messaging_allreduce(void* buf, int count, MPI_Datatype datatype, communicator* c);
-//int messaging_allreduce_receive(void *buf, int count, MPI_Datatype datatype, communicator* c);
-
 // Probe if a message is available.
 int messaging_probe_receive(request *r, int blocking);
 
@@ -153,19 +157,19 @@ int messaging_probe_receive(request *r, int blocking);
 int messaging_finalize_receive(request *r, status *s);
 
 // Send and receive functions used to implement an MPI_COMM_SPLIT
-int messaging_send_comm_request(communicator* c, int color, int key);
-int messaging_receive_comm_reply(comm_reply *reply);
+int messaging_comm_split_send(communicator* c, int color, int key);
+int messaging_comm_split_receive(comm_reply *reply);
 
 // Send and receive functions used to implement an MPI_COMM_CREATE
-int messaging_send_group_request(communicator* c, group *g);
-int messaging_receive_group_reply(group_reply *reply);
+int messaging_comm_create_send(communicator* c, group *g);
+int messaging_comm_create_receive(group_reply *reply);
 
 // Send and receive functions used to implement an MPI_COMM_DUP
-int messaging_send_dup_request(communicator* c);
-int messaging_receive_dup_reply(dup_reply *reply);
+int messaging_comm_dup_send(communicator* c);
+int messaging_comm_dup_receive(dup_reply *reply);
 
 // Send and receive functions used to implement an MPI_COMM_FREE and MPI_FINALIZE
-int messaging_send_terminate_request(communicator* c);
+int messaging_comm_free_send(communicator* c);
 
 // Profiling support
 int messaging_print_profile();
