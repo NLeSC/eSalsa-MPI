@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "shared.h"
 #include "empi.h"
 #include "types.h"
@@ -55,8 +54,6 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
    c->global_rank = global_rank;
    c->global_size = global_size;
    c->cluster_count = cluster_count;
-   c->queue_head = NULL;
-   c->queue_tail = NULL;
    c->coordinators = coordinators;
    c->cluster_sizes = cluster_sizes;
    c->members = members;
@@ -87,11 +84,13 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
       *out = c;
    }
 
+   data_message_queue_init(&(c->queue));
+
    return EMPI_SUCCESS;
 }
 
 
-int init_communicators(int rank, int size, int empi_rank, int empi_size, int cluster_rank, int cluster_count,  int *cluster_sizes, int *cluster_offsets)
+int init_communicators(int rank, int size, MPI_Comm world, int cluster_rank, int cluster_count, int *cluster_sizes, int *cluster_offsets)
 {
    // We create three special communicators here for
    // EMPI_COMM_WORLD, EMPI_COMM_SELF and EMPI_COMM_NULL.
@@ -105,23 +104,20 @@ int init_communicators(int rank, int size, int empi_rank, int empi_size, int clu
    uint32_t *member_cluster_index;
    uint32_t *local_ranks;
 
-   MPI_Comm world;
-   MPI_Group group_world, group_empi_world;
+//   MPI_Comm world;
 
-   int *excluded;
-   int gateways;
-   int new_rank, new_size;
+//   MPI_Group group_world, group_empi_world;
+
+//   int *excluded;
+//   int gateways;
+//   int new_rank, new_size;
 
    // We first need to check if we must create an alternative MPI Communicator to replace
    // MPI_COMM_WORLD. Some of the MPI processes may not participate in the application, but
    // serve as gateways instead. These processes will NOT be visible to the application. It
    // depends on the implementation of wide area messaging ig gateways are used.
 
-   if (size == empi_size) {
-      // We do not need to replace MPI_COMM_WORLD.
-      world = MPI_COMM_WORLD;
-   } else {
-
+/*
       gateways = size - empi_size;
 
       if (gateways <= 0) {
@@ -200,9 +196,10 @@ int init_communicators(int rank, int size, int empi_rank, int empi_size, int clu
 
       // Succesfully created a subset of MPI_COMM_WORLD!
    }
+*/
 
    // Create EMPI_COMM_WORLD
-   global_rank = cluster_offsets[cluster_rank]+empi_rank;
+   global_rank = cluster_offsets[cluster_rank]+rank;
    global_count = cluster_offsets[cluster_count];
 
    coordinators = malloc(cluster_count * sizeof(int));
@@ -287,7 +284,7 @@ int init_communicators(int rank, int size, int empi_rank, int empi_size, int clu
 
    // FIXME: this will fail hopelessly if FORTRAN_MPI_COMM_WORLD has a weird value!
    error = add_communicator(EMPI_COMM_WORLD, world, 1,
-                            empi_rank, empi_size, global_rank, global_count,
+                            rank, size, global_rank, global_count,
                             cluster_count, coordinators, cluster_sizes,
                             flags, members,
                             cluster_ranks, member_cluster_index, local_ranks,
@@ -514,42 +511,55 @@ int get_cluster_rank(communicator *c, int rank)
    return GET_CLUSTER_RANK(c->members[rank]);
 }
 
-void store_message(message_buffer *m)
+int get_pid(communicator *c, int rank)
 {
-   communicator* c = comms[m->header.comm];
+   return c->members[rank];
+}
+
+void store_message(data_message *m)
+{
+   communicator* c = comms[m->comm];
 
    if (c == NULL) {
-      ERROR(1, "Failed to find communicator %d in store_message!", m->header.comm);
+      ERROR(1, "Failed to find communicator %d in store_message!", m->comm);
       ERROR(1, "Dropping message!");
       return;
    }
 
-   m->next = NULL;
+   data_message_enqueue(&(c->queue), m);
 
-   if (c->queue_head == NULL) {
-      c->queue_head = c->queue_tail = m;
-   } else {
-      c->queue_tail->next = m;
-      c->queue_tail = m;
-   }
+//   m->next = NULL;
+
+//   if (c->queue_head == NULL) {
+//      c->queue_head = c->queue_tail = m;
+//   } else {
+//      c->queue_tail->next = m;
+//      c->queue_tail = m;
+//   }
 }
 
-int match_message(message_buffer *m, int comm, int source, int tag)
+/*
+int match_message(data_message *m, int comm, int source, int tag)
 {
-   int result = ((comm == m->header.comm) &&
-                 (source == EMPI_ANY_SOURCE || source == m->header.source) &&
-                 (tag == EMPI_ANY_TAG || tag == m->header.tag));
+   int result = ((comm == m->comm) &&
+                 (source == EMPI_ANY_SOURCE || source == m->source) &&
+                 (tag == EMPI_ANY_TAG || tag == m->tag));
 
    DEBUG(5, "MATCH_MESSAGE: (comm=%d source=%d [any=%d] tag=%d [any=%d]) == (m.comm=%d m.source=%d m.tag=%d) => %d",
 	comm, source, EMPI_ANY_SOURCE, tag, EMPI_ANY_TAG,
-        m->header.comm, m->header.source, m->header.tag, result);
+        m->comm, m->source, m->tag, result);
 
    return result;
 }
+*/
 
-message_buffer *find_pending_message(communicator *c, int source, int tag)
+data_message *find_pending_message(communicator *c, int source, int tag)
 {
-   message_buffer *curr, *prev;
+   return data_message_dequeue_matching(&(c->queue), c->handle, source, tag);
+}
+
+/*
+   data_message *curr, *prev;
 
    DEBUG(4, "FIND_PENDING_MESSAGE: Checking for pending messages in comm=%d from source=%d tag=%d", c->handle, source, tag);
 
@@ -582,7 +592,7 @@ message_buffer *find_pending_message(communicator *c, int source, int tag)
           }
 
           curr->next = NULL;
-          DEBUG(4, "FIND_PENDING_MESSAGE: Found pending message from %d", curr->header.source);
+          DEBUG(4, "FIND_PENDING_MESSAGE: Found pending message from %d", curr->msg.source);
           return curr;
       }
 
@@ -594,4 +604,4 @@ message_buffer *find_pending_message(communicator *c, int source, int tag)
 
    return NULL;
 }
-
+*/

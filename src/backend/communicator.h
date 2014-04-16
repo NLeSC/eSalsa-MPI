@@ -6,6 +6,7 @@
 #include "types.h"
 #include "stdint.h"
 #include "mpi.h"
+#include "message_queue.h"
 
 #define COMM_FLAG_LOCAL  (1 << 0)
 #define COMM_FLAG_REMOTE (1 << 1)
@@ -67,16 +68,17 @@ struct s_communicator {
    /* The local rank for each of the global members. REPLACE WITH GET_PROCESS_RANK(members[i]). */
    uint32_t *local_ranks;
 
+   data_message_queue queue;
+
    /* Head of the message queue. */
-   message_buffer *queue_head;
+//   message_buffer *queue_head;
 
    /* Tail of the message queue. */
-   message_buffer *queue_tail;
+//   message_buffer *queue_tail;
 };
 
 // Communicator mapping
-int init_communicators(int rank, int size,
-                       int empi_rank, int empi_size,
+int init_communicators(int rank, int size, MPI_Comm world,
                        int cluster_rank, int cluster_count,
                        int* cluster_sizes, int *cluster_offsets);
 
@@ -101,9 +103,11 @@ int comm_cluster_rank_to_cluster_index(communicator *c, int cluster_rank);
 
 //int rank_is_local(communicator *c, int rank, int *result);
 
-void store_message(message_buffer *m);
-message_buffer *find_pending_message(communicator *c, int source, int tag);
-int match_message(message_buffer *m, int comm, int source, int tag);
+void store_message(data_message *m);
+
+data_message *find_pending_message(communicator *c, int source, int tag);
+
+// int match_message(data_message *m, int comm, int source, int tag);
 
 int comm_is_world(communicator* c);
 int comm_is_self(communicator* c);
@@ -116,6 +120,6 @@ int rank_is_remote(communicator *c, int rank);
 int get_local_rank(communicator *c, int rank);
 int get_cluster_rank(communicator *c, int rank);
 int get_global_rank(communicator *c, int cluster, int rank);
-
+int get_pid(communicator *c, int rank);
 
 #endif // _COMMUNICATOR_H_

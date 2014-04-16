@@ -23,11 +23,16 @@
 #define CONNECT_ERROR_ALLOCATE             10
 #define CONNECT_ERROR_BYTE_ORDER           11
 #define CONNECT_ERROR_OPAQUE               12
+#define CONNECT_ERROR_CANNOT_FIND_IP       13
+#define CONNECT_ERROR_GATEWAY              14
 
 // TODO: move these ?
 #define OPCODE_HANDSHAKE                  42
 #define OPCODE_HANDSHAKE_ACCEPTED         43
 #define OPCODE_HANDSHAKE_REJECTED         44
+
+#define OPCODE_GATEWAY_INFO               45
+#define OPCODE_GATEWAY_READY              46
 
 #define OPCODE_DATA                       50
 #define OPCODE_COMM                       51
@@ -40,6 +45,7 @@
 #define OPCODE_DUP_REPLY                  56
 
 #define OPCODE_TERMINATE                  57
+#define OPCODE_FREE                       57
 
 #define OPCODE_COLLECTIVE_BCAST           60
 

@@ -299,7 +299,8 @@ int MPI_Group_incl ( MPI_Group g, int n, int *ranks, MPI_Group *newgroup );
 int MPI_Group_range_excl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup );
 int MPI_Group_translate_ranks ( MPI_Group group1, int n, int *ranks1, MPI_Group group2, int *ranks2 );
 int MPI_Group_union ( MPI_Group group1, MPI_Group group2, MPI_Group *newgroup );
-
+int MPI_Group_rank ( MPI_Group g, int *rank );
+int MPI_Group_size ( MPI_Group g, int *size );
 
 // Collectives
 
@@ -533,8 +534,6 @@ int MPI_Group_excl ( MPI_Group g, int n, int *ranks, MPI_Group *newgroup );
 int MPI_Group_free ( MPI_Group *g );
 int MPI_Group_intersection ( MPI_Group group1, MPI_Group group2, MPI_Group *newgroup );
 int MPI_Group_range_incl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup );
-int MPI_Group_rank ( MPI_Group g, int *rank );
-int MPI_Group_size ( MPI_Group g, int *size );
 int MPI_Ibsend ( void *buf, int count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm, MPI_Request *r );
 int MPI_Info_dup ( MPI_Info info, MPI_Info *newinfo );
 int MPI_Info_get ( MPI_Info info, char *key, int valuelen, char *value, int *flag );

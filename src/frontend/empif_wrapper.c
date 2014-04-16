@@ -120,6 +120,16 @@ void FORT_NAME( mpi_group_translate_ranks , MPI_GROUP_TRANSLATE_RANKS ) ( int *g
    *ierr = MPI_Group_translate_ranks(*group1, *n, ranks1, *group2, ranks2);
 }
 
+void FORT_NAME( mpi_group_rank , MPI_GROUP_RANK ) ( int *group, int *rank , int *ierr )
+{
+   *ierr = MPI_Group_rank(*group, rank);
+}
+
+void FORT_NAME( mpi_group_size , MPI_GROUP_SIZE ) ( int *group, int *size , int *ierr )
+{
+   *ierr = MPI_Group_size(*group, size);
+}
+
 
 /* Collectives */
 
@@ -1004,14 +1014,6 @@ FORT_NAME( mpi_group_excl , MPI_GROUP_EXCL ) ( MPI_Group g, int n, int *ranks, M
 }
 
 
-
-FORT_NAME( mpi_group_rank , MPI_GROUP_RANK ) ( MPI_Group g, int *rank , int *ierr )
-{
-}
-
-FORT_NAME( mpi_group_size , MPI_GROUP_SIZE ) ( MPI_Group g, int *size , int *ierr )
-{
-}
 
 
 

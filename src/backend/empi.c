@@ -105,12 +105,14 @@ static void init_constants()
    INFO(1, "FORTRAN_FALSE    = %d", FORTRAN_FALSE);
 }
 
+
 #define __EMPI_Init
 int EMPI_Init(int *argc, char **argv[])
 {
    int rank, size;
    int empi_rank, empi_size;
    int i=0;
+   MPI_Comm world;
 
    INFO(0, "Init EMPI...");
 
@@ -132,25 +134,12 @@ int EMPI_Init(int *argc, char **argv[])
       INFO(4, "argv[%d] = %s", i, (*argv)[i]);
    }
 
-   status = messaging_init(rank, size, &empi_rank, &empi_size, argc, argv);
+   status = messaging_init(rank, size, &empi_rank, &empi_size, &world, argc, argv);
 
    if (status != EMPI_SUCCESS) {
       PMPI_Finalize();
       ERROR(1, "Failed to initialize EMPI MESSAGING %d!", status);
       return EMPI_ERR_INTERN;
-   }
-
-   INFO(1, "Init EMPI messaging on (MPI) %d of %d -> (EMPI) %d of %d", rank, size, empi_rank, empi_size);
-
-   status = init_communicators(rank, size, empi_rank, empi_size,
-                               cluster_rank, cluster_count,
-                               cluster_sizes, cluster_offsets);
-
-   if (status != EMPI_SUCCESS) {
-      messaging_finalize();
-      PMPI_Finalize();
-      ERROR(1, "Failed to initialize communicators! (error=%d)", status);
-      return status;
    }
 
    if (empi_rank == -1) {
@@ -163,9 +152,22 @@ int EMPI_Init(int *argc, char **argv[])
          ERROR(1, "Failed to run EMPI gateway (error=%d)!", status);
       }
 
-      // Once the gateway if finished, we terminate MPI and return a special error to the application.
-      PMPI_Finalize();
+      // Once the gateway is finished, we return a special error to the application.
+      exit(0);
       return EMPI_ERR_GATEWAY;
+   }
+
+   INFO(1, "Init EMPI messaging on (MPI) %d of %d -> (EMPI) %d of %d", rank, size, empi_rank, empi_size);
+
+   status = init_communicators(empi_rank, empi_size, world,
+                               cluster_rank, cluster_count,
+                               cluster_sizes, cluster_offsets);
+
+   if (status != EMPI_SUCCESS) {
+      messaging_finalize();
+      PMPI_Finalize();
+      ERROR(1, "Failed to initialize communicators! (error=%d)", status);
+      return status;
    }
 
    status = init_groups();
@@ -226,16 +228,14 @@ int EMPI_Finalize(void)
    int error;
 
    // We tell the system to shut down by terminating EMPI_COMM_WORLD.
-   error = messaging_comm_free_send(handle_to_communicator(EMPI_COMM_WORLD));
+   error = messaging_finalize();
 
    if (error != EMPI_SUCCESS) {
       ERROR(1, "Failed to terminate EMPI_COMM_WORLD! (error=%d)", error);
       return error;
    }
 
-   messaging_finalize();
-
-   return TRANSLATE_ERROR(PMPI_Finalize());
+   return EMPI_SUCCESS;
 }
 
 #define __EMPI_Abort
@@ -3062,6 +3062,8 @@ int EMPI_Comm_free ( EMPI_Comm *comm )
 int EMPI_Group_rank(EMPI_Group mg, int *rank)
 {
    group *g;
+
+DEBUG(1, "GROUP RANK %d", mg);
 
    H2G(mg, g)
 

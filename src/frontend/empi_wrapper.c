@@ -1064,6 +1064,66 @@ int MPI_Comm_split ( MPI_Comm comm, int color, int key, MPI_Comm *newcomm )
    return error;
 }
 
+int MPI_Group_rank ( MPI_Group g, int *rank )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Group_rank(MPI_Group g=%s, int *rank=%p)", group_to_string(g), rank);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Group_rank(g, rank);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_rank failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_Group_size ( MPI_Group g, int *size )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Group_size(MPI_Group g=%s, int *size=%p)", group_to_string(g), size);
+#endif // TRACE_CALLS
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Group_size(g, size);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Group_size failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
 int MPI_Group_range_incl ( MPI_Group g, int n, int ranges[][3], MPI_Group *newgroup )
 {
 #if PROFILE_LEVEL > 0
@@ -2922,6 +2982,9 @@ int MPI_Unpack ( void *inbuf, int insize, int *position, void *outbuf, int outco
 
 
 // Ignore the rest for now....
+
+
+
 
 #if 0
 
@@ -6814,66 +6877,6 @@ int MPI_Group_intersection ( MPI_Group group1, MPI_Group group2, MPI_Group *newg
 
 
 
-
-
-int MPI_Group_rank ( MPI_Group g, int *rank )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "MPI_Group_rank(MPI_Group g=%s, int *rank=%p)", group_to_string(g), rank);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = EMPI_Group_rank(g, rank);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != MPI_SUCCESS) {
-      ERROR(0, "MPI_Group_rank failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
-
-
-int MPI_Group_size ( MPI_Group g, int *size )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "MPI_Group_size(MPI_Group g=%s, int *size=%p)", group_to_string(g), size);
-#endif // TRACE_CALLS
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = EMPI_Group_size(g, size);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != MPI_SUCCESS) {
-      ERROR(0, "MPI_Group_size failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 

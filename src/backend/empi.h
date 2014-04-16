@@ -301,7 +301,8 @@ int EMPI_Group_incl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup );
 int EMPI_Group_range_excl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup );
 int EMPI_Group_translate_ranks ( EMPI_Group group1, int n, int *ranks1, EMPI_Group group2, int *ranks2 );
 int EMPI_Group_union ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup );
-
+int EMPI_Group_rank ( EMPI_Group g, int *rank );
+int EMPI_Group_size ( EMPI_Group g, int *size );
 
 // Collectives
 
@@ -537,8 +538,6 @@ int EMPI_Group_excl ( EMPI_Group g, int n, int *ranks, EMPI_Group *newgroup );
 int EMPI_Group_free ( EMPI_Group *g );
 int EMPI_Group_intersection ( EMPI_Group group1, EMPI_Group group2, EMPI_Group *newgroup );
 int EMPI_Group_range_incl ( EMPI_Group g, int n, int ranges[][3], EMPI_Group *newgroup );
-int EMPI_Group_rank ( EMPI_Group g, int *rank );
-int EMPI_Group_size ( EMPI_Group g, int *size );
 int EMPI_Ibsend ( void *buf, int count, EMPI_Datatype datatype, int dest, int tag, EMPI_Comm comm, EMPI_Request *r );
 int EMPI_Info_dup ( EMPI_Info info, EMPI_Info *newinfo );
 int EMPI_Info_get ( EMPI_Info info, char *key, int valuelen, char *value, int *flag );

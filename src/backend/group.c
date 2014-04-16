@@ -64,10 +64,15 @@ static int add_group(group *g)
 
 group *handle_to_group(EMPI_Group handle)
 {
+
+DEBUG(1, "HANDLE TO GROUP %d", handle);
+
    if (handle < 0 || handle >= MAX_GROUPS) {
       ERROR(1, "Group handle %d out of bounds!", handle);
       return NULL;
    }
+
+DEBUG(1, "HANDLE TO GROUP will return %p", groups[handle]);
 
    return groups[handle];
 }

@@ -36,7 +36,7 @@ struct s_request {
      MPI_Request req;
 
      // This is the matching message
-     message_buffer *message;
+     data_message *message;
 };
 
 int init_request();
