@@ -111,7 +111,7 @@ public class Server {
             Logging.println("   Cluster " + i + " name           : \"" + clusters[i].getName() + "\"");
             Logging.println("      Application processes : " + clusters[i].getApplicationSize());
             Logging.println("      Port range in use     : " + clusters[i].getBasePort() + " ... " 
-                    + (clusters[i].getBasePort() + numberOfGatewaysPerCluster));
+                    + (clusters[i].getBasePort() + (numberOfGatewaysPerCluster * numberOfStreamsPerGatewayConnection)));
         }
         
         Logging.println("");

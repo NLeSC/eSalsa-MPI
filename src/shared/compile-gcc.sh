@@ -2,11 +2,13 @@
 
 CC=gcc
 
+OPT=-O3
+
 rm -f *.o
 rm -f ../../lib/libempi-logging.a
 
-$CC -c -g -Wall -fPIC logging.c
-$CC -c -g -Wall -fPIC profiling.c
+$CC -c $OPT -Wall -fPIC logging.c
+$CC -c $OPT -Wall -fPIC profiling.c
 
 ar -cr ../../lib/libempi-logging.a \
 logging.o \

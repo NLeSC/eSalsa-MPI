@@ -10,9 +10,6 @@
 	<property name="external" location="external" />
 
 	<path id="default.classpath">
-		<fileset dir="${external}">
-			<include name="*.jar" />
-		</fileset>
 		<pathelement path="tmp" />
 	</path>
 
@@ -24,7 +21,7 @@
 	</target>
 
 	<target name="compile" depends="prepare">
-		<javac classpathref="default.classpath" destdir="${builddir}" srcdir="${srcdir}" debug="true" includes="cesm/**/*.java,generator/**/*.java" />
+		<javac classpathref="default.classpath" destdir="${builddir}" srcdir="${srcdir}" debug="true" includes="esalsa/**/*.java" />
 	</target>
 
 	<!-- Internal target - Builds the JAR file -->

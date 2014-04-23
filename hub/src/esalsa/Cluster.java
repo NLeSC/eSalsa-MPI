@@ -299,7 +299,8 @@ public class Cluster {
 
         byte [] address = selectAddress(addresses);
         
-        setGatewayInfo(new GatewayInfo(name, index, (short) (basePort + index), (short) owner.getNumberOfStreams(), address));
+        setGatewayInfo(new GatewayInfo(name, index, (short) (basePort + index * owner.getNumberOfStreams()), 
+                (short) owner.getNumberOfStreams(), address));
     }
 
     private synchronized void setGatewayInfo(GatewayInfo info) {

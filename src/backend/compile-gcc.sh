@@ -5,10 +5,12 @@ SHARED=../shared
 BACKEND=`pwd`
 
 #WA=wa/sockets
-WA=wa/mpi
+#WA=wa/mpi
 
 MPICC=mpicc
 #GPP=g++
+
+OPT=-O3
 
 echo using `which $MPICC`
 
@@ -19,23 +21,20 @@ rm -f ../../lib/libempi-backend.a
 
 gfortran -c -fPIC logical.f
 
-$MPICC -c -g -Wall -I$SHARED -fPIC debugging.c
-$MPICC -c -g -Wall -I$SHARED -fPIC message_queue.c
-$MPICC -c -g -Wall -I$SHARED -fPIC datatype.c
-$MPICC -c -g -Wall -I$SHARED -fPIC communicator.c
-$MPICC -c -g -Wall -I$SHARED -fPIC request.c
-$MPICC -c -g -Wall -I$SHARED -fPIC group.c
-$MPICC -c -g -Wall -I$SHARED -fPIC operation.c
-$MPICC -c -g -Wall -I$SHARED -fPIC status.c
-$MPICC -c -g -Wall -I$SHARED -fPIC reduce_ops.c
-$MPICC -c -g -Wall -I$SHARED -fPIC file.c
-$MPICC -c -g -Wall -I$SHARED -fPIC info.c
-$MPICC -c -g -Wall -I$SHARED -fPIC empi.c
-
-
-$MPICC -c -g -Wall -I$SHARED -I$BACKEND -I$BACKEND/$WA -fPIC $WA/messaging.c
-$MPICC -c -g -Wall -I$SHARED -I$BACKEND -fPIC $WA/gateway.c
-#$MPICC -c -g -Wall -I$SHARED -I$BACKEND -fPIC $WA/wa_sockets.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC debugging.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC message_queue.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC datatype.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC communicator.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC request.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC group.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC operation.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC status.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC reduce_ops.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC file.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC info.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC empi.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC messaging.c
+$MPICC -c $OPT -Wall -I$SHARED -fPIC gateway.c
 
 ar -cr ../../lib/libempi-backend.a \
 logical.o \
