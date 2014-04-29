@@ -563,17 +563,38 @@ int EMPI_Irecv(void *buf, int count, EMPI_Datatype type,
          *req = EMPI_REQUEST_NULL;
          return error;
       }
-   }
 
-/****
    } else if (source != MPI_ANY_SOURCE) {
-      // If the source is guarenteed to be remote, we directly use the WA link.
+      // If the source is guarenteed to be remote, we only test the WA link.
       error = messaging_probe_receive(r, 0);
 
    } else { // local == 0 && source == MPI_ANY_SOURCE
 
-      // If the source may be local or remote, we must poll both. Start with local MPI.
+      // If the source may be local or remote, we must be able to receive data from both the local
+      // MPI and the wide area link.
+
       // FIXME: fixed order may cause starvation ?
+
+      // Start by checking the WA link.
+      error = messaging_probe_receive(r, 0);
+
+      if (!request_completed(r)) {
+         // Nothing on the WA link yet, so post a local IRecv and return.
+
+         // If the source is guaranteed to be local, we directly use MPI.
+         error = TRANSLATE_ERROR(PMPI_Irecv(buf, count, t->type, MPI_ANY_SOURCE, tag2mpi(tag), c->comm, &(r->req)));
+
+         if (error != EMPI_SUCCESS) {
+            ERROR(1, "IRecv failed! (comm=%d,error=%d)", c->handle, error);
+            free_request(r);
+            *req = EMPI_REQUEST_NULL;
+            return error;
+         }
+      }
+   }
+
+
+/****
       error = PMPI_Iprobe(MPI_ANY_SOURCE, tag, c->comm, &flag, MPI_STATUS_IGNORE);
 
       if (error != MPI_SUCCESS) {
@@ -884,6 +905,7 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
          DEBUG(3, "request=WA_RECEIVE_ANY already completed by source=%d tag=%d count=%d", r->source_or_dest, r->tag, r->count);
          *flag = 1;
       } else {
+/*
          do {
             // Probe locally first
             DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
@@ -927,6 +949,51 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
                }
             }
 
+         } while (blocking && (*flag == 0) && (r->error == EMPI_SUCCESS));
+*/
+         do {
+            // Check local receive first
+            INFO(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
+
+            r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
+
+            if (r->error == EMPI_SUCCESS && *flag == 1) {
+                // We've receive a message! We must now translate local source rank to global rank.
+               INFO(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
+               error = PMPI_Get_count(&mstatus, r->type->type, &count);
+               INFO(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
+               error = translate_status(r->c, r->type, s, &mstatus);
+
+            } else {
+               // No local message was found (yet), so try the WA link.
+               // NOTE: we should poll here, so blocking is set to 0,
+               // ignoring the value of the parameter.
+               r->error = messaging_probe_receive(r, 0);
+
+               if (request_completed(r)) {
+                  INFO(3, "request=WA_RECEIVE_ANY performed WA receive");
+
+                  if (r->error == EMPI_SUCCESS) {
+                     r->error = messaging_finalize_receive(r, s);
+                  } else {
+                     set_status_error(s, r->source_or_dest, r->tag, r->error, r->type);
+                  }
+                  *flag = 1;
+
+                  // We also need to cancel the local receive.
+                  error = PMPI_Cancel(&(r->req));
+
+                  if (error != MPI_SUCCESS) {
+                     WARN(3, "Failed to cancel LOCAL_RECEIVE_ANY after WA receive");
+                  } else {
+                     error = PMPI_Request_free(&(r->req));
+
+                     if (error != MPI_SUCCESS) {
+                        WARN(3, "Failed to free local receive request after cancel");
+                     }
+                  }
+               }
+            }
          } while (blocking && (*flag == 0) && (r->error == EMPI_SUCCESS));
       }
    }
