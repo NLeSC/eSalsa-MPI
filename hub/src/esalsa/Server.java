@@ -12,6 +12,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.StringTokenizer;
 
 public class Server {
 
@@ -112,6 +113,7 @@ public class Server {
             Logging.println("      Application processes : " + clusters[i].getApplicationSize());
             Logging.println("      Port range in use     : " + clusters[i].getBasePort() + " ... " 
                     + (clusters[i].getBasePort() + (numberOfGatewaysPerCluster * numberOfStreamsPerGatewayConnection)));
+            Logging.println("      Network to use        : " + clusters[i].printNetwork());
         }
         
         Logging.println("");
@@ -133,6 +135,54 @@ public class Server {
         }
     }
 
+    private byte [] readNetwork(String ipv4) throws Exception {
+        
+        byte [] result = new byte[4];
+        
+        StringTokenizer tok = new StringTokenizer(ipv4.trim(), ".");
+        
+        if (tok.countTokens() != 4) { 
+            throw new Exception("Invalid IPv4 address: " + ipv4);
+        }
+        
+        for (int i=0;i<4;i++) { 
+            int tmp = Integer.parseInt(tok.nextToken());
+            
+            if (tmp < 0 || tmp > 255) { 
+                throw new Exception("Invalid IPv4 address: " + ipv4);
+            }
+            
+            result[i] = (byte) (tmp & 0xFF);            
+        }
+        
+        return result;
+    }
+    
+    private byte [] generateNetmask(String numBits) throws Exception {
+        
+        int bits = Integer.parseInt(numBits);
+        
+        byte [] result = new byte[4];
+        
+        int index = 0;
+        
+        while (bits >= 8) {
+            result[index] = (byte) 0xFF;
+            index++;
+            bits -= 8;
+        }
+
+        byte tmp = (byte) (1 << 8);
+        
+        while (bits > 0) {
+            result[index] |= tmp;
+            tmp = (byte) (tmp >> 1);
+            bits--;
+        }
+        
+        return result;
+    }
+    
     private Cluster readCluster(BufferedReader r, int index) throws Exception {
 
         String name = readline(r);
@@ -148,8 +198,19 @@ public class Server {
             // TODO: take gateway count into account!
             throw new Exception("Invalid base port in cluster " + index + ": " + port);
         }
-
-        return new Cluster(this, name, size, port, index, numberOfGatewaysPerCluster);
+        
+        String cidr = readline(r).trim(); 
+        
+        int slashIndex = cidr.indexOf("/");
+        
+        if (slashIndex < 0) { 
+            throw new Exception("Invalid CIDR address: " + cidr);
+        }
+        
+        byte [] network = readNetwork(cidr.substring(0, slashIndex));
+        byte [] netmask = generateNetmask(cidr.substring(slashIndex+1));
+        
+        return new Cluster(this, name, size, port, index, numberOfGatewaysPerCluster, network, netmask);
     }
  
     private void connectionHandshake(Socket s) throws Exception {

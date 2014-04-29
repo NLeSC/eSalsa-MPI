@@ -445,6 +445,17 @@ void FORT_NAME( mpi_type_ub , MPI_TYPE_UB ) ( int *type, int *displacement , int
    *ierr = MPI_Type_ub(*type, (MPI_Aint*)displacement);
 }
 
+void FORT_NAME( mpi_get_count , MPI_GET_COUNT ) ( int *stat, int *type, int *count , int *ierr )
+{
+   MPI_Status *s = MPI_STATUS_IGNORE;
+
+   if ((void *)stat != &empi_fortran_status_ignore) {
+      s = (MPI_Status *) stat;
+   }
+
+   *ierr = MPI_Get_count(s, *type, count);
+}
+
 /* Intercomm */
 
 void FORT_NAME( mpi_intercomm_create , MPI_INTERCOMM_CREATE ) ( int *local_comm, int *local_leader, int *peer_comm, int *remote_leader, int *tag, int *newintercomm , int *ierr )

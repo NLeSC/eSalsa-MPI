@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.LinkedList;
 
 public class Cluster {
@@ -123,6 +124,12 @@ public class Cluster {
     /** Number of messages sent. */
     private long messagesSent = 0;
 
+    /** Preferred network range */
+    private byte [] network;
+    
+    /** Network mask to use */
+    private byte [] netmask;
+    
     /** 
      * Constructor for Cluster.
      *  
@@ -138,14 +145,19 @@ public class Cluster {
      *          Rank of this cluster in total set of clusters.
      * @param numberOfGateways
      *          Number of gateways in this cluster.
+     * @param cidr
+     *          Network to use on this gateway in CIDR format, e.g., "192.168.1.0/24" 
      */
-    public Cluster(Server owner, String name, int applicationProcesses, int basePort, int clusterRank, int numberOfGateways) {
+    public Cluster(Server owner, String name, int applicationProcesses, int basePort, int clusterRank, int numberOfGateways, 
+            byte [] network, byte [] netmask) {
         this.owner = owner;
         this.name = name;
         this.applicationProcesses = applicationProcesses;
         this.clusterRank = clusterRank;
         this.basePort = basePort;
         this.gateways = new GatewayInfo[numberOfGateways];    
+        this.network = network;
+        this.netmask = netmask;
     }
 
     /**
@@ -231,17 +243,75 @@ public class Cluster {
     }
 
     /**
-     * Select a single one of the addresses available at the provided gateway. 
+     * Apply a mask to a byte array.
+     * 
+     * @param in
+     *          The input byte array.
+     * @param mask
+     *          The mask to apply.
+     * @return
+     *          A new array that contains <code>in & mask</code>.
+     */
+    private byte [] applyMask(byte [] in, byte [] mask) {
+        
+        byte [] result = new byte [in.length];
+        
+        for (int i=0;i<in.length;i++) {
+            result[i] = (byte) ((in[i] & mask[i]) & 0xFF);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Test if a given address matches the provided subnet and netmask.
+     * 
+     * @param address
+     *          The address to test.
+     * @param subnet
+     *          The subnet to test for.
+     * @param netmask
+     *          The netmask to apply to the subnet.
+     * @return
+     *          if the address matches the subnet and netmask.
+     * @throws Exception 
+     *          thrown if the length of the address does not match the length of the subnet or mask. 
+     */
+    private boolean match(byte [] address, byte [] subnet, byte [] netmask) throws Exception {
+        
+        if (address.length != subnet.length || address.length != netmask.length) { 
+            throw new Exception("Length mismatch in address!");
+        }
+        
+        byte [] tmp1 = applyMask(address, netmask);
+        byte [] tmp2 = applyMask(subnet, netmask);
+        
+        return Arrays.equals(tmp1, tmp2);
+    }
+    
+    /**
+     * Select a single one of the addresses available at the provided gateway unsing the provided subnet and netmask information.  
      * 
      * @param info
      *          The gateway from which to select the address.
      * @return
      *          The selected addresses. 
+     * @throws Exception
+     *          throw if no matching address can be found.  
      */
-    private byte [] selectAddress(InetAddress [] addresses) {
+    private byte [] selectAddress(InetAddress [] addresses) throws Exception {
 
-        // TODO: allow selection rules!
-        return addresses[0].getAddress();
+        for (int i=0;i<addresses.length;i++) {
+
+            byte [] tmp = addresses[i].getAddress();
+            
+            if (match(tmp, network, netmask)) {
+                return tmp;
+            }
+        }
+        
+        throw new Exception("No address found that matches subnet and netmask provided ! (" + printNetwork() + ", " 
+                + Arrays.toString(addresses) + ")");
     }
     
     /**
@@ -542,8 +612,32 @@ public class Cluster {
             Logging.error("Failed to close socket connection to cluster " + name);
         }
     }
-    
 
+    private void printNetwork(byte [] network, StringBuilder target) {
+
+        for (int i=0;i<network.length;i++) { 
+            target.append(((int) network[i]) & 0xff);
+            
+            if (i != network.length-1) {
+                target.append(".");
+            }
+        }
+    }
+        
+    
+    /**
+     * @return
+     */
+    public String printNetwork() {
+        
+        StringBuilder result = new StringBuilder();
+        
+        printNetwork(network, result);
+        result.append("/");
+        printNetwork(netmask, result);
+        
+        return result.toString();
+    }
 
     /*    
 
