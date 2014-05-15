@@ -1,13 +1,16 @@
-include ../../Makefile.inc
+include ../../empi.config
 
 OBJECTS = logging.o profiling.o 
-OBJLIB = $(LIBDIR)/libempi-shared.a
+
+LIBDIR  = $(EMPI_HOME)/lib
+
+OBJLIB  = $(LIBDIR)/libempi-shared.a
 
 all: $(OBJECTS)
 	$(AR) -cr $(OBJLIB) $(OBJECTS)
 
 .c.o:
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(OPT) $(CFLAGS) $< -o $@
 
 clean:
 	$(RM) -f $(OBJLIB) $(OBJECTS)
