@@ -340,6 +340,7 @@ int EMPI_Wait ( EMPI_Request *r, EMPI_Status *stat );
 int EMPI_Waitall ( int count, EMPI_Request *array_of_requests, EMPI_Status *array_of_statuses );
 int EMPI_Waitany ( int count, EMPI_Request array_of_requests[], int *index, EMPI_Status *stat );
 int EMPI_Request_free ( EMPI_Request *r );
+int EMPI_Get_count(EMPI_Status *s, EMPI_Datatype type, int *count);
 
 // Datatypes
 

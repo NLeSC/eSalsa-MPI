@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <execinfo.h>
 
-#include "../../include/settings.h"
+#include "settings.h"
 
 #include "macros.h"
 
@@ -464,6 +464,8 @@ int EMPI_Isend(void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI
    H2C(comm, c)
    H2T(type, t)
 
+   DEBUG(2, "ISEND buf=%p count=%d type=%d dest=%d tag=%d comm=%d req=%p / %d", buf, count, type, dest, tag, comm, req, (req != NULL ? *req : 0));
+
    CHECK_COUNT(count);
    CHECK_DESTINATION(c, dest);
 
@@ -481,10 +483,10 @@ int EMPI_Isend(void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI
    }
 
    if (local) {
-      DEBUG(2, "Local isend");
+      DEBUG(2, "Local isend buf=%p count=%d type=%d dest=%d tag=%d comm=%d req=%d / %p", buf, count, t->handle, get_local_rank(c, dest), tag2mpi(tag), c->handle, r->handle, &(r->req));
       error = TRANSLATE_ERROR(PMPI_Isend(buf, count, t->type, get_local_rank(c, dest), tag2mpi(tag), c->comm, &(r->req)));
    } else {
-      DEBUG(2, "WA isend");
+      DEBUG(2, "WA isend buf=%p count=%d type=%d dest=%d tag=%d comm=%d req=%d / %p", buf, count, t->handle, get_local_rank(c, dest), tag2mpi(tag), c->handle, r->handle, &(r->req));
       error = messaging_send(buf, count, t, dest, tag, c);
    }
 
@@ -548,6 +550,8 @@ int EMPI_Irecv(void *buf, int count, EMPI_Datatype type,
    // Post the ireceive if it is local
    if (local == 1) {
 
+//WARN(0, "JASON local irecv");
+
       if (source == EMPI_ANY_SOURCE) {
          local_source = MPI_ANY_SOURCE;
       } else {
@@ -564,32 +568,34 @@ int EMPI_Irecv(void *buf, int count, EMPI_Datatype type,
          return error;
       }
 
-   } else if (source != MPI_ANY_SOURCE) {
+   } else if (source != EMPI_ANY_SOURCE) {
+
+//WARN(0, "JASON remote irecv");
+
       // If the source is guarenteed to be remote, we only test the WA link.
       error = messaging_probe_receive(r, 0);
 
    } else { // local == 0 && source == MPI_ANY_SOURCE
+
+//WARN(0, "JASON mixed irecv");
 
       // If the source may be local or remote, we must be able to receive data from both the local
       // MPI and the wide area link.
 
       // FIXME: fixed order may cause starvation ?
 
-      // Start by checking the WA link.
-      error = messaging_probe_receive(r, 0);
+//WARN(0, "JASON posting local irecv for mixed receive");
 
-      if (!request_completed(r)) {
-         // Nothing on the WA link yet, so post a local IRecv and return.
+      // Only post a local IRecv and return.
 
-         // If the source is guaranteed to be local, we directly use MPI.
-         error = TRANSLATE_ERROR(PMPI_Irecv(buf, count, t->type, MPI_ANY_SOURCE, tag2mpi(tag), c->comm, &(r->req)));
+      // If the source is guaranteed to be local, we directly use MPI.
+      error = TRANSLATE_ERROR(PMPI_Irecv(buf, count, t->type, MPI_ANY_SOURCE, tag2mpi(tag), c->comm, &(r->req)));
 
-         if (error != EMPI_SUCCESS) {
-            ERROR(1, "IRecv failed! (comm=%d,error=%d)", c->handle, error);
-            free_request(r);
-            *req = EMPI_REQUEST_NULL;
-            return error;
-         }
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "IRecv failed! (comm=%d,error=%d)", c->handle, error);
+         free_request(r);
+         *req = EMPI_REQUEST_NULL;
+         return error;
       }
    }
 
@@ -838,7 +844,7 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
 // END FIXME: for performance debugging!!!
 */
 
-   INFO(1, "request=(index=%d, flags=%d, srcdest=%d, count=%d, tag=%d type=%d) blocking=%d",
+   DEBUG(1, "request=(index=%d, flags=%d, srcdest=%d, count=%d, tag=%d type=%d) blocking=%d",
 	r->handle, r->flags, r->source_or_dest, r->count, r->tag, r->type->handle, blocking);
 
    // We don't support persistent request yet!
@@ -853,25 +859,46 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
    } else if (request_local(r)) {
       // Pure local request, so we ask MPI.
 
-      INFO(2, "request=LOCAL blocking=%d %p", blocking, r->req);
+      DEBUG(2, "request=LOCAL blocking=%d %p", blocking, r->req);
 
       if (blocking) {
          r->error = TRANSLATE_ERROR(PMPI_Wait(&(r->req), &mstatus));
          *flag = 1;
       } else {
+/*
+         if (r->req == MPI_REQUEST_NULL) {
+            ERROR(0, "JASON TESTING COMPLETED REQUEST!!!");
+         }
+
+         if (request_send(r)) {
+            WARN(0, "JASON TESTING SEND REQUEST!!!");
+        }
+
+         WARN(0, "JASON CALLING PMPI_TEST req=%p, flag=%p/%d mstatus=%p", &(r->req), flag, *flag, &mstatus);
+*/
          r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
+
+         DEBUG(0, "JASON CALLING PMPI_TEST req=%p, flag=%p/%d mstatus=%p result=%d flag=%d", &(r->req), flag, *flag, &mstatus, r->error, *flag);
       }
 
       if (r->error == EMPI_SUCCESS && *flag == 1) {
-         // We must translate local source rank to global rank.
-         error = PMPI_Get_count(&mstatus, r->type->type, &count);
-         INFO(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
-         error = translate_status(r->c, r->type, s, &mstatus);
+
+         // Intel-MPI seems to leave "mstatus" unset when PMPI_Test succeeds, and since the MPI standard is 
+         // unclear about this we assume the mstatus is invalid in case of a succesfull isend completion.
+         if (request_send(r)) {
+            set_status(s, r->source_or_dest, r->tag, EMPI_SUCCESS, r->type, r->count, FALSE);
+         } else {
+            // We must translate local source rank to global rank.
+            DEBUG(2, "translating status %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR);
+            error = PMPI_Get_count(&mstatus, r->type->type, &count);
+//            INFO(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
+            error = translate_status(r->c, r->type, s, &mstatus);
+        }
       }
 
    } else if (request_send(r)) {
 
-      INFO(2, "request=WA_SEND blocking=%d", blocking);
+      DEBUG(2, "request=WA_SEND blocking=%d", blocking);
 
       // Non-persistent WA send should already have finished.
       set_status(s, r->source_or_dest, r->tag, EMPI_SUCCESS, r->type, r->count, FALSE);
@@ -880,7 +907,7 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
 
    } else if (r->source_or_dest != EMPI_ANY_SOURCE) {
 
-      INFO(2, "request=WA_RECEIVE blocking=%d", blocking);
+      DEBUG(2, "request=WA_RECEIVE blocking=%d", blocking);
 
       // It was a non-persistent remote receive request, so probe the
       // WA link (will do nothing if the request was already completed).
@@ -899,7 +926,7 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
       // It was a non-persistent mixed receive request, so we must probe
       // the local network and the WA link.
 
-      INFO(2, "request=WA_RECEIVE_ANY blocking=%d", blocking);
+      DEBUG(2, "request=WA_RECEIVE_ANY blocking=%d", blocking);
 
       if (request_completed(r)) {
          DEBUG(3, "request=WA_RECEIVE_ANY already completed by source=%d tag=%d count=%d", r->source_or_dest, r->tag, r->count);
@@ -953,15 +980,15 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
 */
          do {
             // Check local receive first
-            INFO(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
+            DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
 
             r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
 
             if (r->error == EMPI_SUCCESS && *flag == 1) {
                 // We've receive a message! We must now translate local source rank to global rank.
-               INFO(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
+               DEBUG(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
                error = PMPI_Get_count(&mstatus, r->type->type, &count);
-               INFO(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
+               DEBUG(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
                error = translate_status(r->c, r->type, s, &mstatus);
 
             } else {
@@ -971,7 +998,7 @@ static int probe_request(EMPI_Request *req, int blocking, int *flag, EMPI_Status
                r->error = messaging_probe_receive(r, 0);
 
                if (request_completed(r)) {
-                  INFO(3, "request=WA_RECEIVE_ANY performed WA receive");
+                  DEBUG(3, "request=WA_RECEIVE_ANY performed WA receive");
 
                   if (r->error == EMPI_SUCCESS) {
                      r->error = messaging_finalize_receive(r, s);
@@ -1089,10 +1116,11 @@ int EMPI_Waitall(int count, EMPI_Request *array_of_requests, EMPI_Status *array_
    int done = 0;
    int flag;
 
-   DEBUG(0, "Waitall for %d requests", count);
+   DEBUG(0, "Waitall for %d requests=%p statusses=%p", count, array_of_requests, array_of_statuses);
 
    for (i=0;i<count;i++) {
       if (array_of_requests[i] == EMPI_REQUEST_NULL) {
+         DEBUG(0, "Waitall at %d == EMPI_REQUEST_NULL", i);
          done++;
       }
    }
@@ -1124,7 +1152,7 @@ int EMPI_Waitall(int count, EMPI_Request *array_of_requests, EMPI_Status *array_
       }
    }
 
-   DEBUG(0, "count=%d error=%d", count, errors);
+   DEBUG(0, "WAITALL count=%d error=%d", count, errors);
 
    if (errors != 0) {
       return EMPI_ERR_IN_STATUS;
@@ -2182,6 +2210,12 @@ int EMPI_Allreduce(void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, 
    datatype *t;
    operation *o;
 
+   // HACK 
+   if (op == 10 && type == 28) {
+      WARN(0, "JASON REPLACING ALLREDUCE LOR OF LOGICAL WITH INT!");
+      type = 24;
+   }
+
    H2C(comm, c)
    H2T(type, t)
    H2O(op, o)
@@ -2189,7 +2223,16 @@ int EMPI_Allreduce(void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, 
    if (comm_is_local(c)) {
      DEBUG(2, "Local allreduce");
      // simply perform an allreduce in local cluster
-     return TRANSLATE_ERROR(PMPI_Allreduce(sendbuf, recvbuf, count, t->type, o->op, c->comm));
+//WARN(0, "JASON ALLREDUCE sendbuf=%p recvbuf=%p count=%d type=%d op=%d comm=%d", sendbuf, recvbuf, count, t->handle, o->handle, c->handle)  ;
+//WARN(0, "JASON ALLREDUCE sendbuf[0]=%d", (sendbuf == NULL ? -1 :((int *)sendbuf)[0]));
+
+     error = PMPI_Allreduce(sendbuf, recvbuf, count, t->type, o->op, c->comm);
+
+//WARN(0, "JASON ALLREDUCE result=%d", error);
+
+     return TRANSLATE_ERROR(error);
+
+//     return TRANSLATE_ERROR(PMPI_Allreduce(sendbuf, recvbuf, count, t->type, o->op, c->comm));
    }
 
    DEBUG(2, "WA allreduce");
@@ -2973,7 +3016,7 @@ int EMPI_Comm_create(EMPI_Comm mc, EMPI_Group mg, EMPI_Comm *newcomm)
 
       *newcomm = result->handle;
 
-      STACKTRACE(0, "COMM_CREATE %d -> %d", c->handle, result->handle);
+//      STACKTRACE(0, "COMM_CREATE %d -> %d", c->handle, result->handle);
    } else {
       *newcomm = EMPI_COMM_NULL;
    }

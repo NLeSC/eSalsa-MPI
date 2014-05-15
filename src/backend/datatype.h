@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#include "../../include/settings.h"
+#include "settings.h"
 #include "empi.h"
 #include "mpi.h"
 #include "types.h"

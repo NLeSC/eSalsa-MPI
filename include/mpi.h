@@ -337,6 +337,7 @@ int MPI_Wait ( MPI_Request *r, MPI_Status *stat );
 int MPI_Waitall ( int count, MPI_Request *array_of_requests, MPI_Status *array_of_statuses );
 int MPI_Waitany ( int count, MPI_Request array_of_requests[], int *index, MPI_Status *stat );
 int MPI_Request_free ( MPI_Request *r );
+int MPI_Get_count ( MPI_Status *s, MPI_Datatype type, int *count );
 
 // Datatypes
 

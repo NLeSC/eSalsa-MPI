@@ -17,7 +17,7 @@
 #include <errno.h>
 #include <limits.h>
 
-#include "../../include/settings.h"
+#include "settings.h"
 
 #include "util.h"
 #include "empi.h"

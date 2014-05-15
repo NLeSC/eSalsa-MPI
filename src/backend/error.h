@@ -1,7 +1,7 @@
 #ifndef _ERROR_H_
 #define _ERROR_H_
 
-#include "../../include/settings.h"
+#include "settings.h"
 
 #ifdef NEED_ERROR_TRANSLATION
 #define TRANSLATE_ERROR(E) (translate_error(E))

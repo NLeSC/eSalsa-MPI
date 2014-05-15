@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <netdb.h>
 #include <string.h>
@@ -17,7 +18,7 @@
 #include <limits.h>
 #include <fcntl.h>
 
-#include "../../include/settings.h"
+#include "settings.h"
 
 #include "util.h"
 #include "empi.h"
@@ -69,13 +70,29 @@
 #define CONNECT_ERROR_CANNOT_FIND_IP   14
 #define CONNECT_ERROR_GATEWAY          15
 
+#ifdef DETAILED_TIMING
+typedef struct {
+   uint64_t starttime;
+   uint64_t endtime;
+   uint64_t size;
+} timing;
+
+timing write_timings[DETAILED_TIMING_COUNT];
+int write_timing_count;
+
+timing read_timings[DETAILED_TIMING_COUNT];
+int read_timing_count;
+#endif // DETAILED_TIMING
+
+
+
 // A gateway request message whcih is used to inform the server
 // of the contact information of a gateway.
 typedef struct {
-    int opcode;  // type of message
-    int cluster; // rank of cluster
-    int src;     // rank in cluster
-    int count;   // ip adres count
+   int opcode;  // type of message
+   int cluster; // rank of cluster
+   int src;     // rank in cluster
+   int count;   // ip adres count
 } gateway_request_msg;
 
 #define GATEWAY_REQUEST_SIZE (4*sizeof(int))
@@ -91,6 +108,9 @@ typedef struct {
    uint32_t incount;
    uint64_t in_bytes;
    uint64_t in_messages;
+#ifdef DETAILED_TIMING
+   uint64_t in_starttime;
+#endif // DETAILED_TIMING
    message_queue *in_queue;
 
    generic_message *out;
@@ -98,6 +118,9 @@ typedef struct {
    uint32_t outcount;
    uint64_t out_bytes;
    uint64_t out_messages;
+#ifdef DETAILED_TIMING
+   uint64_t out_starttime;
+#endif // DETAILED_TIMING
    message_queue *out_queue;
 
 } socket_info;
@@ -175,6 +198,19 @@ extern uint32_t my_pid;
 
 static uint64_t pending_data_messages;
 static uint64_t pending_data_size;
+
+
+static uint64_t current_time_micros()
+{
+   uint64_t result;
+   struct timeval t;
+
+   gettimeofday(&t,NULL);
+
+   result = (t.tv_sec * 1000000LU) + t.tv_usec;
+
+   return result;
+}
 
 /*****************************************************************************/
 /*                      Initialization / Finalization                        */
@@ -521,78 +557,6 @@ static int socket_receivefully(int socketfd, unsigned char *buffer, size_t len)
    return CONNECT_OK;
 }
 
-/*
-static int socket_wait_for_data(int socketfd, int blocking)
-{
-   int    max_sd, result;
-   struct timeval timeout;
-   fd_set select_set;
-
-   DEBUG(1, "WA_WAIT_FOR_DATA: Waiting for data to appear on socket (blocking=%d)", blocking);
-
-   FD_ZERO(&select_set);
-   max_sd = socketfd;
-   FD_SET(socketfd, &select_set);
-
-   if (blocking == 0) {
-      timeout.tv_sec  = 0;
-      timeout.tv_usec = 0;
-      result = select(max_sd + 1, &select_set, NULL, NULL, &timeout);
-   } else {
-      timeout.tv_sec  = WA_SOCKET_TIMEOUT;
-      timeout.tv_usec = 0;
-      result = select(max_sd + 1, &select_set, NULL, NULL, &timeout);
-   }
-
-   DEBUG(1, "WA_WAIT_FOR_DATA: Result is %d", result);
-
-   // Result will be 1 (have data), 0 (no data), -1 (error)
-   return result;
-}
-*/
-/*
-static int socket_wait_for_opcode(int socketfd, int blocking, int *opcode)
-{
-   int    max_sd, result;
-   struct timeval timeout;
-   fd_set select_set;
-   size_t len = 4;
-   size_t r = 0;
-   ssize_t tmp = 0;
-
-   DEBUG(1, "WA_WAIT_FOR_DATA: Waiting for data to appear on socket (blocking=%d)", blocking);
-
-   if (blocking == 0) {
-
-      FD_ZERO(&select_set);
-      max_sd = socketfd;
-      FD_SET(socketfd, &select_set);
-      timeout.tv_sec  = 0;
-      timeout.tv_usec = 0;
-      result = select(max_sd + 1, &select_set, NULL, NULL, &timeout);
-
-      if (result <= 0) {
-         // If we don't have data, or gotten an error we return.
-	 return result;
-      }
-   }
-
-   // If we want a blocking read, or our non-blocking select said we
-   // had data, we read a full opcode using a blocking read.
-   while (r < len) {
-      tmp = read(socketfd, ((unsigned char *) opcode)+r, len-r);
-
-      if (tmp <= 0) {
-         return -1;
-      } else {
-         r += tmp;
-      }
-   }
-
-   return 1;
-}
-*/
-
 static int set_socket_options(int socket)
 {
    int rcvbuf, sndbuf, flag, error;
@@ -676,9 +640,6 @@ static int socket_connect(unsigned long ipv4, unsigned short port, int *socketfd
 
    error = set_socket_options(*socketfd);
 
-/*
-   error = setsockopt(*socketfd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
-*/
    if (error != 0) {
       close(*socketfd);
       ERROR(1, "Failed to set socket options!");
@@ -719,8 +680,6 @@ static int socket_accept(unsigned short local_port, uint32_t expected_host, int 
       return CONNECT_ERROR_BIND;
    }
 
-//   setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
-
    error = bind(sd,(struct sockaddr *)&address, sizeof(address));
 
    if (error != 0) {
@@ -760,9 +719,6 @@ static int socket_accept(unsigned short local_port, uint32_t expected_host, int 
 
    error = set_socket_options(new_socket);
 
-/*
-   error = setsockopt(new_socket, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
-*/
    if (error != 0) {
       close(new_socket);
       ERROR(1, "Failed to set socket options!");
@@ -774,45 +730,8 @@ static int socket_accept(unsigned short local_port, uint32_t expected_host, int 
    return CONNECT_OK;
 }
 
-/*
-static int host_connect(char *host, unsigned short port, int *socketfd)
-{
-   struct addrinfo *result;
-   long ipv4;
-   int error;
-
-   // resolve the domain name into a list of addresses
-   error = getaddrinfo(host, NULL, NULL, &result);
-
-   if (error != 0) {
-      ERROR(1, "getaddrinfo failed: %s", gai_strerror(error));
-      return CONNECT_ERROR_SERVER_NOT_FOUND;
-   }
-
-   if (result->ai_family == AF_INET) {
-      DEBUG(1, "Got inet4");
-   } else if (result->ai_family == AF_INET6) {
-      ERROR(1, 0, "Got IPv6 address type!");
-      return CONNECT_ERROR_SERVER_NOT_FOUND;
-   } else {
-      ERROR(1, 0, "Got unknown address type!");
-      return CONNECT_ERROR_SERVER_NOT_FOUND;
-   }
-
-   ipv4 = ((struct sockaddr_in *) result)->sin_addr.s_addr;
-
-   freeaddrinfo(result);
-
-   return socket_connect(ipv4, port, socketfd);
-}
-*/
-
 static int handshake()
 {
-//int local_rank, int local_count, int cluster_rank, int cluster_count,
-//       char* cluster_name, int *cluster_sizes, int *cluster_offsets)
-//{
-
    // A handshake consist of a single RPC that sends the name of this cluster
    // to the server and gets a cluster rank and clusters count as a reply (or an error).
    int error;
@@ -924,181 +843,6 @@ static int receive_cluster_sizes()
 
    return CONNECT_OK;
 }
-
-
-/*
-int wa_finalize() {
-   int error;
-
-   // Send a close link opcode before shutting down the socket.
-   int tmp = htonl(OPCODE_CLOSE_LINK);
-
-   error = wa_sendfully((unsigned char *) &tmp, 4);
-
-   if (error != 0) {
-      ERROR(1, "Failed to close link! %d", error);
-      return CONNECT_ERROR_CLOSE_FAILED;
-   }
-
-   error = shutdown(serverfd, SHUT_RDWR);
-
-   if (error != 0) {
-      ERROR(1, "Failed to shutdown socket! %d", error);
-      return CONNECT_ERROR_CLOSE_FAILED;
-   }
-
-   error = close(serverfd);
-
-   if (error != 0) {
-      ERROR(1, "Failed to close socket! %d", error);
-      return CONNECT_ERROR_CLOSE_FAILED;
-   }
-
-   // TODO: cleanup communicators!
-
-   return CONNECT_OK;
-}
-*/
-
-/*
-static int ensure_byte_order(message_buffer *m, int order)
-{
-   if (m->byte_order == order) {
-      return CONNECT_OK;
-   }
-
-   if (order == BYTE_ORDER_HOST && m->byte_order == BYTE_ORDER_NETWORK) {
-      m->byte_order = BYTE_ORDER_HOST;
-
-      m->msg.opcode = ntohl(m->msg.opcode);
-      m->msg.comm = ntohl(m->msg.comm);
-      m->msg.source = ntohl(m->msg.source);
-      m->msg.dest = ntohl(m->msg.dest);
-      m->msg.tag = ntohl(m->msg.tag);
-      m->msg.count = ntohl(m->msg.count);
-      m->msg.bytes = ntohl(m->msg.bytes);
-
-      return CONNECT_OK;
-   }
-
-   if (order == BYTE_ORDER_NETWORK && m->byte_order == BYTE_ORDER_HOST) {
-      m->byte_order = BYTE_ORDER_NETWORK;
-
-      m->msg.opcode = htonl(m->msg.opcode);
-      m->msg.comm = htonl(m->msg.comm);
-      m->msg.source = htonl(m->msg.source);
-      m->msg.dest = htonl(m->msg.dest);
-      m->msg.tag = htonl(m->msg.tag);
-      m->msg.count = htonl(m->msg.count);
-      m->msg.bytes = htonl(m->msg.bytes);
-
-      return CONNECT_OK;
-   }
-
-   ERROR(1, "Failed to convert byte order %d to %d", order, m->byte_order);
-   return CONNECT_ERROR_BYTE_ORDER;
-}
-*/
-
-/*
-
-static int wa_wait_for_opcode(int socketfd, int blocking, int *opcode)
-{
-   int    max_sd, result;
-   struct timeval timeout;
-   fd_set select_set;
-   size_t len = 4;
-   size_t r = 0;
-   ssize_t tmp = 0;
-
-   DEBUG(1, "WA_WAIT_FOR_DATA: Waiting for data to appear on socket (blocking=%d)", blocking);
-
-   if (blocking == 0) {
-
-      FD_ZERO(&select_set);
-      max_sd = socketfd;
-      FD_SET(socketfd, &select_set);
-      timeout.tv_sec  = 0;
-      timeout.tv_usec = 0;
-      result = select(max_sd + 1, &select_set, NULL, NULL, &timeout);
-
-      if (result <= 0) {
-         // If we don't have data, or gotten an error we return.
-	 return result;
-      }
-   }
-
-   // If we want a blocking read, or our non-blocking select said we
-   // had data, we read a full opcode using a blocking read.
-   while (r < len) {
-      tmp = read(socketfd, ((unsigned char *) opcode)+r, len-r);
-
-      if (tmp <= 0) {
-         return -1;
-      } else {
-         r += tmp;
-      }
-   }
-
-   return 1;
-}
-
-static int receive_opcode(int socketfd, int* opcode, int *error, int blocking)
-{
-   DEBUG(1, "Receiving from socket (blocking=%d)", blocking);
-
-   int result = wa_wait_for_opcode(socketfd, blocking, opcode);
-
-   DEBUG(1, "Result of receive: result=%d error=%d", result, *error);
-
-   if (result == -1) {
-      *error = EMPI_ERR_INTERN;
-      return 0;
-   }
-
-   if (result == 0) {
-      if (blocking == 1) {
-         *error = EMPI_ERR_INTERN;
-      } else {
-         *error = EMPI_SUCCESS;
-      }
-      return 0;
-   }
-
-   *opcode = ntohl(*opcode);
-   return 1;
-}
-*/
-
-
-/*
-
-
-   struct ifaddrs * ifAddrStruct=NULL;
-    struct ifaddrs * ifa=NULL;
-    void * tmpAddrPtr=NULL;
-
-    getifaddrs(&ifAddrStruct);
-
-    for (ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa ->ifa_addr->sa_family==AF_INET) { // check it is IP4
-            // is a valid IP4 Address
-            tmpAddrPtr=&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
-            char addressBuffer[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-            printf("%s IP Address %s\n", ifa->ifa_name, addressBuffer); 
-        } else if (ifa->ifa_addr->sa_family==AF_INET6) { // check it is IP6
-            // is a valid IP6 Address
-            tmpAddrPtr=&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
-            char addressBuffer[INET6_ADDRSTRLEN];
-            inet_ntop(AF_INET6, tmpAddrPtr, addressBuffer, INET6_ADDRSTRLEN);
-            printf("%s IP Address %s\n", ifa->ifa_name, addressBuffer); 
-        } 
-    }
-    if (ifAddrStruct!=NULL) freeifaddrs(ifAddrStruct);
-    return 0;
-*/
-
 
 static int get_local_ips(struct in_addr **ip4ads, int *ip4count)
 {
@@ -1470,33 +1214,6 @@ static int disconnect_gateways()
    return CONNECT_OK;
 }
 
-static void print_gateway_statistics(uint64_t deltat)
-{
-   int i,j;
-
-   uint64_t sec;
-   uint64_t millis;
-
-   sec = deltat / 1000000UL;
-   millis = (deltat % 1000000UL) / 1000UL;
-
-   for (i=0;i<cluster_count;i++) {
-      if (i != cluster_rank) {
-         for (j=0;j<gateway_connections[i].stream_count;j++) {
-            printf("STATS FOR GATEWAY STREAM %d.%d.%d TO %d.%d.%d AFTER %ld.%03ld IN %ld %ld OUT %ld %ld PENDING %ld %ld\n",
-               cluster_rank, gateway_rank, j, i, gateway_rank, j, sec, millis,
-               gateway_connections[i].sockets[j].in_messages,
-               gateway_connections[i].sockets[j].in_bytes,
-               gateway_connections[i].sockets[j].out_messages,
-               gateway_connections[i].sockets[j].out_bytes,
-               pending_data_messages, pending_data_size);
-         }
-      }
-   }
-
-   fflush(stdout);
-}
-
 int master_gateway_init(int rank, int size, int *argc, char ***argv)
 {
    int status;
@@ -1590,6 +1307,11 @@ int generic_gateway_init(int rank, int size)
 
    // I am one of the gateways.
    INFO(1, "I am one of the gateways -- performing generic gateway init!");
+
+#ifdef DETAILED_TIMING
+   write_timing_count = 0;
+   read_timing_count = 0;
+#endif // DETAILED_TIMING
 
    // Create an fd for polling.
    epollfd = epoll_create1(0);
@@ -1757,121 +1479,35 @@ int generic_gateway_init(int rank, int size)
 }
 
 
-
-
-
-
-/*
-static int forward_data_message(unsigned char *buffer, int size)
+#ifdef DETAILED_TIMING
+static void flush_read_timings()
 {
-   int error, cluster, socketfd;
-   message *m;
+   int i;
 
-   m = (message *) buffer;
-
-   cluster = m->dest_cluster;
-
-
-HIERO
-
-
-
-   socketfd = gateway_addresses[cluster*gateway_count + gateway_rank].socket;
-
-   // EEP: blocking send!
-   error = socket_sendfully(socketfd, buffer, len);
-
-   if (error != CONNECT_OK) {
-      ERROR(1, "Failed to forward data to remote gateway! (error=%d)", error);
-      return EMPI_ERR_INTERN;
+   for (i=0;i<read_timing_count;i++) {
+      printf("READ TIMINGS GATEWAY %d.%d %d %ld %ld %ld\n",
+               cluster_rank, gateway_rank, i,
+               read_timings[i].starttime,
+               read_timings[i].endtime,
+               read_timings[i].size);
    }
 
-   return EMPI_SUCCESS;
+   read_timing_count = 0;
+//   fflush(stdout);
 }
 
-static int handle_gateway_msg(generic_message *message, int size, int *done)
+static void store_read_timings(uint64_t starttime, uint64_t endtime, uint64_t size)
 {
-   // TODO: implement!!1
-   return EMPI_SUCCESS;
+   if (read_timing_count >= DETAILED_TIMING_COUNT) {
+      flush_read_timings();
+   }
+
+   read_timings[read_timing_count].starttime = starttime;
+   read_timings[read_timing_count].endtime = endtime;
+   read_timings[read_timing_count].size = size;
+   read_timing_count++;
 }
-
-// Process at most one incoming message from MPI.
-static int probe_mpi_message(generic_message **message, int *tag)
-{
-   int error, flag;
-   MPI_Status status;
-   unsigned char *buffer;
-
-   error = PMPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, mpi_comm_gateway_and_application, &flag, &status);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to probe MPI! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   if (!flag) {
-      return EMPI_SUCCESS;
-   }
-
-   error = PMPI_Get_count(&status, MPI_BYTE, &count);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive size of MPI message! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   buffer = malloc(count);
-
-   if (buffer == NULL) {
-      ERROR(1, "Failed to allocate space for MPI message! (error=%d)", error);
-      return EMPI_ERR_INTERN;
-   }
-
-   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting.
-   error = PMPI_Recv(buffer, count, MPI_BYTE, status.SOURCE, status.TAG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.source, status.tag, count, error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   *message = buffer;
-   *tag = status.TAG;
-   return EMPIP_SUCCESS;
-}
-
-static int receive_mpi_message(int *done)
-{
-   generic_message *m;
-   int tag,error;
-
-   m = NULL;
-
-   error = probe_mpi_message(&m, &tag);
-
-   if (error != EMPI_SUCCESS) {
-      ERROR(1, "Failed to probe MPI! (error=%d)", error);
-      return error;
-   }
-
-   if (m != NULL) {
-      // The tag now detemines what we should to with the message. Forward it to the server, or to one or more clusters...
-      switch (tag) {
-      case TAG_DATA_MSG:
-         return forward_data_msg_mpi_to_sockets(buffer, count);
-      case TAG_SERVER_REQUEST:
-         return forward_server_msg_mpi_to_sockets(buffer, count);
-      case TAG_GATEWAY_REQUEST:
-         return handle_gateway_msg(buffer, count, done);
-      default:
-         ERROR(1, "Received message with unsupported tag %d from %d (size=%d)", status.tag, status.source, count);
-         return EMPI_ERR_INTERN;
-      }
-   }
-
-   return MPI_SUCCESS;
-}
-*/
+#endif // DETAILED_TIMING
 
 static int nonblock_read_message(socket_info *info, int *more)
 {
@@ -1889,6 +1525,9 @@ static int nonblock_read_message(socket_info *info, int *more)
       info->in = malloc(sizeof(generic_message));
       info->inpos = 0;
       info->incount = sizeof(generic_message);
+#ifdef DETAILED_TIMING
+      info->in_starttime = current_time_micros();
+#endif // DETAILED_TIMING
    }
 
    count = info->inpos;
@@ -1911,7 +1550,7 @@ static int nonblock_read_message(socket_info *info, int *more)
             return EMPI_ERR_INTERN;
          }
       } else if (tmp == 0) {
-         ERROR(1, "Unexpected EOF on socket %d!", info->socketfd);
+         ERROR(1, "Unexpected EOF on socket %d! count=%ld incount=%d", info->socketfd, count, info->incount);
          return EMPI_ERR_INTERN;
       }
 
@@ -1932,6 +1571,10 @@ static int nonblock_read_message(socket_info *info, int *more)
    if (count > sizeof(generic_message)) {
 
       DEBUG(1, "Read full message %d", count);
+
+#ifdef DETAILED_TIMING
+      store_read_timings(info->in_starttime, current_time_micros(), count);
+#endif // DETAILED_TIMING
 
       // We've read the entire message, so queue it and return.
       message_enqueue(info->in_queue, info->in);
@@ -1984,172 +1627,10 @@ static int nonblock_read_message(socket_info *info, int *more)
    return nonblock_read_message(info, more);
 }
 
-
-/*
-static int nonblock_read_message(socket_info *info, message_queue *queue, int order)
-{
-   ssize_t tmp, count;
-   uint32_t len;
-
-   DEBUG(1, "Reading message from socket");
-
-   if (info->in == NULL) {
-
-      DEBUG(1, "No message available yet -- will allocate!");
-
-      // Allocate an empty message and read that first.
-      info->in = malloc(sizeof(generic_message));
-      info->inpos = 0;
-      info->incount = sizeof(generic_message);
-   }
-
-   count = info->inpos;
-
-   while (count < info->incount) {
-
-      DEBUG(1, "Reading message from socket %d %d %d", count, info->incount, info->incount - count);
-
-      tmp = read(info->socketfd, ((unsigned char *) info->in) + count, info->incount - count);
-
-      DEBUG(1, "Read message from socket %d %d %d", count, info->incount, tmp);
-
-      if (tmp == -1) {
-         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // Cannot write any more data.
-            info->inpos = (uint32_t) count;
-            return EMPI_SUCCESS;
-         } else {
-            ERROR(1, "Failed to read message from socket! (error=%d)", errno);
-            return EMPI_ERR_INTERN;
-         }
-      } else if (tmp == 0) {
-         ERROR(1, "Unexpected EOF on socket %d!", info->socketfd);
-         return EMPI_ERR_INTERN;
-      }
-
-      count += tmp;
-   }
-
-   // We've either read the entire message, or just the entire header, depending on the size!
-
-   if (count < sizeof(generic_message)) {
-      // Sanity check - should not happen!
-      ERROR(1, "Read invalid message size %d!", count);
-      return EMPI_ERR_INTERN;
-   }
-
-   if (count > sizeof(generic_message)) {
-
-      DEBUG(1, "Read full message %d", count);
-
-      // We've read the entire message, so queue it and return.
-      message_enqueue(queue, info->in);
-
-      info->in_bytes += count;
-      info->in_messages++;
-      info->in = NULL;
-      info->inpos = 0;
-      info->incount = 0;
-
-      return EMPI_SUCCESS;
-   }
-
-   // We've only read a header!
-   if (order == 0) {
-      len = ntohl(info->in->header.length);
-   } else {
-      len = info->in->header.length;
-   }
-
-   if (len == sizeof(generic_message)) {
-
-      DEBUG(1, "Read SPECIAL message %d %d", len, count);
-
-      // The message only contains a header.
-      message_enqueue(queue, info->in);
-//      process_special_message(info->in, order);
-
-      info->in_bytes += count;
-      info->in_messages++;
-      info->in = NULL;
-      info->inpos = 0;
-      info->incount = sizeof(generic_message);
-      return EMPI_SUCCESS;
-   }
-
-   DEBUG(1, "Read PARTIAL message %d %d", count, len);
-
-   // Otherwise, we have to realloc the message, and read more data!
-   info->in = realloc(info->in, len);
-   info->inpos = count;
-   info->incount = len;
-
-   if (info->in == NULL) {
-      ERROR(1, "Failed to realloc message!");
-      return EMPI_ERR_INTERN;
-   }
-
-   return nonblock_read_message(info, queue, order);
-}
-
-static int nonblock_write_message(socket_info *info) {
-
-   ssize_t tmp, count;
-
-   if (info->out == NULL) {
-      // Sanity check -- nothing to read
-      set_socket_in_epoll_to_ro(info->socketfd, info);
-      return EMPI_SUCCESS;
-   }
-
-   count = info->outpos;
-
-   while (count < info->outcount) {
-
-      DEBUG(1, "Writing message to socket %d %d", count, info->outcount);
-
-      tmp = write(info->socketfd, ((unsigned char *) info->out) + count, info->outcount - count);
-
-      DEBUG(1, "Written %d bytes", tmp);
-
-      if (tmp == -1) {
-         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // Cannot write any more data.
-            info->outpos = (uint32_t) count;
-            return EMPI_SUCCESS;
-         } else {
-            ERROR(1, "Failed to write message to socket! (error=%d)", errno);
-            return EMPI_ERR_INTERN;
-         }
-      }
-
-      count += tmp;
-   }
-
-   DEBUG(1, "Finished writing message to socket %d  %d", count, info->outcount);
-
-   // We've finished writing the message!
-   info->out_bytes += count;
-   info->out_messages++;
-   info->out      = NULL;
-   info->outpos   = 0;
-   info->outcount = 0;
-
-   // Update the pending data counts.
-   if (info != &server_info) {
-      pending_data_messages--;
-      pending_data_size -= count;
-   }
-
-   set_socket_in_epoll_to_ro(info->socketfd, info);
-   return EMPI_SUCCESS;
-}
-
-*/
-
 static void ensure_state_ro(socket_info *info)
 {
    if (info->state == STATE_RW) {
+      DEBUG(1, "Switching socket %d to RO", info->socketfd);
       set_socket_in_epoll_to_ro(info->socketfd, info);
       info->state = STATE_RO;
    }
@@ -2158,6 +1639,7 @@ static void ensure_state_ro(socket_info *info)
 static void ensure_state_rw(socket_info *info)
 {
    if (info->state == STATE_RO) {
+      DEBUG(1, "Switching socket %d to RW", info->socketfd);
       set_socket_in_epoll_to_rw(info->socketfd, info);
       info->state = STATE_RW;
    }
@@ -2205,6 +1687,37 @@ static void prepare_messages(int index)
    }
 }
 
+#ifdef DETAILED_TIMING
+static void flush_write_timings()
+{
+   int i;
+
+   for (i=0;i<write_timing_count;i++) {
+      printf("WRITE TIMINGS GATEWAY %d.%d %d %ld %ld %ld\n",
+               cluster_rank, gateway_rank, i,
+               write_timings[i].starttime,
+               write_timings[i].endtime,
+               write_timings[i].size);
+   }
+
+   write_timing_count = 0;
+//   fflush(stdout);
+}
+
+static void store_write_timings(uint64_t starttime, uint64_t endtime, uint64_t size)
+{
+   if (write_timing_count >= DETAILED_TIMING_COUNT) {
+      flush_write_timings();
+   }
+
+   write_timings[write_timing_count].starttime = starttime;
+   write_timings[write_timing_count].endtime = endtime;
+   write_timings[write_timing_count].size = size;
+   write_timing_count++;
+
+}
+#endif // DETAILED_TIMING
+
 static int nonblock_write_message(socket_info *info, int *more) {
 
    ssize_t tmp, count;
@@ -2216,20 +1729,25 @@ static int nonblock_write_message(socket_info *info, int *more) {
 
    if (prepare_message(info) == 0) {
       // We have run out of messages to write!
+      DEBUG(1, "No more messages to write to socket %d -- switching to RO mode!", info->socketfd);
       *more = 0;
       ensure_state_ro(info);
       return EMPI_SUCCESS;
+   } else {
+#ifdef DETAILED_TIMING
+      info->out_starttime = current_time_micros();
+#endif // DETAILED_TIMING
    }
 
    count = info->outpos;
 
    while (count < info->outcount) {
 
-      DEBUG(1, "Writing message to socket %d %d", count, info->outcount);
+      DEBUG(1, "Writing message to socket %d %d %d", info->socketfd, count, info->outcount);
 
       tmp = write(info->socketfd, ((unsigned char *) info->out) + count, info->outcount - count);
 
-      DEBUG(1, "Written %d bytes", tmp);
+      DEBUG(1, "Written %d bytes to socket %d", tmp, info->socketfd);
 
       if (tmp == -1) {
          if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -2247,11 +1765,16 @@ static int nonblock_write_message(socket_info *info, int *more) {
       count += tmp;
    }
 
-   DEBUG(1, "Finished writing message to socket %d  %d", count, info->outcount);
+   DEBUG(1, "Finished writing message to socket %d %d %d", info->socketfd, count, info->outcount);
 
    // We've finished writing the message!
    info->out_bytes += count;
    info->out_messages++;
+
+#ifdef DETAILED_TIMING
+   store_write_timings(info->out_starttime, current_time_micros(), count);
+#endif // DETAILED_TIMING
+
    free(info->out);
 
    info->out      = NULL;
@@ -2353,81 +1876,6 @@ static int poll_socket_event(int *done, int *progress)
 
    return EMPI_SUCCESS;
 }
-
-/*
-static void push_message(socket_info *target, message_queue *queue, int order)
-{
-   if (target->out != NULL || message_queue_empty(queue)) {
-      return;
-   }
-
-   target->out = message_dequeue(queue);
-   target->outpos = 0;
-
-   if (order == 0) {
-      target->outcount = ntohl(target->out->header.length);
-   } else {
-      target->outcount = target->out->header.length;
-   }
-
-   DEBUG(1, "Pushing queue message into socket %d %d!", ntohl(target->out->header.length), target->out->header.length);
-
-   set_socket_in_epoll_to_rw(target->socketfd, target);
-}
-
-// Move messages queued for the gateway at 'index' to the queue of a specific socket (if possible).
-static void push_messages(int index)
-{
-   int i;
-
-   for (i=0;i<gateway_connections[index].stream_count;i++) {
-
-      if (message_queue_empty(&(gateway_connections[index].out_queue))) {
-         return;
-      }
-
-      push_message(&(gateway_connections[index].sockets[i]), &(gateway_connections[index].out_queue), 1);
-   }
-}
-
-// Handle the gateway sockets.
-static int process_socket_messages(int *done)
-{
-   int i, status, progress, count;
-
-   count = 0;
-
-   do {
-      if (gateway_rank == 0) {
-         // Attempt to push a pending server request from the queue into the server connection (if possible).
-         push_message(&server_info, &server_queue_out, 0);
-      }
-
-      // For each gateway connection, push a pending data message into a socket connection (if available).
-      for (i=0;i<cluster_count;i++) {
-         if (i != cluster_rank) {
-            push_messages(i);
-         }
-      }
-
-      // DEBUG(1, "Poll socket event");
-
-      progress = 0;
-
-      status = poll_socket_event(done, &progress);
-
-      if (status != EMPI_SUCCESS) {
-         ERROR(1, "Failed to poll for messages!");
-      }
-
-      count++;
-
-   } while (progress == 1 && *done != 1 && count < MAX_SOCKETS_RECEIVE_SEQUENCE);
-
-   return status;
-}
-*/
-
 
 static int process_socket_messages(int *done)
 {
@@ -2532,76 +1980,6 @@ static int process_gateway_message(generic_message *m, int *done)
 
    return EMPI_SUCCESS;
 }
-
-/*
-static int receive_mpi_message(int *done, int *received)
-{
-   int error, flag, count;
-   MPI_Status status;
-   unsigned char *buffer;
-
-   error = PMPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, mpi_comm_gateway_and_application, &flag, &status);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to probe MPI! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   if (!flag) {
-      *received = 0;
-      return EMPI_SUCCESS;
-   }
-
-   DEBUG(1, "Incoming MPI message!");
-
-   error = PMPI_Get_count(&status, MPI_BYTE, &count);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive size of MPI message! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   buffer = malloc(count);
-
-   if (buffer == NULL) {
-      ERROR(1, "Failed to allocate space for MPI message! (error=%d)", error);
-      return EMPI_ERR_INTERN;
-   }
-
-   DEBUG(2, "Receiving MPI message from source %d, with tag %d and size %d", status.MPI_SOURCE, status.MPI_TAG, count);
-
-   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting.
-   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   DEBUG(2, "Received MPI message! %d %d", ntohl(((generic_message *)buffer)->header.opcode), ntohl(((generic_message *)buffer)->header.length));
-
-   *received = 1;
-
-   // The tag now detemines what we should to with the message. Forward it to the server, or to one or more clusters...
-   switch (status.MPI_TAG) {
-   case TAG_DATA_MSG:
-      // This is a request from an application process to forward data to another cluster.
-      DEBUG(2, "Forwarding MPI DATA message to remote gateway via socket!");
-      return enqueue_data_message((generic_message *)buffer, count);
-   case TAG_SERVER_REQUEST:
-      // This is a request from an application process to forward a request to the server.
-      DEBUG(2, "Forwarding MPI SERVER request to server via socket!");
-      return enqueue_server_request((generic_message *)buffer, count);
-   case TAG_SERVER_REPLY:
-      // This is a message from the server forwarded to me via MPI by the master gateway.
-      DEBUG(2, "Received SERVER reply via MPI!");
-      return process_gateway_message((generic_message *)buffer, done);
-   default:
-      ERROR(1, "Received message with unsupported tag %d from %d (size=%d)", status.MPI_TAG, status.MPI_SOURCE, count);
-      return EMPI_ERR_INTERN;
-   }
-}
-*/
 
 static int receive_mpi_server_request(int *received)
 {
@@ -2750,11 +2128,11 @@ static int receive_mpi_data_message(int *received)
    error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, TAG_DATA_MSG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
 
    if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
+      DEBUG(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
       return TRANSLATE_ERROR(error);
    }
 
-   DEBUG(2, "Received MPI DATA message! %d %d", ntohl(((generic_message *)buffer)->header.opcode), ntohl(((generic_message *)buffer)->header.length));
+   DEBUG(2, "Received MPI DATA message! %d %d", ((generic_message *)buffer)->header.opcode, ((generic_message *)buffer)->header.length);
 
    // This is a request from an application process to forward data to another cluster.
    return enqueue_data_message((generic_message *)buffer, count);
@@ -3035,31 +2413,36 @@ void cleanup()
    close(epollfd);
 }
 
-/*
-static void delta_t(struct timeval *oldtime, struct timeval *newtime, uint64_t *seconds, uint64_t *millis)
+static void print_gateway_statistics(uint64_t deltat)
 {
-   uint64_t oldt, newt, deltat;
+   int i,j;
 
-   oldt = oldtime->tv_sec * 1000000 + oldtime->tv_usec;
-   newt = newtime->tv_sec * 1000000 + newtime->tv_usec;
+   uint64_t sec;
+   uint64_t millis;
 
-   deltat = newt - oldt;
+   sec = deltat / 1000000UL;
+   millis = (deltat % 1000000UL) / 1000UL;
 
-   *seconds = deltat/1000000;
-   *millis = deltat%1000000;
-}
-*/
+   for (i=0;i<cluster_count;i++) {
+      if (i != cluster_rank) {
+         for (j=0;j<gateway_connections[i].stream_count;j++) {
+            printf("STATS FOR GATEWAY STREAM %d.%d.%d TO %d.%d.%d AFTER %ld.%03ld IN %ld %ld OUT %ld %ld PENDING %ld %ld\n",
+               cluster_rank, gateway_rank, j, i, gateway_rank, j, sec, millis,
+               gateway_connections[i].sockets[j].in_messages,
+               gateway_connections[i].sockets[j].in_bytes,
+               gateway_connections[i].sockets[j].out_messages,
+               gateway_connections[i].sockets[j].out_bytes,
+               pending_data_messages, pending_data_size);
+         }
+      }
+   }
 
-static uint64_t current_time_micros()
-{
-   uint64_t result;
-   struct timeval t;
+#ifdef DETAILED_TIMING
+   flush_write_timings();
+   flush_read_timings();
+#endif
 
-   gettimeofday(&t,NULL);
-
-   result = (t.tv_sec * 1000000LU) + t.tv_usec;
-
-   return result;
+   fflush(stdout);
 }
 
 int messaging_run_gateway(int rank, int size, int empi_size)
@@ -3108,18 +2491,6 @@ int messaging_run_gateway(int rank, int size, int empi_size)
          last = current;
          print_gateway_statistics(current-start);
       }
-
-/*
-      gettimeofday(&current,NULL);
-
-      delta_t(&last, &current, &seconds, &millis);
-
-      if (seconds >= 1) {
-         delta_t(&start, &current, &seconds, &millis);
-         print_gateway_statistics(seconds, millis);
-         last = current;
-      }
-*/
    }
 
    // We need a barrier to ensure everybody (application and gateway nodes) is ready to finalize.
@@ -3135,10 +2506,6 @@ int messaging_run_gateway(int rank, int size, int empi_size)
 
    // Print final statistics about the communcation with other gateways.
    current = current_time_micros();
-
-//   gettimeofday(&last,NULL);
-
-//   delta_t(&start, &last, &seconds, &millis);
 
    print_gateway_statistics(current-start);
 

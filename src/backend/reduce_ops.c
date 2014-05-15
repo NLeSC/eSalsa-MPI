@@ -1,6 +1,6 @@
 #include "logging.h"
 #include "reduce_ops.h"
-#include "../../include/settings.h"
+#include "settings.h"
 #include "empi.h"
 
 // According to the MPI 2.1 standard, the following combinations of reduce operations and types are supported:

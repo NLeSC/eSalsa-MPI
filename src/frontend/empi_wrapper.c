@@ -3,13 +3,13 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "../include/settings.h"
+#include "settings.h"
+#include "profiling.h"
+#include "logging.h"
 
-#include "../shared/profiling.h"
-#include "../shared/logging.h"
-
-#include "../include/mpi.h"
-#include "../backend/empi.h"
+// Include the MPI from -OUR- include directory!
+#include "mpi.h"
+#include "empi.h"
 
 // The indexes and names of the profiled communication operations.
 #define STATS_BARRIER         0
@@ -2082,6 +2082,7 @@ int MPI_Request_free ( MPI_Request *r )
    return error;
 }
 
+
 int MPI_Waitany ( int count, MPI_Request array_of_requests[], int *index, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
@@ -2106,6 +2107,40 @@ int MPI_Waitany ( int count, MPI_Request array_of_requests[], int *index, MPI_St
 #ifdef TRACE_ERRORS
    if (error != MPI_SUCCESS) {
       ERROR(0, "MPI_Waitany failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
+
+int MPI_Get_count ( MPI_Status *s, MPI_Datatype type, int *count )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Get_count(MPI_Status *s=%p, MPI_Datatype type=%s, int *count=%p)", s, type_to_string(datatype), coun$
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Get_count((EMPI_Status *)s, type, count);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Get_count failed (%d)!", error);
    }
 #endif // TRACE_ERRORS
    return error;
@@ -6349,39 +6384,6 @@ int MPI_Get_address ( void *location, MPI_Aint *address )
    return error;
 }
 
-
-int MPI_Get_count ( MPI_Status *s, MPI_Datatype type, int *count )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "MPI_Get_count(MPI_Status *s=%p, MPI_Datatype type=%s, int *count=%p)", s, type_to_string(datatype), count);
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = EMPI_Get_count((EMPI_Status *)s, type, count);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(MPI_COMM_SELF, STATS_MISC, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != MPI_SUCCESS) {
-      ERROR(0, "MPI_Get_count failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 int MPI_Get_elements ( MPI_Status *s, MPI_Datatype type, int *elements )

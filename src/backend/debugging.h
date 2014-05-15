@@ -2,9 +2,7 @@
 #define _DEBUGGING_H_
 
 #include <stdlib.h>
-
-#include "../../include/settings.h"
-
+#include "settings.h"
 #include "communicator.h"
 
 // Macros to check parameters

@@ -1,7 +1,7 @@
 #ifndef _COMMUNICATOR_H_
 #define _COMMUNICATOR_H_
 
-#include "../../include/settings.h"
+#include "settings.h"
 #include "empi.h"
 #include "types.h"
 #include "stdint.h"

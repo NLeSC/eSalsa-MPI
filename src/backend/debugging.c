@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "../../include/settings.h"
+#include "settings.h"
 
 #include "empi.h"
 #include "debugging.h"

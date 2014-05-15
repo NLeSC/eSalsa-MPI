@@ -1,7 +1,7 @@
 #ifndef _REQUEST_H_
 #define _REQUEST_H_
 
-#include "../../include/settings.h"
+#include "settings.h"
 
 #include "empi.h"
 #include "types.h"
