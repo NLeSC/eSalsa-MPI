@@ -71,7 +71,7 @@ How do I install eSalsa-MPI?
 First of all make sure you have defined the EMPI_HOME environent variable. 
 For example: 
 
-  export EMPI_HOME=/home/jason/eSalsa-MPI
+   export EMPI_HOME=/home/jason/eSalsa-MPI
 
 Next, set the "CC" and "FC" variables in $EMPI_HOME/empi.config to refer 
 to the C and fortran compilers you which to use. Also set the "MPICC" 
@@ -80,8 +80,8 @@ MPI you wish to use.
 
 Next, build eSalsa-MPI like this:
 
-  cd $EMPI_HOME
-  make
+   cd $EMPI_HOME
+   make
 
 
 How do I run eSalsa-MPI?
