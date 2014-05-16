@@ -1,11 +1,11 @@
 <project name="CESM" default="all" basedir=".">
 
-	<property name="version" value="0.1" />
-	<property name="jar" value="cesm-${version}.jar" />
+	<property name="version" value="0.2" />
+	<property name="jar" value="eSalsaMPI-server-${version}.jar" />
 
 	<property name="srcdir" value="./src" />
 	<property name="builddir" value="./build" />
-	<property name="distdir" value="./lib" />
+	<property name="distdir" value="../../lib" />
 	
 	<property name="external" location="external" />
 
@@ -17,11 +17,10 @@
 	<target name="prepare">
 		<mkdir dir="${distdir}" />
 		<mkdir dir="${builddir}" />
-		<mkdir dir="${builddir}/headers" />
 	</target>
 
 	<target name="compile" depends="prepare">
-		<javac classpathref="default.classpath" destdir="${builddir}" srcdir="${srcdir}" debug="true" includes="esalsa/**/*.java" />
+		<javac includeantruntime="false" classpathref="default.classpath" destdir="${builddir}" srcdir="${srcdir}" debug="true" includes="esalsa/**/*.java" />
 	</target>
 
 	<!-- Internal target - Builds the JAR file -->
@@ -42,13 +41,8 @@
 
 	<!-- remove all generated code -->
 	<target name="clean" description="Removes the ${distdir} directory">
-		<delete failonerror="false" dir="${builddir}" />
-		<delete failonerror="false" dir="${distdir}" />
-	</target>
-
-	<target name="distclean" depends="clean">
 		<delete failonerror="false" dir="./build-eclipse" />
-		<delete failonerror="false" file="${version}.zip" />
+		<delete failonerror="false" dir="${builddir}" />
+		<delete failonerror="false" dir="${distdir}/${jar}" />
 	</target>
-
 </project>

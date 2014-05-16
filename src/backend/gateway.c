@@ -2458,7 +2458,9 @@ int messaging_run_gateway(int rank, int size, int empi_size)
    start = current_time_micros();
    last = start;
 
+#ifdef SIMPLE_TIMING
    printf("GATEWAY %d.%d starting!\n", cluster_rank, gateway_rank);
+#endif // SIMPLE_TIMING
 
    while (done == 0) {
 
@@ -2484,6 +2486,7 @@ int messaging_run_gateway(int rank, int size, int empi_size)
          break;
       }
 
+#ifdef SIMPLE_TIMING
       current = current_time_micros();
 
       // Check if a second has passed
@@ -2491,6 +2494,7 @@ int messaging_run_gateway(int rank, int size, int empi_size)
          last = current;
          print_gateway_statistics(current-start);
       }
+#endif // SIMPLE_TIMING
    }
 
    // We need a barrier to ensure everybody (application and gateway nodes) is ready to finalize.
@@ -2505,11 +2509,14 @@ int messaging_run_gateway(int rank, int size, int empi_size)
    cleanup();
 
    // Print final statistics about the communcation with other gateways.
+
+#ifdef END_TIMING
    current = current_time_micros();
 
    print_gateway_statistics(current-start);
 
    printf("GATEWAY %d.%d finished after %ld usec\n", cluster_rank, gateway_rank, (current-start));
+#endif // END_TIMING
 
    error = PMPI_Finalize();
 

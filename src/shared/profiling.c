@@ -1,12 +1,5 @@
-// #include "flags.h"
-
 #include <stdio.h>
 #include <stdlib.h>
-
-// #include "mpi.h"
-
-//#include "generated_header.h"
-// #include "messaging.h"
 
 #include "logging.h"
 #include "profiling.h"

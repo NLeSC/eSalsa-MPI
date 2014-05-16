@@ -1,8 +1,8 @@
 #ifndef __FLAGS_H_
 #define __FLAGS_H_
 
-// These flags determine how much of the MPIbis library will be used.
-// Switch features off by commenting a define.
+// These flags can be use to configure eSalsa-MPI at compile time.
+// Switch features off by commenting a define, or changing its value.
 
 // Print every call ?
 // #define TRACE_CALLS
@@ -12,6 +12,15 @@
 
 // Profiling level 0 = no profiling, 1 = course grained, 2 = fine grained
 #define PROFILE_LEVEL 0
+
+// Used detailed message info in gateway nodes ? (NOTE: May be expensive!)
+// #define DETAILED_TIMING
+
+// Used simple message info in gateway nodes ? (NOTE: Cheap but chatty!)
+// #define SIMPLE_TIMING
+
+// Print message info when gateway nodes terminate ?
+// #define END_TIMING
 
 // These constants determine various maxima used in the EMPI library.
 
@@ -51,7 +60,7 @@
 // Maximum number of info object that can be created (at once, for each individual process).
 #define MAX_INFOS 64
 
-
-
+// Size of detailed timing buffers (in messages) in gateway nodes.
+#define DETAILED_TIMING_COUNT 8096
 
 #endif

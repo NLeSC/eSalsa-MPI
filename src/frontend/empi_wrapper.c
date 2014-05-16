@@ -667,7 +667,9 @@ int MPI_Init ( int *argc, char ***argv )
    }
 #endif // TRACE_ERRORS
 
+#if PROFILE_LEVEL > 0
    profile_init(statistic_names);
+#endif // PROFILE_LEVEL
 
    return error;
 }
