@@ -6,28 +6,53 @@ What is it?
 
 This project contains the wide area MPI used in the eSalsa project. 
 
-This code is __VERY__ experimental!!
+DISCLAIMER: This code is still experimental!! 
 
-This wide area MPI consists of two parts, an MPI wrapper (written in C), 
-and a Hub (written in Java). 
+The goal of eSalsa-MPI is to allow traditional MPI applications to 
+be run on a -combination- of multiple supercomputers or clusters, 
+without changing a single line of code of the application. 
 
-The MPI wrapper uses the MPI profiling interface to intercept calls to a 
-_real_ MPI implementation and change their behaviour. The Hub acts as a 
-(currently centralized) server that can be used to exchange data. 
+eSalsa-MPI is capable of merging several distict MPI jobs running 
+on different supercomputers and present it to the application a 
+a single set of MPI tasks. This way, the application "thinks" it 
+is running on a single supercomputers, while in reality it it 
+running on two or more. 
 
-The combination of the Hub and the MPI wrapper can be used to merge 
-several distinct MPI applications (possibly running on different sites 
-and using different MPI libraries) into one large application.
 
-To do this, each MPI process using the MPI wrapper creates a socket 
-connection to the Hub at startup. All MPI calls are then intercepted, 
-and the illusion of a single large MPI application is presented to the 
-MPI processes. 
+How does it work? 
+-----------------
 
-For each intercepted call a decision is made if the call can be handled 
-locally (for example, an MPI_Send to a different process in the same 
-cluster) or if the hub must be involved (for example an MPI_Send between 
-clusters or a collective operation that involves all processes). 
+eSalsa-MPI consists of three components, an MPI wrapper, gateways
+and a server. 
+
+The MPI wrapper implements (part of) the regular MPI interface. This 
+allows applications to be compiled against, and linked with, 
+eSalsa-MPI instead of a "normal" MPI implementation. This way, 
+all MPI calls performed by the application are intercepted
+by eSalsa-MPI. 
+
+However, eSalsa-MPI is -not- a complete MPI implementation. Instead, 
+most MPI calls are simple forwarded to a local MPI implementation
+by using the MPI profiling interface. Only MPI calls that require 
+wide area communication are handled differently. 
+
+The server acts as a central contact point that allows the distict 
+eSalsa-MPI jobs running on different supercomputers to locate each
+other. In addition, the server provides support for operations on 
+communicators and groups. For example, it is up to the server to 
+create an MPI_COMM_WORLD communicator that contains all tasks on all 
+particiating machines.
+
+It is the tasks of the gateways to forward (local) MPI messages over 
+the wide area links and vice versa. To do so, a gateway is connected
+to a peer gateway in a remote site via one or more TCP streams. Each 
+site may use multiple gateways.
+
+For each MPI call intercepted by eSalsa-MPI a decision is made if the 
+call can be handled locally (for example, an MPI_Send to a different 
+process in the same cluster) or if it must be forwarded to a local 
+gateway that will forward it to a remote site (for example an MPI_Send
+between clusters or a collective operation that involves all processes). 
 
 As mentioned above, this code is __VERY__ experimental. However, its has 
 already been used to run both the Parallel Ocean Program (POP) and the 
@@ -36,6 +61,33 @@ Community Earth System Model (CESM) in a multicluster setting.
 POP can be found at <http://climate.lanl.gov/Models/POP/>
 
 CESM can be found at <http://www2.cesm.ucar.edu/>
+
+
+How do I install eSalsa-MPI?
+----------------------------
+
+First of all make sure you have defined the EMPI_HOME environent variable. 
+For example: 
+
+  export EMPI_HOME=/home/jason/eSalsa-MPI
+
+Next, set the "CC" and "FC" variables in $EMPI_HOME/empi.config to refer 
+to the C and fortran compilers you which to use. Also set the "MPICC" 
+variable to refer to an mpi compiler (script) provided by the local 
+MPI you wish to use. 
+
+Next, build eSalsa-MPI like this:
+
+  cd $EMPI_HOME
+  make
+
+
+How do I run eSalsa-MPI?
+------------------------
+
+See the "examples/README.md" file for an example on how to use eSalsa-MPI 
+in an application.
+
 
 What is the eSalsa Project?
 ---------------------------
