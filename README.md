@@ -10,7 +10,7 @@ DISCLAIMER: This code is still experimental!!
 
 The goal of eSalsa-MPI is to allow traditional MPI applications to 
 be run on a -combination- of multiple supercomputers or clusters, 
-without changing a single line of code of the application. 
+without changing a single line of code in the application. 
 
 eSalsa-MPI is capable of merging several distict MPI jobs running 
 on different supercomputers and present it to the application a 
