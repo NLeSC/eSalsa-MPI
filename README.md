@@ -56,7 +56,7 @@ process in the same cluster) or if it must be forwarded to a local
 gateway that will forward it to a remote site (for example an MPI_Send
 between clusters or a collective operation that involves all processes). 
 
-As mentioned above, this code is __VERY__ experimental. However, its has 
+As mentioned above, this code is still experimental. However, its has 
 already been used to run both the Parallel Ocean Program (POP) and the 
 Community Earth System Model (CESM) in a multicluster setting.  
  
