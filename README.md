@@ -25,6 +25,8 @@ How does it work?
 eSalsa-MPI consists of three components, an MPI wrapper, gateways
 and a server. 
 
+![example](doc/images/eSalsaMPI-setup.png "Example eSalsa-MPI setup")
+
 The MPI wrapper implements (part of) the regular MPI interface. This 
 allows applications to be compiled against, and linked with, 
 eSalsa-MPI instead of a "normal" MPI implementation. This way, 
@@ -116,3 +118,14 @@ web site at:
 
 <https://github.com/NLeSC/eSalsa-MPI>
 
+
+Copyrights & Disclaimers
+------------------------
+
+Xenon is copyrighted by the Netherlands eScience Center and 
+releases under the Apache License, Version 2.0.
+
+See <http://www.esciencecenter.nl> for more information on the 
+Netherlands eScience Center.
+
+See the "LICENSE" file for more information. 
