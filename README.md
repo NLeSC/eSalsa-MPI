@@ -15,7 +15,7 @@ without changing a single line of code in the application.
 eSalsa-MPI is capable of merging several distict MPI jobs running 
 on different supercomputers and present it to the application a 
 a single set of MPI tasks. This way, the application "thinks" it 
-is running on a single supercomputers, while in reality it it 
+is running on a single supercomputer, while in reality it it 
 running on two or more. 
 
 
