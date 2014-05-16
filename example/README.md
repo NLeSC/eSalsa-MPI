@@ -86,14 +86,14 @@ In this example the "location1.config" looks like this:
 
     location1 192.168.0.5 6677
 
-and the "location-ocn.config" looks like this: 
+and the "location2.config" looks like this: 
 
     location2 192.168.0.5 6677
 
-Note that the <name> in each of these config files should match 
+Note that the "name" in each of these config files should match 
 one of the names defined in the "server.config" file.
 
-The "<server address> <server port>" should contain the IP address 
+The "server address server port" should contain the IP address 
 and port number at which the server can be reached. 
 
 
