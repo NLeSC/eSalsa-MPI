@@ -4,9 +4,9 @@ Example eSalsa-MPI configuration.
 This directory contains an example configuration for eSalsa MPI.
 This configuration consists of (at least) three files: 
 
-   server.config
-   location1.config
-   location2.config
+- server.config
+- location1.config
+- location2.config
 
 The "server.config" file describes the server setup, the number
 of locations used in an experiment, and the configuration used 
@@ -32,16 +32,16 @@ and a single TCP stream.
 
 The resulting "server.config" file looks like this:
 
-  # Name of this experiment
-  Example 1
-  # Port at which the server should listnen. 
-  6677
-  # Number of locations used in this experiment
-  2
-  # Number of gateways used per location
-  1
-  # Number of streams used to connect gateways 
-  1
+     # Name of this experiment
+     Example 1
+     # Port at which the server should listnen. 
+     6677
+     # Number of locations used in this experiment
+     2
+     # Number of gateways used per location
+     1
+     # Number of streams used to connect gateways 
+     1
 
 Next, the "server.config" file contains a configuration for each
 individual location. This configuration describes the number of 
@@ -50,28 +50,28 @@ used by the gateways. Only the start of the port range needs to
 be specified. On port will be added for each TCP stream on each 
 gateway. Therefore the entire port range is:
 
-  N ... N + (gateways * streams_per_gateway)
+     N ... N + (gateways * streams_per_gateway)
 
 In this example only one port will be needed. The rest of the 
 "server.config" file looks like this:
 
-  # Name of the first location
-  location1
-  # Number of application tasks
-  1
-  # Start of TCP port range
-  12000
-  # Network interface to use on the gateways
-  192.168.0.0/24
+     # Name of the first location
+     location1
+     # Number of application tasks
+     1
+     # Start of TCP port range
+     12000
+     # Network interface to use on the gateways
+     192.168.0.0/24
 
-  # Name of second location
-  location2
-  # Number of application tasks.
-  2
-  # Start of port range.
-  14000
-  # Network interface to use on the gateways
-  192.168.0.0/24
+     # Name of second location
+     location2
+     # Number of application tasks.
+     2
+     # Start of port range.
+     14000
+     # Network interface to use on the gateways
+     192.168.0.0/24
 
 In addition to the "server.config" file, two separate config 
 files are needed for each location. These config files are read
@@ -80,15 +80,15 @@ and identify itself.
 
 These config files contain single line:
 
-  <name> <server address> <server port>
+    <name> <server address> <server port>
 
 In this example the "location1.config" looks like this: 
 
-  location1 192.168.0.5 6677
+    location1 192.168.0.5 6677
 
 and the "location-ocn.config" looks like this: 
 
-  location2 192.168.0.5 6677
+    location2 192.168.0.5 6677
 
 Note that the <name> in each of these config files should match 
 one of the names defined in the "server.config" file.
@@ -109,61 +109,63 @@ To start the eSalsa-MPI server, make sure the EMPI_HOME variable
 set and pointing to your eSalsa-MPI application. Then start the 
 eSalsa-MPI server. For example:
 
-   export EMPI_HOME=/home/jason/eSalsa-MPI
-   cd $EMPI_HOME
-   ./scripts/empi-server.sh ./example/server.config
+     export EMPI_HOME=/home/jason/eSalsa-MPI
+     cd $EMPI_HOME
+     ./scripts/empi-server.sh ./example/server.config
 
 The server should now start and print something like this:
 
-0 : Logging started
-5 : Starting eSalsa MPI server for experiment "Example 1"
-5 :    Clusters                 : 2
-5 :    Gateways/clusters        : 1
-5 :    Application processes    : 3
-5 :    Total processes          : 5
-5 :    Parallel streams         : 1
-5 :    Server listening on port : 6677
-5 :    --------------------------
-5 :    Cluster 0 name           : "location1"
-5 :       Application processes : 1
-5 :       Port range in use     : 12000 ... 12001
-5 :       Network to use        : 192.168.0.0/255.255.255.0
-5 :    --------------------------
-5 :    Cluster 1 name           : "location2"
-5 :       Application processes : 2
-5 :       Port range in use     : 14000 ... 14001
-5 :       Network to use        : 192.168.0.0/255.255.255.0
-5 : 
-6 : Waiting for 2 clusters to connect...
+     0 : Logging started
+     5 : Starting eSalsa MPI server for experiment "Example 1"
+     5 :    Clusters                 : 2
+     5 :    Gateways/clusters        : 1
+     5 :    Application processes    : 3
+     5 :    Total processes          : 5
+     5 :    Parallel streams         : 1
+     5 :    Server listening on port : 6677
+     5 :    --------------------------
+     5 :    Cluster 0 name           : "location1"
+     5 :       Application processes : 1
+     5 :       Port range in use     : 12000 ... 12001
+     5 :       Network to use        : 192.168.0.0/255.255.255.0
+     5 :    --------------------------
+     5 :    Cluster 1 name           : "location2"
+     5 :       Application processes : 2
+     5 :       Port range in use     : 14000 ... 14001
+     5 :       Network to use        : 192.168.0.0/255.255.255.0
+     5 : 
+     6 : Waiting for 2 clusters to connect...
 
 Next, start the test application as two separate MPI jobs. For each 
 MPI job you must specify which eSalsa-MPI location config file to use.
 For example: 
 
-   cd $EMPI_HOME
-   EMPI_CONFIG=$EMPI_HOME/example/location1.config mpirun -np 2 ./test/test_init.exe 
+     cd $EMPI_HOME
+     EMPI_CONFIG=$EMPI_HOME/example/location1.config mpirun -np 2 ./test/test_init.exe 
    
 and 
 
-   cd $EMPI_HOME
-   EMPI_CONFIG=$EMPI_HOME/example/location2.config mpirun -np 3 ./test/test_init.exe 
+     cd $EMPI_HOME
+     EMPI_CONFIG=$EMPI_HOME/example/location2.config mpirun -np 3 ./test/test_init.exe 
 
 Note that the EMPI_CONFIG variable is set to a different location config
 file in each example. In addition, each "mpirun" command must start 
 
-   (application tasks + gateway tasks) 
+    (application tasks + gateway tasks) 
 
 MPI tasks in each location. In the example, "location1" needs 2 tasks, and "location2" 
 needs 3 tasks. 
 
 It the application starts correctly, it will print something like this for "location1":
 
-  Process 0 of 3
+    Process 0 of 3
 
 and 
 
-  Process 1 of 3
-  Process 2 of 3
+    Process 1 of 3
+    Process 2 of 3
 
 for "location2". This shows that eSalsa-MPI has combined the two MPI jobs, 
 and presents it as a single 3 task job to the application.
+
+TO BE CONTINUED
