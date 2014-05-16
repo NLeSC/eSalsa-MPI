@@ -23,25 +23,25 @@ How does it work?
 -----------------
 
 eSalsa-MPI consists of three components, an MPI wrapper, gateways
-and a server. 
+and a server, as shown in the image below:
 
 ![example](doc/images/eSalsaMPI-setup.png "Example eSalsa-MPI setup")
 
-The MPI wrapper implements (part of) the regular MPI interface. This 
-allows applications to be compiled against, and linked with, 
+The eMPI wrapper implements (part of) the regular MPI interface.
+This allows applications to be compiled against, and linked with, 
 eSalsa-MPI instead of a "normal" MPI implementation. This way, 
 all MPI calls performed by the application are intercepted
 by eSalsa-MPI. 
 
 However, eSalsa-MPI is -not- a complete MPI implementation. Instead, 
-most MPI calls are simple forwarded to a local MPI implementation
-by using the MPI profiling interface. Only MPI calls that require 
-wide area communication are handled differently. 
+most MPI calls are simple forwarded to a local MPI implementation 
+by using the MPI profiling interface. Only MPI calls that
+require wide area communication are handled differently. 
 
-The server acts as a central contact point that allows the distict 
-eSalsa-MPI jobs running on different supercomputers to locate each
-other. In addition, the server provides support for operations on 
-communicators and groups. For example, it is up to the server to 
+The server acts as a central contact point that allows
+the distict eSalsa-MPI jobs running on different supercomputers to
+locate each other. In addition, the server provides support for operations
+on communicators and groups. For example, it is up to the server to 
 create an MPI_COMM_WORLD communicator that contains all tasks on all 
 particiating machines.
 
