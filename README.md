@@ -23,7 +23,7 @@ How does it work?
 -----------------
 
 eSalsa-MPI consists of three components, an MPI wrapper, gateways
-and a server, as shown in the image below:
+and a server, as shown in the example below:
 
 ![example](doc/images/eSalsaMPI-setup.png "Example eSalsa-MPI setup")
 
