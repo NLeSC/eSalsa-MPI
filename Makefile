@@ -1,4 +1,4 @@
-DIRS = src/shared src/frontend src/backend test
+DIRS = src/shared src/frontend src/backend src/test
 
 all: check-env
 	for d in $(DIRS); do (cd $$d; $(MAKE)); done
