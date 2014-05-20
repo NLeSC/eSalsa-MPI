@@ -91,8 +91,8 @@ Next, build eSalsa-MPI like this:
 How do I run eSalsa-MPI?
 ------------------------
 
-See the [example/README.md](https://github.com/NLeSC/eSalsa-MPI/tree/develop/example/README.md) 
-file for an example on how to use eSalsa-MPI in an application.
+See [example](https://github.com/NLeSC/eSalsa-MPI/tree/develop/example) 
+for an example on how to use eSalsa-MPI in an application.
 
 
 What is the eSalsa Project?
