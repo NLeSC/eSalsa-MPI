@@ -1,12 +1,49 @@
 Example eSalsa-MPI configuration.
 ---------------------------------
 
-This directory contains an example configuration for eSalsa MPI.
-This configuration consists of (at least) three files: 
+This directory contains an example for eSalsa MPI consisting of:
 
-- server.config
-- location1.config
-- location2.config
+- [example.c](https://github.com/NLeSC/eSalsa-MPI/tree/develop/example/example.c): an example MPI application.
+- [server.config](https://github.com/NLeSC/eSalsa-MPI/tree/develop/example/server.config): a server configuration file.
+- [location1.config](https://github.com/NLeSC/eSalsa-MPI/tree/develop/example/location1.config): a confuration file for location 1.
+- [location2.config](https://github.com/NLeSC/eSalsa-MPI/tree/develop/example/location2.config): a configuration for location 2.
+
+The example application is very simple; It initializes MPI, prints its rank and the size of MPI_COMM_WORLD, 
+and then exists:
+
+     #include <stdio.h>
+     #include "mpi.h"
+
+     int main(int argc, char *argv[])
+     {
+        int rank, size, error;
+
+        error = MPI_Init(&argc, &argv);
+
+        if (error != MPI_SUCCESS) {
+           fprintf(stderr, "Init failed! %d\n", error);
+        }
+
+        MPI_Comm_size(MPI_COMM_WORLD, &size);
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+ 
+        fprintf(stderr, "Process %d of %d\n", rank, size);
+
+        MPI_Finalize();
+
+        return 0;
+     }
+
+
+To compile this example use the `empicc` script. Make sure that the 
+`EMPI_HOME` variable set and pointing to your eSalsa-MPI directory. 
+Then run the following command:
+
+     $EMPI_HOME/scripts/empicc example.c -o example
+
+When the example is compiled, an eSalsa-MPI configuration must be created to run it. 
+
+### Server configuration
 
 The "server.config" file describes the server setup, the number
 of locations used in an experiment, and the configuration used 
@@ -73,6 +110,9 @@ In this example only one port will be needed. The rest of the
      # Network interface to use on the gateways
      192.168.0.0/24
 
+
+### Location configurations
+
 In addition to the "server.config" file, two separate config 
 files are needed for each location. These config files are read
 by the gateways in each location, and used to contact the server 
@@ -97,21 +137,12 @@ The "server address server port" should contain the IP address
 and port number at which the server can be reached. 
 
 
-Example run:
-------------
+### Running the example:
 
-We will now show how to run an example application using the 
-configuration shown above. As a simple test application we will 
-use the "test_init" test that can be found in "test" directory 
-of eSalsa-MPI. 
+To run the example application using the configuration shown above you 
+first need to start the eSalsa-MPI server.
 
-To start the eSalsa-MPI server, make sure the EMPI_HOME variable 
-set and pointing to your eSalsa-MPI application. Then start the 
-eSalsa-MPI server. For example:
-
-     export EMPI_HOME=/home/jason/eSalsa-MPI
-     cd $EMPI_HOME
-     ./scripts/empi-server.sh ./example/server.config
+     $EMPI_HOME/scripts/empi-server.sh server.config
 
 The server should now start and print something like this:
 
@@ -140,15 +171,13 @@ Next, start the test application as two separate MPI jobs. For each
 MPI job you must specify which eSalsa-MPI location config file to use.
 For example: 
 
-     cd $EMPI_HOME
-     EMPI_CONFIG=$EMPI_HOME/example/location1.config mpirun -np 2 ./test/test_init.exe 
+     EMPI_CONFIG=location1.config mpirun -np 2 example
    
 and 
 
-     cd $EMPI_HOME
-     EMPI_CONFIG=$EMPI_HOME/example/location2.config mpirun -np 3 ./test/test_init.exe 
+     EMPI_CONFIG=location2.config mpirun -np 3 example
 
-Note that the EMPI_CONFIG variable is set to a different location config
+Note that the `EMPI_CONFIG` variable is set to a different location config
 file in each example. In addition, each "mpirun" command must start 
 
     (application tasks + gateway tasks) 
@@ -168,4 +197,3 @@ and
 for "location2". This shows that eSalsa-MPI has combined the two MPI jobs, 
 and presents it as a single 3 task job to the application.
 
-TO BE CONTINUED

@@ -1,3 +1,3 @@
 #!/bin/bash
 source $EMPI_HOME/empi.config
-$CC -I$EMPI_HOME/include $@
+$CC -I$EMPI_HOME/include $@ -L$EMPI_HOME/lib -lempi-frontend -lempi-shared -lempi-backend -lmpi
