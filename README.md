@@ -73,10 +73,14 @@ For example:
 
      export EMPI_HOME=/home/jason/eSalsa-MPI
 
-Next, set the "CC" and "FC" variables in $EMPI_HOME/empi.config to refer 
-to the C and fortran compilers you which to use. Also set the "MPICC" 
+Next, set the `CC` and `FC` variables in `$EMPI_HOME/empi.config` to refer 
+to the C and fortran compilers you which to use. Also set the `MPICC`
 variable to refer to an mpi compiler (script) provided by the local 
-MPI you wish to use. 
+MPI you wish to use. For example:
+
+     CC=gcc
+     FC=gfortran
+     MPICC=mpicc
 
 Next, build eSalsa-MPI like this:
 
@@ -87,8 +91,8 @@ Next, build eSalsa-MPI like this:
 How do I run eSalsa-MPI?
 ------------------------
 
-See the "examples/README.md" file for an example on how to use eSalsa-MPI 
-in an application.
+See the [examples/README.md](https://github.com/NLeSC/eSalsa-MPI/tree/develop/examples/README.md) 
+file for an example on how to use eSalsa-MPI in an application.
 
 
 What is the eSalsa Project?
