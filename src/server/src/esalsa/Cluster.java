@@ -501,10 +501,7 @@ public class Cluster {
             return false;
         }
 
-        //        Logging.println(pidAsString + " Forwarding message from " + m.source);
-
-        Logging.println("Sending message to Cluster " + name + " with opcode " + m.opcode);
-        
+	//        Logging.println("Sending message to Cluster " + name + " with opcode " + m.opcode);
         m.write(out);
         out.flush();
         messagesSent++;        
@@ -517,56 +514,55 @@ public class Cluster {
 
         CommunicatorRequest req = null;
 
-        Logging.println("Cluster " + name + " received opcode " + opcode);
-        
+//        Logging.println("Cluster " + name + " received opcode " + opcode);
+
         switch (opcode) {
 
         case Protocol.OPCODE_SPLIT:
-            Logging.println("Cluster " + name + " - Reading COMM message.");
+//            Logging.println("Cluster " + name + " - Reading COMM message.");
             req = new SplitRequest(in);
             break;
 
         case Protocol.OPCODE_GROUP:
-            Logging.println("Cluster " + name +" - Reading GROUP message.");
+//            Logging.println("Cluster " + name +" - Reading GROUP message.");
             req = new GroupRequest(in);
             break;
 
         case Protocol.OPCODE_DUP:
-            Logging.println("Cluster " + name + " - Reading DUP message.");
+//            Logging.println("Cluster " + name + " - Reading DUP message.");
             req = new DupRequest(in);
             break;
 
         case Protocol.OPCODE_FREE:
-            Logging.println("Cluster " + name + " - Reading FREE message.");
+//            Logging.println("Cluster " + name + " - Reading FREE message.");
             req = new FreeRequest(in);
             break;
 
         case Protocol.OPCODE_FINALIZE:
-            Logging.println("Cluster " + name + " - Reading FINALIZE message.");
+//            Logging.println("Cluster " + name + " - Reading FINALIZE message.");
             req = new FinalizeRequest(in);
             break;
-            
         case Protocol.OPCODE_CLOSE_LINK:
-            Logging.println("Cluster " + name + " - Closing link.");
+//            Logging.println("Cluster " + name + " - Closing link.");
             done();           
             return false;
 
         default:
             Logging.println("Cluster " + name + " sent illegal opcode " + opcode);
-            throw new Exception("Illegal opcode " + opcode + " snet by cluster " + name);
+            throw new Exception("Illegal opcode " + opcode + " sent by cluster " + name);
         }
 
         messagesReceived++;
 
-        Logging.println("Cluster " + name + " - Deliver request!");
-        
+//        Logging.println("Cluster " + name + " - Deliver request!");
+
         owner.deliverRequest(req);
         return true;
     }
 
 
     /**
-     * 
+     *
      */
     public void startMessaging() {
         // Start the sending and receiving threads for this cluster.
@@ -581,108 +577,57 @@ public class Cluster {
         return basePort;
     }
 
-    
     void closeSocket() {
-        
         // Wait until all clusters are done!
         owner.allClustersDone();
-        
-        try { 
+
+        try {
             out.writeInt(Protocol.OPCODE_CLOSE_LINK);
             out.flush();
         } catch (Exception e) {
             Logging.error("Failed write OPCODE_FINALIZE_REPLY to cluster " + name);
         }
-                
-        try { 
+
+        try {
             in.close();
-        } catch (Exception e) { 
+        } catch (Exception e) {
             Logging.error("Failed to close socket input from cluster " + name);
         }
-        
-        try { 
+
+        try {
             out.close();
-        } catch (Exception e) { 
+        } catch (Exception e) {
             Logging.error("Failed to close socket output to cluster " + name);
         }
-        
-        try { 
+
+        try {
             socket.close();
-        } catch (Exception e) { 
+        } catch (Exception e) {
             Logging.error("Failed to close socket connection to cluster " + name);
         }
     }
 
     private void printNetwork(byte [] network, StringBuilder target) {
 
-        for (int i=0;i<network.length;i++) { 
+        for (int i=0;i<network.length;i++) {
             target.append(((int) network[i]) & 0xff);
-            
+
             if (i != network.length-1) {
                 target.append(".");
             }
         }
     }
-        
-    
+
     /**
      * @return
      */
     public String printNetwork() {
-        
+
         StringBuilder result = new StringBuilder();
-        
+
         printNetwork(network, result);
         result.append("/");
         printNetwork(netmask, result);
-        
         return result.toString();
     }
-
-    /*    
-
-
-
-
-
-
-
-    void getConnections(List<Connection> out) {
-        for (Connection c : connections) {
-            out.add(c);
-        }
-    }
-
-    synchronized void addConnection(int rank, int size, String name, Connection c) throws Exception {
-
-        if (rank < 0 || rank >= connections.length) {
-            throw new Exception("Illegal rank " + rank + " for cluster " + name
-                    + " of size " + localCount);
-        }
-
-        if (localCount != size) {
-            throw new Exception("Size of cluster does not match (" + size
-                    + " != " + localCount + ")");
-        }
-
-        if (!this.name.equals(name)) {
-            throw new Exception("Name of cluster does not match (" + name
-                    + " != " + this.name + ")");
-        }
-
-        if (connections[rank] != null) {
-            throw new Exception("Rank " + rank + " on cluster " + name
-                    + " already in use!");
-        }
-
-        connections[rank] = c;
-        connectionCount++;
-
-        Logging.println("Added connection " + rank + " to " + name);
-    }
-     */
-
-
-
-
 }

@@ -607,7 +607,7 @@ public class Communicator {
 
     public synchronized void deliverRequest(CommunicatorRequest req) {
 
-        System.out.println("Got request " + req.opcode + " " + req.communicator + " " + req.rank);
+//        System.out.println("Got request " + req.opcode + " " + req.communicator + " " + req.rank);
         
         // First check the message is legal
         if (req.rank < 0 || req.rank >= size) {
@@ -656,7 +656,7 @@ public class Communicator {
         sb.append(" commOut: " + commReplies + " / " + commReplyBytes);
         return sb.toString();
     }
-    
+
     public String printInfo() {
         return "COMM(" + communicator + ") = " + printPIDs(members);
     }
