@@ -1,4 +1,5 @@
 #!/bin/bash
 source $EMPI_HOME/empi.config
-$FC -I$EMPI_HOME/include $@ -L$EMPI_HOME/lib -lempi-frontend -lempi-shared -lempi-backend -L$MPI_LIBS -lmpi
+$FC -I$EMPI_HOME/include $@
+# -L$EMPI_HOME/lib -lempi-frontend -lempi-shared -lempi-backend -L$MPI_LIBS -lmpi
 
