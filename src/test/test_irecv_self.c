@@ -26,12 +26,12 @@ int main(int argc, char *argv[])
        statusses = malloc(size * sizeof(MPI_Status));
 
        if (requests == 0) {
-          fprintf(stderr, "Failed to allocate requests! %d\n", error);
+          fprintf(stderr, "Failed to allocate requests!");
           return 1;
        }
 
        if (statusses == 0) {
-          fprintf(stderr, "Failed to allocate statusses! %d\n", error);
+          fprintf(stderr, "Failed to allocate statusses!");
           return 1;
        }
 
