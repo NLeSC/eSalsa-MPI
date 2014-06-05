@@ -82,6 +82,18 @@ MPI you wish to use. For example:
      FC=gfortran
      MPICC=mpicc
 
+In addition, you will need to set the `MPI_HOME` variable to point to 
+the location of the MPI installation you wish to use. For example:
+
+     MPI_HOME=/usr/lib/openmpi
+
+Also, the `MPI_INCLUDE`, `MPI_LIBS` and `MPI_LIB` variables may need to
+be changed (although their default setting is often correct). 
+
+     MPI_INCLUDE=$MPI_HOME/include
+     MPI_LIBS=$MPI_HOME/lib
+     MPI_LIB=mpi
+
 Next, build eSalsa-MPI like this:
 
      cd $EMPI_HOME
