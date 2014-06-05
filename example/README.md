@@ -37,9 +37,10 @@ and then exists:
 
 To compile this example use the `empicc` script. Make sure that the 
 `EMPI_HOME` variable set and pointing to your eSalsa-MPI directory. 
-Then run the following command:
+Then run the following commands:
 
-     $EMPI_HOME/scripts/empicc example.c -o example
+     $EMPI_HOME/scripts/empicc -c example.c -o example.o
+     $EMPI_HOME/scripts/empild example.o -o example
 
 When the example is compiled, an eSalsa-MPI configuration must be created to run it. 
 
