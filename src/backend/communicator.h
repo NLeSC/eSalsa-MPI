@@ -6,7 +6,7 @@
 #include "types.h"
 #include "stdint.h"
 #include "mpi.h"
-#include "message_queue.h"
+#include "data_message_queue.h"
 
 #define COMM_FLAG_LOCAL  (1 << 0)
 #define COMM_FLAG_REMOTE (1 << 1)
@@ -68,7 +68,7 @@ struct s_communicator {
    /* The local rank for each of the global members. REPLACE WITH GET_PROCESS_RANK(members[i]). */
    uint32_t *local_ranks;
 
-   data_message_queue queue;
+   data_message_queue *queue;
 
    /* Head of the message queue. */
 //   message_buffer *queue_head;

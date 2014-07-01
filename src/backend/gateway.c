@@ -33,18 +33,26 @@
 #include "logging.h"
 #include "mpi.h"
 #include "opcodes.h"
+#include "message_queue.h"
+
+#include "linked_queue.h"
+
+//#define DETAILED_MESSAGE_INFO 1
+
+#define MAX_POLL_MISS_COUNT (100)
+
+#define MAX_MESSAGE_SIZE (1*1024*1024)
+
+#define MIN_INTERESTING_BUFFER_SIZE (512*1024)
+
+#define MAX_SINGLE_SOCKET_RECEIVE (8*1024*1024)
+#define MAX_SINGLE_SOCKET_SEND    (8*1024*1024)
 
 #define MAX_LENGTH_CLUSTER_NAME 128
 #define MAX_STREAMS 16
-#define MAX_EVENTS 32
-#define MAX_MPI_RECEIVE_SEQUENCE 16
-#define MAX_SOCKETS_RECEIVE_SEQUENCE 1
-#define MAX_SOCKETS_READ_SEQUENCE 2
-#define MAX_PENDING_DATA_SIZE (1024L*1024L*1024L)
-#define MAX_PENDING_DATA_MSG  (128)
 
-#define RECEIVE_BUFFER_SIZE (2*1024*1024)
-#define SEND_BUFFER_SIZE (2*1024*1024)
+#define RECEIVE_BUFFER_SIZE (8*1024*1024)
+#define SEND_BUFFER_SIZE (8*1024*1024)
 
 #define STATE_RW (1)
 #define STATE_RO (0)
@@ -84,7 +92,13 @@ timing read_timings[DETAILED_TIMING_COUNT];
 int read_timing_count;
 #endif // DETAILED_TIMING
 
-
+typedef struct {
+   uint32_t size;
+   uint32_t start;
+   uint32_t end;
+   uint32_t messages;
+   unsigned char data[];
+} message_buffer;
 
 // A gateway request message whcih is used to inform the server
 // of the contact information of a gateway.
@@ -100,28 +114,23 @@ typedef struct {
 // A type to store socket information
 typedef struct {
    int socketfd;
-   int state;
    int type;
-
-   generic_message *in;
-   uint32_t inpos;
-   uint32_t incount;
    uint64_t in_bytes;
    uint64_t in_messages;
+
 #ifdef DETAILED_TIMING
    uint64_t in_starttime;
 #endif // DETAILED_TIMING
-   message_queue *in_queue;
 
-   generic_message *out;
-   uint32_t outpos;
-   uint32_t outcount;
    uint64_t out_bytes;
    uint64_t out_messages;
+
 #ifdef DETAILED_TIMING
    uint64_t out_starttime;
 #endif // DETAILED_TIMING
-   message_queue *out_queue;
+
+   message_buffer *socket_read_buffer;
+   message_buffer *socket_write_buffer;
 
 } socket_info;
 
@@ -136,13 +145,15 @@ typedef struct {
    gateway_address info;
    socket_info sockets[MAX_STREAMS];
    int stream_count;
-   message_queue out_queue;
+
+   message_buffer *mpi_receive_buffer;
+
 } gateway_connection;
 
 typedef struct s_mpi_message {
    MPI_Request r;
    struct s_mpi_message *next;
-   generic_message *message;
+   unsigned char data[];
 } mpi_message;
 
 // The name of this cluster (must be unique).
@@ -167,10 +178,15 @@ int gateway_rank;
 
 //static MPI_Comm mpi_comm_application_only;
 MPI_Comm mpi_comm_gateways_only;
+
 extern MPI_Comm mpi_comm_gateway_and_application;
 
+//extern MPI_Comm mpi_comm_gateway_and_application_server;
+//extern MPI_Comm mpi_comm_gateway_and_application_optimistic;
+//extern MPI_Comm mpi_comm_gateway_and_application_rendezvous;
+
 // The file descriptor used to epoll the gateway connections.
-static int epollfd;
+// static int epollfd;
 
 // The filedescriptor of the socket connected to the 'server'.
 static int serverfd = 0;
@@ -183,12 +199,8 @@ static unsigned short server_port;
 // Socket info containing information on the address of the server.
 static socket_info server_info;
 
-static message_queue server_queue_out;
-
-static message_queue server_queue_in;
-
-// Message queue for incoming messages. They are parked here until they can be forwarded.
-static message_queue incoming_queue;
+// The current message buffer used to receive messages for the server.
+static message_buffer *server_mpi_receive_buffer = NULL;
 
 // Queue of pending MPI_Isends.
 static mpi_message *mpi_messages;
@@ -199,6 +211,39 @@ extern uint32_t my_pid;
 static uint64_t pending_data_messages;
 static uint64_t pending_data_size;
 
+// Timing offset.
+uint64_t gateway_start_time;
+
+static message_buffer *create_message_buffer()
+{
+   message_buffer *tmp = malloc(sizeof(message_buffer) + 2*MAX_MESSAGE_SIZE);
+
+   tmp->size = 2*MAX_MESSAGE_SIZE;
+   tmp->start = 0;
+   tmp->end = 0;
+   tmp->messages = 0;
+
+   return tmp;
+}
+
+static mpi_message *create_mpi_message(generic_message *source, int len)
+{
+   mpi_message *tmp;
+
+   if (len  < 0) {
+      return NULL;
+   }
+
+   tmp = malloc(sizeof(mpi_message) + len);
+
+   if (tmp == NULL) {
+      return NULL;
+   }
+
+   tmp->next = NULL;
+   memcpy(&(tmp->data[0]), source, len);
+   return tmp;
+}
 
 static uint64_t current_time_micros()
 {
@@ -385,24 +430,19 @@ static int get_server_address()
    return CONNECT_OK;
 }
 
-
-static void init_socket_info(socket_info *info, int socketfd, message_queue *in_queue, message_queue *out_queue, int type)
+static void init_socket_info(socket_info *info, int socketfd, int type)
 {
    info->socketfd = socketfd;
-   info->in_queue = in_queue;
-   info->out_queue = out_queue;
    info->type = type;
-   info->state = STATE_RO;
-   info->in = NULL;
-   info->out = NULL;
-   info->inpos = 0;
-   info->outpos = 0;
-   info->incount = 0;
-   info->outcount = 0;
+
    info->in_bytes = 0;
    info->out_bytes = 0;
+
    info->in_messages = 0;
    info->out_messages = 0;
+
+   info->socket_read_buffer = create_message_buffer();
+   info->socket_write_buffer = create_message_buffer();
 }
 
 /*****************************************************************************/
@@ -449,66 +489,6 @@ static int set_socket_blocking(int socketfd)
 
    if (error == -1) {
       ERROR(1, "Failed to set socket to BLOCKING mode! (error=%d)", errno);
-      return EMPI_ERR_INTERN;
-   }
-
-   return EMPI_SUCCESS;
-}
-
-static int add_socket_to_epoll(int socketfd, void *data)
-{
-   int error;
-   struct epoll_event event;
-
-   DEBUG(1, "Adding socket %d to epoll %d", socketfd, epollfd);
-
-   event.data.ptr = data;
-   event.events = EPOLLIN;
-
-   error = epoll_ctl (epollfd, EPOLL_CTL_ADD, socketfd, &event);
-
-   if (error == -1) {
-      ERROR(1, "Failed to add socket to epoll (error=%d %s)", errno, strerror(errno));
-      return EMPI_ERR_INTERN;
-   }
-
-   return EMPI_SUCCESS;
-}
-
-static int set_socket_in_epoll_to_rw(int socketfd, void *data)
-{
-   int error;
-   struct epoll_event event;
-
-   DEBUG(1, "Setting socket %d to RW in epoll %d", socketfd, epollfd);
-
-   event.data.ptr = data;
-   event.events = EPOLLIN | EPOLLOUT;
-
-   error = epoll_ctl (epollfd, EPOLL_CTL_MOD, socketfd, &event);
-
-   if (error != 0) {
-      ERROR(1, "Failed to set socket to RW (%d %d error=%d %s )", epollfd, socketfd, errno, strerror(errno));
-      return EMPI_ERR_INTERN;
-   }
-
-   return EMPI_SUCCESS;
-}
-
-static int set_socket_in_epoll_to_ro(int socketfd, void *data)
-{
-   int error;
-   struct epoll_event event;
-
-   DEBUG(1, "Setting socket %d to RO in epoll %d", socketfd, epollfd);
-
-   event.data.ptr = data;
-   event.events = EPOLLIN;
-
-   error = epoll_ctl (epollfd, EPOLL_CTL_MOD, socketfd, &event);
-
-   if (error != 0) {
-      ERROR(1, "Failed to set socket to RO (error=%d %d)", error, strerror(errno));
       return EMPI_ERR_INTERN;
    }
 
@@ -1058,7 +1038,7 @@ static int connect_to_gateways(int crank, int local_port)
          remoteIndex = i*gateway_count + gateway_rank;
 
          gateway_connections[i].stream_count = gateway_addresses[remoteIndex].streams;
-         message_queue_init(&(gateway_connections[i].out_queue));
+         gateway_connections[i].mpi_receive_buffer = create_message_buffer();
 
          for (s=0;s<gateway_addresses[remoteIndex].streams;s++) {
 
@@ -1072,7 +1052,7 @@ static int connect_to_gateways(int crank, int local_port)
                return status;
             }
 
-            init_socket_info(&(gateway_connections[i].sockets[s]), socket, &incoming_queue, &(gateway_connections[i].out_queue), TYPE_DATA);
+            init_socket_info(&(gateway_connections[i].sockets[s]), socket, TYPE_DATA);
 
             INFO(1, "Created connection to remote gateway stream %d.%d.%d socket = %d!", i, gateway_rank, s, socket);
          }
@@ -1088,7 +1068,7 @@ static int connect_to_gateways(int crank, int local_port)
      remoteIndex = crank*gateway_count + gateway_rank;
 
      gateway_connections[crank].stream_count = gateway_addresses[remoteIndex].streams;
-     message_queue_init(&(gateway_connections[crank].out_queue));
+     gateway_connections[crank].mpi_receive_buffer = create_message_buffer();
 
      for (s=0;s<gateway_addresses[remoteIndex].streams;s++) {
 
@@ -1102,7 +1082,7 @@ static int connect_to_gateways(int crank, int local_port)
            return status;
         }
 
-        init_socket_info(&(gateway_connections[crank].sockets[s]), socket, &incoming_queue, &(gateway_connections[crank].out_queue), TYPE_DATA);
+        init_socket_info(&(gateway_connections[crank].sockets[s]), socket, TYPE_DATA);
 
         INFO(1, "Accepted connection from remote gateway %d.%d.%d socket = %d!", crank, gateway_rank, s, socket);
      }
@@ -1119,7 +1099,7 @@ static int connect_to_gateways(int crank, int local_port)
    return CONNECT_OK;
 }
 
-static int add_gateway_to_epoll(int index)
+static int set_gateway_to_nonblocking(int index)
 {
    int i, status;
 
@@ -1135,13 +1115,6 @@ static int add_gateway_to_epoll(int index)
 
       if (status != EMPI_SUCCESS) {
          ERROR(1, "Failed to set socket to non-blocking mode!");
-         return status;
-      }
-
-      status = add_socket_to_epoll(gateway_connections[index].sockets[i].socketfd, &(gateway_connections[index].sockets[i]));
-
-      if (status != EMPI_SUCCESS) {
-         ERROR(1, "Failed to add socket to epoll set!");
          return status;
       }
    }
@@ -1175,7 +1148,7 @@ static int connect_gateways()
    }
 
    for (i=0;i<cluster_count;i++) {
-      status = add_gateway_to_epoll(i);
+      status = set_gateway_to_nonblocking(i);
 
       if (status != CONNECT_OK) {
          ERROR(1, "Failed to add gateway %d to epoll (error=%d)", i, status);
@@ -1225,12 +1198,8 @@ int master_gateway_init(int rank, int size, int *argc, char ***argv)
 
    INFO(1, "Initializing master gateway");
 
-   // Create an fd for polling. Not needed on non-gateway nodes, so on these nodes we close it later.
-//   epollfd = epoll_create1(0);
-
    // Create a queue for messages being send to or received from the server.
-   message_queue_init(&server_queue_out);
-   message_queue_init(&server_queue_in);
+   server_mpi_receive_buffer = create_message_buffer();
 
    // Read the cluster name and server location from a file.
    status = init_cluster_info(argc, argv);
@@ -1263,7 +1232,7 @@ int master_gateway_init(int rank, int size, int *argc, char ***argv)
       return EMPI_ERR_INTERN;
    }
 
-   init_socket_info(&server_info, serverfd, &server_queue_in, &server_queue_out, TYPE_SERVER);
+   init_socket_info(&server_info, serverfd, TYPE_SERVER);
 
    // Ask the server for information on the cluster count and number of gateways per cluster.
    status = handshake();
@@ -1308,16 +1277,14 @@ int generic_gateway_init(int rank, int size)
    // I am one of the gateways.
    INFO(1, "I am one of the gateways -- performing generic gateway init!");
 
+   gateway_start_time = current_time_micros();
+
+   mpi_messages = NULL;
+
 #ifdef DETAILED_TIMING
    write_timing_count = 0;
    read_timing_count = 0;
 #endif // DETAILED_TIMING
-
-   // Create an fd for polling.
-   epollfd = epoll_create1(0);
-
-   // Init the message queue.
-   message_queue_init(&incoming_queue);
 
    // Retrieve the local IPv4 addresses.
    status = get_local_ips(&ip4ads, &ip4count);
@@ -1451,7 +1418,6 @@ int generic_gateway_init(int rank, int size)
 
       // We are done talking to the server for now. Set the server socket to non-blocking mode for future messages.
       set_socket_non_blocking(server_info.socketfd);
-      add_socket_to_epoll(server_info.socketfd, &server_info);
    } else {
 
       INFO(1, "Receiving IP information on all gateways from gateway 0");
@@ -1507,187 +1473,7 @@ static void store_read_timings(uint64_t starttime, uint64_t endtime, uint64_t si
    read_timings[read_timing_count].size = size;
    read_timing_count++;
 }
-#endif // DETAILED_TIMING
 
-static int nonblock_read_message(socket_info *info, int *more)
-{
-   ssize_t tmp, count;
-   uint32_t len;
-
-   DEBUG(1, "Reading message from socket");
-
-   // Assume here that we return when we are out of data or encounter an error.
-   *more = 0;
-
-   if (info->in == NULL) {
-      DEBUG(1, "No message available yet -- will allocate!");
-      // Allocate an empty message and read that first.
-      info->in = malloc(sizeof(generic_message));
-      info->inpos = 0;
-      info->incount = sizeof(generic_message);
-#ifdef DETAILED_TIMING
-      info->in_starttime = current_time_micros();
-#endif // DETAILED_TIMING
-   }
-
-   count = info->inpos;
-
-   while (count < info->incount) {
-
-      DEBUG(1, "Reading message from socket %d %d %d", count, info->incount, info->incount - count);
-
-      tmp = read(info->socketfd, ((unsigned char *) info->in) + count, info->incount - count);
-
-      DEBUG(1, "Read message from socket %d %d %d", count, info->incount, tmp);
-
-      if (tmp == -1) {
-         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // Cannot read any more data. Socket is empty
-            info->inpos = (uint32_t) count;
-            return EMPI_SUCCESS;
-         } else {
-            ERROR(1, "Failed to read message from socket! (error=%d)", errno);
-            return EMPI_ERR_INTERN;
-         }
-      } else if (tmp == 0) {
-         ERROR(1, "Unexpected EOF on socket %d! count=%ld incount=%d", info->socketfd, count, info->incount);
-         return EMPI_ERR_INTERN;
-      }
-
-      count += tmp;
-   }
-
-   // We've either read the entire message, or just the entire header, depending on the size!
-
-   // Sanity check - should not happen!
-   if (count < sizeof(generic_message)) {
-      ERROR(1, "Read invalid message size %d!", count);
-      return EMPI_ERR_INTERN;
-   }
-
-    // In all subsequent cases we return when there may still be data on the stream.
-   *more = 1;
-
-   if (count > sizeof(generic_message)) {
-
-      DEBUG(1, "Read full message %d", count);
-
-#ifdef DETAILED_TIMING
-      store_read_timings(info->in_starttime, current_time_micros(), count);
-#endif // DETAILED_TIMING
-
-      // We've read the entire message, so queue it and return.
-      message_enqueue(info->in_queue, info->in);
-
-      info->in_bytes += count;
-      info->in_messages++;
-      info->in = NULL;
-      info->inpos = 0;
-      info->incount = 0;
-      return EMPI_SUCCESS;
-   }
-
-   // We've only read a header!
-   if (info->type == TYPE_SERVER) {
-      len = ntohl(info->in->header.length);
-   } else {
-      len = info->in->header.length;
-   }
-
-   if (len == sizeof(generic_message)) {
-
-      DEBUG(1, "Read SPECIAL message %d %d", len, count);
-
-      // The message only contains a header.
-      message_enqueue(info->in_queue, info->in);
-//      process_special_message(info->in, order);
-
-      info->in_bytes += count;
-      info->in_messages++;
-      info->in = NULL;
-      info->inpos = 0;
-      info->incount = sizeof(generic_message);
-      return EMPI_SUCCESS;
-   }
-
-   DEBUG(1, "Read PARTIAL message %d %d", count, len);
-
-   // Otherwise, we have to realloc the message, and read more data!
-   info->in = realloc(info->in, len);
-   info->inpos = count;
-   info->incount = len;
-
-   if (info->in == NULL) {
-      ERROR(1, "Failed to realloc message!");
-      *more = 0;
-      return EMPI_ERR_INTERN;
-   }
-
-   // Attempt to read the rest of the message before returning...
-   return nonblock_read_message(info, more);
-}
-
-static void ensure_state_ro(socket_info *info)
-{
-   if (info->state == STATE_RW) {
-      DEBUG(1, "Switching socket %d to RO", info->socketfd);
-      set_socket_in_epoll_to_ro(info->socketfd, info);
-      info->state = STATE_RO;
-   }
-}
-
-static void ensure_state_rw(socket_info *info)
-{
-   if (info->state == STATE_RO) {
-      DEBUG(1, "Switching socket %d to RW", info->socketfd);
-      set_socket_in_epoll_to_rw(info->socketfd, info);
-      info->state = STATE_RW;
-   }
-}
-
-static int prepare_message(socket_info *info)
-{
-   if (info->out != NULL) {
-      // Message in progress, so keep going!
-      return 1;
-   }
-
-   if (message_queue_empty(info->out_queue)) {
-      // No message in progress and no messages queued, so stop writing.
-      return 0;
-   }
-
-   // No message in progress so dequeue next message.
-   info->out = message_dequeue(info->out_queue);
-   info->outpos = 0;
-
-   if (info->type == TYPE_SERVER) {
-      info->outcount = ntohl(info->out->header.length);
-   } else {
-      info->outcount = info->out->header.length;
-   }
-
-   return 1;
-}
-
-static void prepare_messages(int index)
-{
-   int i;
-   socket_info *info;
-
-   for (i=0;i<gateway_connections[index].stream_count;i++) {
-
-      info = &(gateway_connections[index].sockets[i]);
-
-      if (prepare_message(info) == 0) {
-         ensure_state_ro(info);
-      } else {
-         ensure_state_rw(info);
-      }
-   }
-}
-
-#ifdef DETAILED_TIMING
 static void flush_write_timings()
 {
    int i;
@@ -1718,243 +1504,130 @@ static void store_write_timings(uint64_t starttime, uint64_t endtime, uint64_t s
 }
 #endif // DETAILED_TIMING
 
-static int nonblock_write_message(socket_info *info, int *more) {
 
-   ssize_t tmp, count;
+static int nonblock_write_message(message_buffer *buffer, int socketfd, bool *wouldblock, int *written_data) {
 
-   // SANITY CHECK
-   if (info->state != STATE_RW) {
-      ERROR(1, "inconsistent state in nonblock_write_message!");
-   }
+   ssize_t avail, tmp;
 
-   if (prepare_message(info) == 0) {
-      // We have run out of messages to write!
-      DEBUG(1, "No more messages to write to socket %d -- switching to RO mode!", info->socketfd);
-      *more = 0;
-      ensure_state_ro(info);
-      return EMPI_SUCCESS;
-   } else {
-#ifdef DETAILED_TIMING
-      info->out_starttime = current_time_micros();
-#endif // DETAILED_TIMING
-   }
+   avail = buffer->end - buffer->start;
 
-   count = info->outpos;
+   while (avail > 0) {
 
-   while (count < info->outcount) {
+      DEBUG(1, "Writing message(s) to socket %d %d %d %d", socketfd, buffer->start, buffer->end, avail);
 
-      DEBUG(1, "Writing message to socket %d %d %d", info->socketfd, count, info->outcount);
+      tmp = write(socketfd, &(buffer->data[buffer->start]), avail);
 
-      tmp = write(info->socketfd, ((unsigned char *) info->out) + count, info->outcount - count);
-
-      DEBUG(1, "Written %d bytes to socket %d", tmp, info->socketfd);
+      DEBUG(1, "Written %d bytes to socket %d", tmp, socketfd);
 
       if (tmp == -1) {
          if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // Cannot write any more data. Socket is full.
-            *more = 0;
-            info->outpos = (uint32_t) count;
+            *wouldblock = true;
             return EMPI_SUCCESS;
          } else {
-            *more = 0;
-            ERROR(1, "Failed to write message to socket! (error=%d)", errno);
+            ERROR(1, "Failed to write message to socket! %d %d %d %d (error=%d)", socketfd, buffer->start, buffer->end, avail, errno);
             return EMPI_ERR_INTERN;
          }
       }
 
-      count += tmp;
+      buffer->start += tmp;
+      avail -= tmp;
+      written_data += tmp;
    }
 
-   DEBUG(1, "Finished writing message to socket %d %d %d", info->socketfd, count, info->outcount);
-
-   // We've finished writing the message!
-   info->out_bytes += count;
-   info->out_messages++;
-
-#ifdef DETAILED_TIMING
-   store_write_timings(info->out_starttime, current_time_micros(), count);
-#endif // DETAILED_TIMING
-
-   free(info->out);
-
-   info->out      = NULL;
-   info->outpos   = 0;
-   info->outcount = 0;
-   *more = 1;
-
-   // Update the pending data counts.
-   if (info->type == TYPE_DATA) {
-      pending_data_messages--;
-      pending_data_size -= count;
-   }
-
+   // We ran out of data to write, so return!
    return EMPI_SUCCESS;
 }
 
-static int nonblock_read_messages(socket_info *info)
+static inline void reset_message_buffer(message_buffer *buffer)
 {
-   int more, error, count;
+   buffer->start = buffer->end = 0;
+}
 
-   count = 0;
+static int write_socket_messages()
+{
+   int idle, error, written_data, i;
+   bool wouldblock;
+   message_buffer *tmp;
+   socket_info *info;
+
+   written_data = 0;
 
    do {
-      more = 0;
-      error = nonblock_read_message(info, &more);
-      count++;
-   } while (more == 1 && error == MPI_SUCCESS && count < MAX_SOCKETS_READ_SEQUENCE);
+      idle = 0;
 
-   return error;
-}
-
-static int nonblock_write_messages(socket_info *info)
-{
-   int more, error;
-
-   do {
-      more = 0;
-      error = nonblock_write_message(info, &more);
-   } while (more == 1 && error == MPI_SUCCESS);
-
-   return error;
-}
-
-static int handle_socket_event(uint32_t events, socket_info *info)
-{
-   int error;
-
-   if ((events & EPOLLERR) || (events & EPOLLHUP)) {
-      // We've received an error on the socket!
-      ERROR(1, "Unexpected socket error!");
-      return EMPI_ERR_INTERN;
-   }
-
-   if (events & EPOLLOUT) {
-      error = nonblock_write_messages(info);
-
-      if (error != 0) {
-         ERROR(1, "Unexpected socket error (write)!");
-         return EMPI_ERR_INTERN;
-      }
-   }
-
-   if (events & EPOLLIN) {
-      error = nonblock_read_messages(info);
-
-      if (error != 0) {
-         ERROR(1, "Unexpected socket error (read)!");
-         return EMPI_ERR_INTERN;
-      }
-   }
-
-   return EMPI_SUCCESS;
-}
-
-// Process at most one incoming message from each gateway.
-static int poll_socket_event(int *done, int *progress)
-{
-   int n, i, status;
-   struct epoll_event events[MAX_EVENTS];
-
-   n = epoll_wait (epollfd, events, MAX_EVENTS, 0);
-
-   if (n == 0) {
-      *progress = 0;
-      return MPI_SUCCESS;
-   }
-
-   *progress = 1;
-
-   DEBUG(1, "Got %d socket events", n);
-
-   for (i=0;i<n;i++) {
-      status = handle_socket_event(events[i].events, events[i].data.ptr);
-
-      if (status != EMPI_SUCCESS) {
-         return status;
-      }
-   }
-
-   return EMPI_SUCCESS;
-}
-
-static int process_socket_messages(int *done)
-{
-   int i, status, progress, count;
-
-   count = 0;
-
-   do {
-      if (gateway_rank == 0) {
-         // Prepare a server request for sending into the server connection (if possible).
-         if (prepare_message(&server_info) == 0) {
-            ensure_state_ro(&server_info);
-         } else {
-            ensure_state_rw(&server_info);
-         }
-      }
-
-      // For each gateway connection, prepare a pending data message for sending (if available).
       for (i=0;i<cluster_count;i++) {
          if (i != cluster_rank) {
-            prepare_messages(i);
+
+            info = &(gateway_connections[i].sockets[0]);
+
+            wouldblock = false;
+
+            error = nonblock_write_message(info->socket_write_buffer, info->socketfd, &wouldblock, &written_data);
+
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "Failed to write message to socket! (error=%d)", errno);
+               return error;
+            }
+
+            if (wouldblock) {
+               // nonblock_write_message returned because the socket was full.
+               idle++;
+            } else {
+               // nonblock_write_message returned because it ran out of data to send.
+               reset_message_buffer(info->socket_write_buffer);
+
+               // Check if there is data available in the gateway mpi receive buffer
+               if (gateway_connections[i].mpi_receive_buffer->end > 0) {
+                  // There is, so swap buffers.
+                  tmp = info->socket_write_buffer;
+                  info->socket_write_buffer = gateway_connections[i].mpi_receive_buffer;
+                  gateway_connections[i].mpi_receive_buffer = tmp;
+               } else {
+                  // There isn't, so add one to the idle count.
+                  idle++;
+               }
+            }
          }
       }
 
-      // DEBUG(1, "Poll socket event");
-
-      progress = 0;
-
-      status = poll_socket_event(done, &progress);
-
-      if (status != EMPI_SUCCESS) {
-         ERROR(1, "Failed to poll for messages!");
-      }
-
-      count++;
-
-   } while (progress == 1 && *done != 1 && count < MAX_SOCKETS_RECEIVE_SEQUENCE);
-
-   return status;
-}
-
-static int enqueue_data_message(generic_message *message, int size)
-{
-   // NOTE: data messages are internal and therefore in host byte order!
-   int error, target;
-
-   // Up the global message and data count.
-   pending_data_messages++;
-   pending_data_size += size;
-
-   target = GET_CLUSTER_RANK(message->header.dst_pid);
-
-   error = message_enqueue(&(gateway_connections[target].out_queue), message);
-
-   if (error == -1) {
-      ERROR(1, "Failed to enqueue message!");
-      return EMPI_ERR_INTERN;
-   }
+   } while (idle < (cluster_count-1) && written_data < MAX_SINGLE_SOCKET_SEND);
 
    return EMPI_SUCCESS;
 }
 
-static int enqueue_server_request(generic_message *message, int size)
+
+static int nonblock_read_message(message_buffer *buffer, int socketfd, bool *wouldblock, int *read_data)
 {
-   // NOTE: server messages are external and therefore in network byte order!
-   int error;
+   size_t avail, tmp;
 
-   if (gateway_rank != 0) {
-      ERROR(1, "Cannot forward message to server, as I am not gateway 0!");
-      return EMPI_ERR_INTERN;
-   }
+   avail = buffer->size - buffer->end;
 
-   DEBUG(1, "Enqueue request for server %d %d %d", message->header.length, ntohl( message->header.length), size);
+   while (avail > 0) {
 
-   error = message_enqueue(&server_queue_out, message);
+      DEBUG(1, "Reading message from socket %d available space %ld %d %d %d", socketfd, avail, buffer->start, buffer->end, buffer->size);
 
-   if (error == -1) {
-      ERROR(1, "Failed to enqueue message!");
-      return EMPI_ERR_INTERN;
+      tmp = read(socketfd, &(buffer->data[buffer->end]), avail);
+
+      DEBUG(1, "Read message from socket %d size %ld", socketfd, tmp);
+
+      if (tmp == -1) {
+         if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            // Cannot read any more data. Socket is empty
+            *wouldblock = true;
+            return EMPI_SUCCESS;
+         } else {
+            ERROR(1, "Failed to read message from socket %d %d %d %d ! (error=%d)", socketfd, buffer->end, buffer->size, avail, errno);
+            return EMPI_ERR_INTERN;
+         }
+      } else if (tmp == 0) {
+         ERROR(1, "Unexpected EOF on socket %d! avail=%ld", socketfd, avail);
+         return EMPI_ERR_INTERN;
+      }
+
+      buffer->end += tmp;
+      avail -= tmp;
+      *read_data += tmp;
    }
 
    return EMPI_SUCCESS;
@@ -1963,9 +1636,7 @@ static int enqueue_server_request(generic_message *message, int size)
 static int process_gateway_message(generic_message *m, int *done)
 {
    // NOTE: server messages are external and therefore in network byte order!
-   int opcode;
-
-   opcode = ntohl(m->header.opcode);
+   int opcode = ntohl(m->header.opcode);
 
    DEBUG(1, "Received gateway message with opcode %d", opcode);
 
@@ -1981,163 +1652,43 @@ static int process_gateway_message(generic_message *m, int *done)
    return EMPI_SUCCESS;
 }
 
-static int receive_mpi_server_request(int *received)
+// NOTE: Assiumption here is that "generic_message *m" points to a shared buffer, and
+// we therefore need to copy any data that is cannot be reused after this call returns!!
+static int forward_mpi_message(generic_message *m, int pid, int len, int tag)
 {
-   int error, flag, count;
-   MPI_Status status;
-   unsigned char *buffer;
+   int cluster, rank, error;
+   mpi_message *mpi_msg;
 
-   error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_SERVER_REQUEST, mpi_comm_gateway_and_application, &flag, &status);
+   cluster = GET_CLUSTER_RANK(pid);
+   rank = GET_PROCESS_RANK(pid);
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to probe MPI! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
+   DEBUG(1, "Forwarding message to MPI %d:%d tag=%d len-%d", cluster, rank, tag, len);
 
-   if (!flag) {
-      *received = 0;
-      return EMPI_SUCCESS;
-   }
-
-   *received = 1;
-
-   DEBUG(1, "Incoming MPI SERVER REQUEST!");
-
-   error = PMPI_Get_count(&status, MPI_BYTE, &count);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive size of MPI message! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   buffer = malloc(count);
-
-   if (buffer == NULL) {
-      ERROR(1, "Failed to allocate space for MPI message! (error=%d)", error);
+   if (cluster != cluster_rank) {
+      ERROR(1, "Received message for wrong cluster! dst=%d me=%d!", cluster, cluster_rank);
       return EMPI_ERR_INTERN;
    }
 
-   DEBUG(2, "Receiving MPI SERVER REQUEST from source %d, with tag %d and size %d", status.MPI_SOURCE, status.MPI_TAG, count);
+   mpi_msg = create_mpi_message(m, len);
 
-   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting.
-   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, TAG_SERVER_REQUEST, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   DEBUG(2, "Received MPI SERVER REQUEST! %d %d", ntohl(((generic_message *)buffer)->header.opcode), ntohl(((generic_message *)buffer)->header.length));
-
-   // This is a request from an application process to forward a request to the server.
-   return enqueue_server_request((generic_message *)buffer, count);
-}
-
-static int receive_mpi_server_reply(int *done, int *received)
-{
-   int error, flag, count;
-   MPI_Status status;
-   unsigned char *buffer;
-
-   error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_SERVER_REPLY, mpi_comm_gateway_and_application, &flag, &status);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to probe MPI! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   if (!flag) {
-      *received = 0;
-      return EMPI_SUCCESS;
-   }
-
-   *received = 1;
-
-   DEBUG(1, "Incoming MPI SERVER REPLY!");
-
-   error = PMPI_Get_count(&status, MPI_BYTE, &count);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive size of MPI message! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   buffer = malloc(count);
-
-   if (buffer == NULL) {
-      ERROR(1, "Failed to allocate space for MPI message! (error=%d)", error);
+   if (mpi_msg == NULL) {
+      ERROR(1, "Failed to allocate MPI request!");
       return EMPI_ERR_INTERN;
    }
 
-   DEBUG(2, "Receiving MPI SERVER REPLY from source %d, with tag %d and size %d", status.MPI_SOURCE, status.MPI_TAG, count);
-
-   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting.
-   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, TAG_SERVER_REPLY, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
+   error = PMPI_Isend(&(mpi_msg->data[0]), len, MPI_BYTE, rank, tag, mpi_comm_gateway_and_application, &(mpi_msg->r));
 
    if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
+      ERROR(1, "Failed to perform Isend! (error=%d)", error);
+      free(mpi_msg);
       return TRANSLATE_ERROR(error);
    }
 
-   DEBUG(2, "Received MPI SERVER REPLY! %d %d", ntohl(((generic_message *)buffer)->header.opcode), ntohl(((generic_message *)buffer)->header.length));
+   mpi_msg->next = mpi_messages;
+   mpi_messages = mpi_msg;
 
-   // This is a message from the server forwarded to me via MPI by the master gateway.
-   DEBUG(2, "Received SERVER reply via MPI!");
-   return process_gateway_message((generic_message *)buffer, done);
+   return EMPI_SUCCESS;
 }
-
-static int receive_mpi_data_message(int *received)
-{
-   int error, flag, count;
-   MPI_Status status;
-   unsigned char *buffer;
-
-   error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_DATA_MSG, mpi_comm_gateway_and_application, &flag, &status);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to probe MPI! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   if (!flag) {
-      *received = 0;
-      return EMPI_SUCCESS;
-   }
-
-   *received = 1;
-
-   DEBUG(1, "Incoming MPI DATA message!");
-
-   error = PMPI_Get_count(&status, MPI_BYTE, &count);
-
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to receive size of MPI data message! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   buffer = malloc(count);
-
-   if (buffer == NULL) {
-      ERROR(1, "Failed to allocate space for MPI data message! (error=%d)", error);
-      return EMPI_ERR_INTERN;
-   }
-
-   DEBUG(2, "Receiving MPI data message from source %d, with tag %d and size %d", status.MPI_SOURCE, status.MPI_TAG, count);
-
-   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting.
-   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, TAG_DATA_MSG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
-
-   if (error != MPI_SUCCESS) {
-      DEBUG(1, "Failed to receive after probe! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   DEBUG(2, "Received MPI DATA message! %d %d", ((generic_message *)buffer)->header.opcode, ((generic_message *)buffer)->header.length);
-
-   // This is a request from an application process to forward data to another cluster.
-   return enqueue_data_message((generic_message *)buffer, count);
-}
-
 
 static int poll_mpi_requests()
 {
@@ -2173,7 +1724,6 @@ static int poll_mpi_requests()
             curr = curr->next;
          }
 
-         free(tmp->message);
          free(tmp);
 
       } else {
@@ -2186,93 +1736,81 @@ static int poll_mpi_requests()
    return EMPI_SUCCESS;
 }
 
-
-static int forward_mpi_message(generic_message *m, int pid, int len, int tag)
+static int process_socket_buffer(socket_info *info, int *done)
 {
-   int cluster, rank, error;
-   mpi_message *mpi_msg;
+   message_buffer *buffer;
+   generic_message *m; //, *c;
+   int avail, len, pid, error;
+   bool stop = false;
 
-   cluster = GET_CLUSTER_RANK(pid);
-   rank = GET_PROCESS_RANK(pid);
+   buffer = info->socket_read_buffer;
 
-   DEBUG(1, "Forwarding message to MPI %d:%d tag=%d len-%d", cluster, rank, tag, len);
+   DEBUG(1, "PROCESSING SOCKET BUFFER of socket %d %d %d %d", info->socketfd, buffer->start, buffer->end, buffer->size);
 
-   if (cluster != cluster_rank) {
-      ERROR(1, "Received message for wrong cluster! dst=%d me=%d!", cluster, cluster_rank);
-      return EMPI_ERR_INTERN;
-   }
+   avail = buffer->end - buffer->start;
 
-   mpi_msg = malloc(sizeof(mpi_message));
+   while (!stop) {
 
-   if (mpi_msg == NULL) {
-      ERROR(1, "Failed to allocate MPI request!");
-      return EMPI_ERR_INTERN;
-   }
+      len = sizeof(generic_message);
 
-   error = PMPI_Isend(m, len, MPI_BYTE, rank, tag, mpi_comm_gateway_and_application, &(mpi_msg->r));
+      if (avail < len) {
+         // There's no full message header in the buffer yet.
 
-   if (error != MPI_SUCCESS) {
-      ERROR(1, "Failed to perform Isend! (error=%d)", error);
-      return TRANSLATE_ERROR(error);
-   }
-
-   mpi_msg->message = m;
-   mpi_msg->next = mpi_messages;
-   mpi_messages = mpi_msg;
-
-   return EMPI_SUCCESS;
-}
-
-
-// Forward all data messages received from other gateways to their destinations using MPI.
-static int forward_data_messages_to_mpi()
-{
-   int len, pid, error;
-   generic_message *m;
-
-   m = message_dequeue(&incoming_queue);
-
-   while (m != NULL) {
-
-      len = m->header.length;
-      pid = m->header.dst_pid;
-
-      error = forward_mpi_message(m, pid, len, TAG_FORWARDED_DATA_MSG);
-
-      if (error != MPI_SUCCESS) {
-         ERROR(1, "Failed to forward message to MPI! (error=%d)", error);
-         return error;
+         DEBUG(2, "No complete header in buffer %d", avail);
+         stop = true;
+         break;
       }
 
-      m = message_dequeue(&incoming_queue);
-   }
+      // These is at least a message header in the buffer.
+      m = (generic_message *) &(buffer->data[buffer->start]);
 
-   return EMPI_SUCCESS;
-}
+      if (info->type == TYPE_SERVER) {
+         len = ntohl(m->header.length);
+         pid = ntohl(m->header.dst_pid);
+      } else {
+         len = m->header.length;
+         pid = m->header.dst_pid;
+      }
 
-// Forward all server messages received from the server to their destinations using MPI.
-static int forward_server_messages_to_mpi(int *done)
-{
-   int len, pid, error;
-   generic_message *m;
+      DEBUG(2, "Got message of len %d at offset %d", len, buffer->start);
 
-   m = message_dequeue(&server_queue_in);
+      if (avail < len) {
+         // There's no full message in the buffer yet.
+         DEBUG(3, "No complete message in buffer %d", avail);
+         stop = true;
+         break;
+      }
 
-   while (m != NULL) {
+      // We have a full message, so copy it and queue to copy for sending with MPI later.
+      // EEP EEP EEP!!!!
 
-      len = ntohl(m->header.length);
-      pid = ntohl(m->header.dst_pid);
+      DEBUG(3, "Copying and queueing message of len %d", len);
 
-      if (pid == my_pid) {
-          // This message is indented for me!
-         error = process_gateway_message(m, done);
+//    Replaced by immediate send!
+//    c = malloc(len);
+//    memcpy(c, m, len);
+//    linked_queue_enqueue(queue, c);
+
+      if (info->type == TYPE_SERVER) {
+
+         if (pid == my_pid) {
+             // This message is indented for me!
+             error = process_gateway_message(m, done);
+
+             if (*done == 1) {
+                stop = true;
+                break;
+             }
+         } else {
+             error = forward_mpi_message(m, pid, len, TAG_SERVER_REPLY);
+         }
 
          if (error != MPI_SUCCESS) {
             ERROR(1, "Failed to process gateway message! (error=%d)", error);
             return error;
          }
       } else {
-         error = forward_mpi_message(m, pid, len, TAG_SERVER_REPLY);
+         error = forward_mpi_message(m, pid, len, TAG_FORWARDED_DATA_MSG);
 
          if (error != MPI_SUCCESS) {
             ERROR(1, "Failed to forward message to MPI! (error=%d)", error);
@@ -2280,86 +1818,435 @@ static int forward_server_messages_to_mpi(int *done)
          }
       }
 
-      m = message_dequeue(&server_queue_in);
+      // Update some statistics.
+      info->in_bytes += len;
+      info->in_messages++;
+
+      // Update the buffer start position and available data.
+      buffer->start += len;
+      avail -= len;
+   }
+
+   if (avail == 0) {
+      // buffer is empty
+      DEBUG(2, "Finished extraction BUFFER IS EMPTY");
+      reset_message_buffer(buffer);
+      return EMPI_SUCCESS;
+   }
+
+   DEBUG(2, "Finished extraction BUFFER HAS REMAINING DATA %d %d", buffer->start, avail);
+
+   // There is some data left in the buffer, but not enough for a complete
+   // message. We must check if the complete message will fit into the rest
+   // of the buffer.
+
+   if (buffer->start + len >= buffer->size) {
+      // It does not fit, so we need to copy the existing data to the start of the buffer.
+      if (avail < buffer->start) {
+         // No overlapping copy, so memcpy is safe.
+         memcpy(&(buffer->data[0]), &(buffer->data[buffer->start]), avail);
+      } else {
+         // Overlapping copy, so must use memmove.
+         memmove(&(buffer->data[0]), &(buffer->data[buffer->start]), avail);
+      }
+
+      buffer->start = 0;
+      buffer->end = avail;
+   } // else the rest of the message fits, so no copy and just receive in the remaining buffer space.
+
+   return EMPI_SUCCESS;
+}
+
+static int read_socket_messages()
+{
+   int idle, error, read_data, i, done;
+   bool wouldblock;
+   socket_info *info;
+   read_data = 0;
+
+   do {
+      idle = 0;
+
+      for (i=0;i<cluster_count;i++) {
+         if (i != cluster_rank) {
+
+            info = &(gateway_connections[i].sockets[0]);
+
+            wouldblock = false;
+
+            error = nonblock_read_message(info->socket_read_buffer, info->socketfd, &wouldblock, &read_data);
+
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "Failed to read message from socket! (error=%d)", errno);
+               return error;
+            }
+
+            if (wouldblock) {
+               idle++;
+            }
+
+            error = process_socket_buffer(info, &done);
+
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "Failed to flush socket read message buffer! (error=%d)", errno);
+               return error;
+            }
+         }
+      }
+
+   } while (read_data < MAX_SINGLE_SOCKET_RECEIVE && idle < (cluster_count-1));
+
+   return EMPI_SUCCESS;
+}
+
+static int write_socket_server_messages()
+{
+   message_buffer *tmp;
+   int error, written_data;
+   bool wouldblock;
+
+   written_data = 0;
+   wouldblock = false;
+
+   error = nonblock_write_message(server_info.socket_write_buffer, server_info.socketfd, &wouldblock, &written_data);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to write message to socket! (error=%d)", errno);
+      return error;
+   }
+
+   if (wouldblock) {
+      // nonblock_write_message returned because the socket was full.
+      return EMPI_SUCCESS;
+   }
+
+   // nonblock_write_message returned because it ran out of data to send.
+   reset_message_buffer(server_info.socket_write_buffer);
+
+   // Check if there is data available in the gateway mpi receive buffer
+   if (server_mpi_receive_buffer->end > 0) {
+      // There is, so swap buffers.
+      tmp = server_info.socket_write_buffer;
+      server_info.socket_write_buffer = server_mpi_receive_buffer;
+      server_mpi_receive_buffer = tmp;
    }
 
    return EMPI_SUCCESS;
 }
 
+static int read_socket_server_messages(int *done)
+{
+   int error, read_data;
+   bool wouldblock;
+
+   read_data = 0;
+   wouldblock = false;
+
+   error = nonblock_read_message(server_info.socket_read_buffer, server_info.socketfd, &wouldblock, &read_data);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to read message from socket! (error=%d)", errno);
+      return error;
+   }
+
+   return process_socket_buffer(&server_info, done);
+}
+
+static int process_socket_messages(int *done)
+{
+   int error;
+
+   error = write_socket_messages();
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to write socket messages! (error=%d)", errno);
+      return error;
+   }
+
+   error = read_socket_messages();
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to read socket messages! (error=%d)", errno);
+      return error;
+   }
+
+   // The master gateway must also handle server communication
+   if (gateway_rank == 0) {
+
+      error = write_socket_server_messages();
+
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed to write socket server messages! (error=%d)", errno);
+         return error;
+      }
+
+      error = read_socket_server_messages(done);
+
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed to read socket server messages! (error=%d)", errno);
+         return error;
+      }
+   }
+
+   return EMPI_SUCCESS;
+}
+
+static int receive_message(int count, MPI_Status *status, message_buffer *buffer)
+{
+#ifdef DETAILED_MESSAGE_INFO
+   message_header *m;
+   uint64_t time;
+#endif
+
+   // SANITY CHECKS!
+//   if (buffer == NULL) {
+//      ERROR(1, "Receive got invalid buffer (NULL)!");
+//   }
+
+//   if (buffer->size != STANDARD_BUFFER_SIZE ||
+//       buffer->start < 0 || buffer->start > STANDARD_BUFFER_SIZE || buffer->start > buffer->end ||
+//       buffer->end < 0 || buffer->end >= STANDARD_BUFFER_SIZE) {
+//      ERROR(1, "Receive got invalid buffer (size=%d, start=%d end=%d messages=%d)!", buffer->size, buffer->start, buffer->end, buffer->messages);
+//   }
+
+   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting -- IS THIS TRUE???
+   int error = PMPI_Recv(&(buffer->data[buffer->end]), count, MPI_BYTE, status->MPI_SOURCE, status->MPI_TAG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to receive MPI server message! source=%d tag=%d count=%d (error=%d)", status->MPI_SOURCE, status->MPI_TAG, count, error);
+      return TRANSLATE_ERROR(error);
+   }
+
+#ifdef DETAILED_MESSAGE_INFO
+
+   time = current_time_micros() - gateway_start_time;
+
+   m = (message_header *) &(buffer->data[buffer->end]);
+
+   fprintf(stderr, "DETAILED_MESSAGE_INFO MPI_MESSAGE_RECEIVED FROM %d %d TO %d %d TAG %d SIZE %d PAYLOAD %ld TIMESTAMP %ld\n",
+           GET_CLUSTER_RANK(m->src_pid), GET_PROCESS_RANK(m->src_pid),
+           GET_CLUSTER_RANK(m->dst_pid), GET_PROCESS_RANK(m->dst_pid),
+           status->MPI_TAG, count, (count - sizeof(data_message)), time);
+#endif
+
+   buffer->end += count;
+   buffer->messages += 1;
+
+   // FIXME: sanity check!!!
+   if (buffer->end > buffer->size) {
+      ERROR(1, "Receivebuffer overflow!!!");
+   }
+
+   return EMPI_SUCCESS;
+}
+
+static int receive_server_reply(int *done)
+{
+   int error, flag, count;
+   unsigned char *buffer;
+   MPI_Status status;
+
+   error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_SERVER_REPLY, mpi_comm_gateway_and_application, &flag, &status);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to probe MPI for TAG_SERVER_REQUEST! (error=%d)", error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   if (!flag) {
+      return EMPI_SUCCESS;
+   }
+
+   DEBUG(1, "Incoming MPI server_request!");
+
+   error = PMPI_Get_count(&status, MPI_BYTE, &count);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to receive size of MPI data message! (error=%d)", error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   buffer = malloc(count);
+
+   if (buffer == NULL) {
+      ERROR(1, "Failed to allocate space for MPI server message!");
+      return EMPI_ERR_INTERN;
+   }
+
+   DEBUG(2, "Receiving MPI server reply from source %d, with tag %d and size %d", status.MPI_SOURCE, status.MPI_TAG, count);
+
+   // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting -- IS THIS TRUE???
+   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
+
+   if (error != MPI_SUCCESS) {
+      DEBUG(1, "Failed to receive MPI server message! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   // This is a message from the server forwarded to me via MPI by the master gateway.
+   return process_gateway_message((generic_message *)buffer, done);
+}
+
+static int receive_mpi_message(message_buffer *buffer, int tag, int *wouldblock, int *nospace, int *received_data, int *messages)
+{
+   int error, flag, count, space;
+   MPI_Status status;
+
+   error = PMPI_Iprobe(MPI_ANY_SOURCE, tag, mpi_comm_gateway_and_application, &flag, &status);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to probe MPI for TAG_SERVER_REQUEST! (error=%d)", error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   if (!flag) {
+      *wouldblock += 1;
+      return EMPI_SUCCESS;
+   }
+
+   DEBUG(1, "Incoming MPI message for tag %d!", tag);
+
+   error = PMPI_Get_count(&status, MPI_BYTE, &count);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to receive size of MPI message for tag %d! (error=%d)", tag, error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   space = buffer->size - buffer->end;
+
+   if (count > space) {
+      *nospace += 1;
+      return EMPI_SUCCESS;
+   }
+
+   *received_data += count;
+   *messages += 1;
+
+   return receive_message(count, &status, buffer);
+}
+
+static int receive_from_mpi(int *done)
+{
+   int received_data, wouldblock, nospace, messages, error, i, miss, buffered_data;
+
+   message_buffer *buffer;
+
+   messages = 0;
+   received_data = 0;
+   wouldblock = 0;
+   nospace = 0;
+   miss = 0;
+   buffered_data = 0;
+
+   // We keep receiving until we have received enough data, or all receivers run out of MPI messages or buffer space.
+//   while (received_data < MAX_SINGLE_MPI_RECEIVE && ((wouldblock + nospace) < cluster_count-1)) {
+//   while (miss < MAX_POLL_MISS_COUNT && received_data < MAX_SINGLE_MPI_RECEIVE) {
+
+   do {
+
+      if ((wouldblock + nospace) == cluster_count-1) {
+         miss++;
+      } else {
+         miss = 0;
+      }
+
+      wouldblock = 0;
+      nospace = 0;
+
+      for (i=0;i<cluster_count;i++) {
+         if (i != cluster_rank) {
+
+            // FIXME: only records the last buffer size!
+            buffer = gateway_connections[i].mpi_receive_buffer;
+
+            buffered_data += buffer->end-buffer->start;
+
+            error = receive_mpi_message(buffer, TAG_DATA_MSG+i, &wouldblock, &nospace, &received_data, &messages);
+
+            if (error != EMPI_SUCCESS) {
+               ERROR(1, "Failed to receive from MPI! (error=%d)", error);
+               return error;
+            }
+         }
+      }
+
+   } while (miss < MAX_POLL_MISS_COUNT && buffered_data < MIN_INTERESTING_BUFFER_SIZE);
+
+//if (received_data > 0) {
+//   fprintf(stderr, "Stopped receiving MPI data after %d bytes, wouldblock=%d, nospace=%d messages %d\n",
+//                            received_data, wouldblock, nospace, messages);
+//}
+
+   error = receive_server_reply(done);
+
+   if (error != EMPI_SUCCESS) {
+      ERROR(1, "Failed to receive from MPI! (error=%d)", error);
+      return error;
+   }
+
+   if (gateway_rank == 0) {
+      // The master gateway reads as many server requests as it can.
+      nospace = 0;
+      wouldblock = 0;
+      messages = 0;
+
+      while (nospace == 0 && wouldblock == 0) {
+         error = receive_mpi_message(server_mpi_receive_buffer, TAG_SERVER_REQUEST, &nospace, &wouldblock, &received_data, &messages);
+
+         if (error != EMPI_SUCCESS) {
+            ERROR(1, "Failed to receive server request from MPI! (error=%d)", error);
+            return error;
+         }
+      }
+    }
+
+//      error = receive_any_from_mpi(done, &received, &stored_buffer);
+
+
+//fprintf(stderr, "Receive_from_mpi count %d done %d received %d stored %d\n", count, *done, received, stored_buffer);
+
+   return MPI_SUCCESS;
+}
+
+
 // Process the MPI messages.
 static int process_mpi_messages(int *done)
 {
-   int error, receivedRequest, receivedReply, receivedData, count;
+   int error;
 
-   // First process all available server requests and replies.
-   do {
-      receivedRequest = 0;
+   // First, attempt to push data messages into MPI.
+//   error = forward_data_messages_to_mpi();
 
-      error = receive_mpi_server_request(&receivedRequest);
+//   if (error != EMPI_SUCCESS) {
+//      ERROR(1, "Failed to forward MPI data messages! (error=%d)", error);
+//      return error;
+//   }
 
-      if (error != EMPI_SUCCESS) {
-         ERROR(1, "Failed to receive from MPI! (error=%d)", error);
-         return error;
-      }
+//   if (gateway_rank == 0) {
+      // Second, attempt to push server messages into MPI.
+//      error = forward_server_messages_to_mpi(done);
 
-      receivedReply = 0;
+//      if (error != EMPI_SUCCESS) {
+//         ERROR(1, "Failed to forward MPI server messages! (error=%d)", error);
+//         return error;
+//      }
+//   }
 
-      error = receive_mpi_server_reply(&receivedReply, done);
-
-      if (error != EMPI_SUCCESS) {
-         ERROR(1, "Failed to receive from MPI! (error=%d)", error);
-         return error;
-      }
-
-      error = forward_server_messages_to_mpi(done);
-
-      if (error != EMPI_SUCCESS) {
-         ERROR(1, "Failed to forward MPI server messages! (error=%d)", error);
-         return error;
-      }
-
-   } while ((receivedRequest + receivedReply) > 0 && *done != 1);
-
-   // Next, attempt to push data messages into MPI.
-   error = forward_data_messages_to_mpi();
+   // Third, receive messages from MPI
+   error = receive_from_mpi(done);
 
    if (error != EMPI_SUCCESS) {
-      ERROR(1, "Failed to forward MPI data messages! (error=%d)", error);
+      ERROR(1, "Failed to receive MPI messages! (error=%d)", error);
       return error;
    }
 
-   // Next, see if any pending send messages have finished.
+   // Fourth, poll to see if any pending send messages have finished.
    error = poll_mpi_requests();
 
    if (error != EMPI_SUCCESS) {
-      ERROR(1, "Failed to poll MPI requests! (error=%d)", error);
+      ERROR(1, "Failed to poll MPI send requests! (error=%d)", error);
       return error;
-   }
-
-   if (*done == 1) {
-      return MPI_SUCCESS;
-   }
-
-   count = 0;
-   receivedData = 1;
-
-   // Finally, receive new data from MPI to push into sockets,
-   // provided that/ we are not running out of buffer space.
-   while (pending_data_messages < MAX_PENDING_DATA_MSG &&
-          pending_data_size < MAX_PENDING_DATA_SIZE &&
-          receivedData == 1 &&
-          count < MAX_MPI_RECEIVE_SEQUENCE) {
-
-      receivedData = 0;
-
-      error = receive_mpi_data_message(&receivedData);
-
-      if (error != EMPI_SUCCESS) {
-         ERROR(1, "Failed to receive from MPI! (error=%d)", error);
-         return error;
-      }
-
-      count++;
    }
 
    return EMPI_SUCCESS;
@@ -2410,7 +2297,7 @@ void cleanup()
    disconnect_gateways();
 
    // Finally close the epoll socket.
-   close(epollfd);
+   // close(epollfd);
 }
 
 static void print_gateway_statistics(uint64_t deltat)
@@ -2450,15 +2337,19 @@ int messaging_run_gateway(int rank, int size, int empi_size)
    int error;
    int done = 0;
 
-   uint64_t start, current, last;
+#ifdef SIMPLE_TIMING
+   uint64_t start, last;
+   uint64_t current;
+#endif
 
    pending_data_messages = 0;
    pending_data_size = 0;
 
+#ifdef SIMPLE_TIMING
+
    start = current_time_micros();
    last = start;
 
-#ifdef SIMPLE_TIMING
    printf("GATEWAY %d.%d starting!\n", cluster_rank, gateway_rank);
 #endif // SIMPLE_TIMING
 
