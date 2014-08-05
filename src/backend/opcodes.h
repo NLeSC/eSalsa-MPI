@@ -35,7 +35,10 @@
 #define TAG_SERVER_REQUEST      0
 #define TAG_SERVER_REPLY        1
 #define TAG_FORWARDED_DATA_MSG  2
-#define TAG_DATA_MSG            3
+#define TAG_RENDEZVOUS_REQUEST  3
+#define TAG_RENDEZVOUS_REPLY    4
+// NOTE: TAG_DATA_MSG must be LAST tag that is used!!!
+#define TAG_DATA_MSG            100
 
 #endif // _OPCODES_H_
 

@@ -33,6 +33,9 @@
 #include "gateway.h"
 #include "opcodes.h"
 
+// The maximum size of an message on the optimisitic channel.
+#define MAX_OPTIMISTIC_MESSAGE_SIZE (16*1024)
+
 // TODO: Cleanup these messages. They always have the comm and src fields!
 
 // This message is used to request a comm-split at the server.
@@ -174,19 +177,62 @@ uint32_t server_pid;
 extern int *cluster_sizes;
 extern int *cluster_offsets;
 
+// This lot is needed to post ireceives for incoming small gateway messages.
+int receive_count;
+generic_message **messages;
+
+MPI_Request *requests;
+MPI_Status *statusses;
+
+int requests_ready;
+int *requests_ready_indices;
+
 static MPI_Comm mpi_comm_application_only;
 
 // Unused?
 extern MPI_Comm mpi_comm_gateways_only;
-MPI_Comm mpi_comm_gateway_and_application;
+
+MPI_Comm mpi_comm_gateway_and_application_server;
+MPI_Comm mpi_comm_gateway_and_application_optimistic;
+MPI_Comm mpi_comm_gateway_and_application_rendezvous;
+
+//MPI_Comm mpi_comm_gateway_and_application;
 
 /*****************************************************************************/
 /*                      Initialization / Finalization                        */
 /*****************************************************************************/
 
+int prepare_optimistic_message(int index, int new_alloc)
+{
+   int error;
+
+   // Sanity check
+   if (index < 0 || index >= receive_count) {
+      ERROR(1, "Index out of bounds! %d");
+      return EMPI_ERR_INTERN;
+   }
+
+   if (new_alloc == 1) {
+      messages[index] = malloc(MAX_OPTIMISTIC_MESSAGE_SIZE);
+
+      if (messages[index] == NULL) {
+         ERROR(1, "Failed allocate message buffer for optimistic sends!");
+         return EMPI_ERR_INTERN;
+      }
+   }
+
+   error = PMPI_Irecv(messages[index], MAX_OPTIMISTIC_MESSAGE_SIZE, MPI_BYTE, local_application_size+index, MPI_ANY_TAG, mpi_comm_gateway_and_application_optimistic, &requests[index]);
+
+   if (error != MPI_SUCCESS) {
+      return TRANSLATE_ERROR(error);
+   }
+
+   return EMPI_SUCCESS;
+}
+
 int messaging_init(int rank, int size, int *adjusted_rank, int *adjusted_size, MPI_Comm *world, int *argc, char ***argv)
 {
-   int status, error;
+   int status, error, i;
 
    cluster_count = 0;
    cluster_rank = -1;
@@ -281,17 +327,40 @@ int messaging_init(int rank, int size, int *adjusted_rank, int *adjusted_size, M
    // mpi_comm_gateway_only     : contains only the gateway
    //                             processes of this cluster
    //
-   // mpi_comm_gateway_and_application: dup of MPI_COMM_WORLD
-   //                                   used for messages between
-   //                                   the application and
-   //                                   gateway processes.
+   // mpi_comm_gateway_and_application_server: dup of MPI_COMM_WORLD used for server
+   //                                          related messages between the application
+   //                                          and gateway processes.
+   //
+   // mpi_comm_gateway_and_application_optimistic: dup of MPI_COMM_WORLD used for optimistic
+   //                                              send of small data messages between the
+   //                                              application and gateway processes. Also
+   //                                              used for handshakes for large (rendezvous)
+   //                                              data messages.
+   //
+   // mpi_comm_gateway_and_application_rendezvous: dup of MPI_COMM_WORLD used for rendezvous
+   //                                              exchange of large data messages.
 
-   error = PMPI_Comm_dup(MPI_COMM_WORLD, &mpi_comm_gateway_and_application);
+   error = PMPI_Comm_dup(MPI_COMM_WORLD, &mpi_comm_gateway_and_application_server);
 
    if (error != MPI_SUCCESS) {
       ERROR(1, "Failed to create communicator! (error=%d)", error);
       return EMPI_ERR_INTERN;
    }
+
+   error = PMPI_Comm_dup(MPI_COMM_WORLD, &mpi_comm_gateway_and_application_optimistic);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to create communicator! (error=%d)", error);
+      return EMPI_ERR_INTERN;
+   }
+
+   error = PMPI_Comm_dup(MPI_COMM_WORLD, &mpi_comm_gateway_and_application_rendezvous);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to create communicator! (error=%d)", error);
+      return EMPI_ERR_INTERN;
+   }
+
 
    *adjusted_size = local_application_size;
 
@@ -337,8 +406,50 @@ int messaging_init(int rank, int size, int *adjusted_rank, int *adjusted_size, M
 
    if (gateway_rank >= 0) {
       generic_gateway_init(rank, size);
+      receive_count = gateway_count;
+   } else {
+      receive_count = local_application_size;
    }
 
+   messages = malloc(receive_count * sizeof(unsigned char *));
+
+   if (messages == NULL) {
+      ERROR(1, "Failed allocate message buffers for optimistic sends! (error=%d)", error);
+      return EMPI_ERR_INTERN;
+   }
+
+   requests = malloc(receive_count * sizeof(MPI_Request));
+
+   if (requests == NULL) {
+      ERROR(1, "Failed allocate message requests for optimistic sends! (error=%d)", error);
+      return EMPI_ERR_INTERN;
+   }
+
+   statusses = malloc(receive_count * sizeof(MPI_Status));
+
+   if (statusses == NULL) {
+      ERROR(1, "Failed allocate message statusses for optimistic sends! (error=%d)", error);
+      return EMPI_ERR_INTERN;
+   }
+
+   requests_ready_indices = malloc(receive_count * sizeof(int));
+
+   if (requests_ready_indices == NULL) {
+      ERROR(1, "Failed allocate messages indices for optimistic sends! (error=%d)", error);
+      return EMPI_ERR_INTERN;
+   }
+
+   requests_ready = 0;
+
+   for (i=0;i<receive_count;i++) {
+      error = prepare_optimistic_message(i, 1);
+
+      if (error != EMPI_SUCCESS) {
+         ERROR(1, "Failed allocate message buffer for optimistic sends from gateway %d! (error=%d)", i, error);
+         return EMPI_ERR_INTERN;
+      }
+   }
+   
    // Perform a barrier here, to ensure that the application processes
    // do not start before the gateway(s) are initialized!
    error = PMPI_Barrier(MPI_COMM_WORLD);
@@ -423,7 +534,7 @@ static int unpack_message(void *buf, int count, datatype *t, communicator *c, da
    return error;
 }
 
-
+/*
 // Process at most one incoming message from MPI.
 static int probe_mpi_data_message(data_message **message, int blocking)
 {
@@ -484,6 +595,142 @@ static int probe_mpi_data_message(data_message **message, int blocking)
    return EMPI_SUCCESS;
 }
 
+*/
+
+// Process at most one incoming message from MPI.
+static int probe_mpi_data_message(int blocking, int comm, int source, int tag, data_message **message)
+{
+   int error, count, i, index, found;
+   unsigned char *buffer;
+
+   MPI_Request r;
+   MPI_Status s;
+
+   found = 0;
+
+   if (blocking) {
+
+      // Use a Waitsome to wait for at least one irecv to become ready.
+      error = PMPI_Waitsome(receive_count, requests, &requests_ready, requests_ready_indices, statusses);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to probe MPI! (error=%d)", error);
+         return TRANSLATE_ERROR(error);
+      }
+
+   } else {
+
+      // Use a Testsome to poll for 0 or more irecvs to become ready.
+      error = PMPI_Testsome(receive_count, requests, &requests_ready, requests_ready_indices, statusses);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to probe MPI! (error=%d)", error);
+         return TRANSLATE_ERROR(error);
+      }
+   }
+
+   if (requests_ready == 0) {
+      *message = NULL;
+      return EMPI_SUCCESS;
+   }
+
+   // Now iterate over the available messages to see if we can find the one we are looking for.
+   // NOTE: MPI will 'deactivate' all requests that are returned. Therefore, we -MUST- process all
+   // of them here and post a new Irecv for every request that was received.
+   for (i=0;i<requests_ready;i++) {
+
+      index = requests_ready_indices[i];
+
+      if (statusses[i].MPI_TAG == TAG_FORWARDED_DATA_MSG) {
+         // messages[index] contains a complete data message.
+         if (found == 0) {
+            if (!match_message((data_message*) messages[index], comm, source, tag)) {
+               DEBUG(5, "No match. Storing message");
+               store_message((data_message*) messages[index]);
+            } else {
+               found = 1;
+               *message = (data_message *) messages[index];
+            }
+         } else {
+            store_message((data_message*) messages[index]);
+         }
+
+         // Reset the Irecv for this index;
+         error = prepare_optimistic_message(index, 1);
+
+         if (error != EMPI_SUCCESS) {
+            return error;
+         }
+
+      } else if (statusses[i].MPI_TAG == TAG_RENDEZVOUS_REQUEST) {
+         // messages[index] contains a redezvous request for a large message.
+         // The size of the large messages is send as the payload in messages[index];
+         count = *((int *) messages[index]);
+
+         buffer = malloc(count);
+
+         if (buffer == NULL) {
+            ERROR(1, "Failed to allocate space for large MPI message! (error=%d)", error);
+            return EMPI_ERR_INTERN;
+         }
+
+         // Post an Irecv to receive the message data
+         error = PMPI_Irecv(buffer, count, MPI_BYTE, statusses[i].MPI_SOURCE, TAG_FORWARDED_DATA_MSG, mpi_comm_gateway_and_application_rendezvous, &r);
+
+//         // NOTE: Blocking receive as the message should already be pending.
+//         error = PMPI_Recv(buffer, count, MPI_BYTE, statusses[i].MPI_SOURCE, TAG_FORWARDED_DATA_MSG, mpi_comm_gateway_and_application_rendezvous, MPI_STATUS_IGNORE);
+
+         if (error != MPI_SUCCESS) {
+            ERROR(1, "Failed to ireceive large message! source=%d tag=%d count=%d (error=%d)", statusses[i].MPI_SOURCE, TAG_RENDEZVOUS_REQUEST, count, error);
+            return TRANSLATE_ERROR(error);
+         }
+
+         // Inform the sender that we are ready for the rendezvous data! We use an Rsend, since we are 100% sure the other side it ready for this message!
+         error = PMPI_Rsend(((int *)messages[index]), 1, MPI_INT, statusses[i].MPI_SOURCE, TAG_RENDEZVOUS_REPLY, mpi_comm_gateway_and_application_rendezvous);
+
+         if (error != MPI_SUCCESS) {
+            ERROR(1, "Failed to Rsend rendezvous reply! target=%d tag=%d (error=%d)", statusses[i].MPI_SOURCE, TAG_RENDEZVOUS_REPLY, count, error);
+            return TRANSLATE_ERROR(error);
+         }
+
+         // Wait for the data to arrive.
+         error = MPI_Wait(&r, &s);
+
+         if (error != MPI_SUCCESS) {
+            ERROR(1, "Failed to wait for rendezvous data! (error=%d)", error);
+            return TRANSLATE_ERROR(error);
+         }
+
+         // buffer should now contain the complete message.
+         if (found == 0) {
+            if (!match_message((data_message*) buffer, comm, source, tag)) {
+               DEBUG(5, "No match. Storing message");
+               store_message((data_message*) buffer);
+            } else {
+               found = 1;
+               *message = (data_message *)buffer;
+            }
+         } else {
+            store_message((data_message*) buffer);
+         }
+
+         // Reset the Irecv for this index;
+         error = prepare_optimistic_message(index, 0);
+
+         if (error != EMPI_SUCCESS) {
+            return error;
+         }
+      } else {
+          // Sanity check
+         ERROR(1, "Received DATA message with unknown TAG %d! (error=%d)", statusses[i].MPI_TAG, error);
+         return EMPI_ERR_INTERN;
+      }
+   }
+
+   return EMPI_SUCCESS;
+}
+
+/*
 static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c)
 {
    // We have already checked the various parameters, so all we have to so is send the lot!
@@ -536,6 +783,159 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
    // Return the error if needed.
    return error;
 }
+*/
+
+static int do_optimistic_send(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c, int bytes)
+{
+   int tmp, error;
+   unsigned char buffer[MAX_OPTIMISTIC_MESSAGE_SIZE];
+   data_message *m;
+
+   tmp = 0;
+
+   // Prepare the message header
+   m = (data_message *)buffer;
+
+   m->header.opcode = opcode;
+   m->header.src_pid = my_pid;
+   m->header.dst_pid = get_pid(c, dest);
+   m->header.length = DATA_MESSAGE_SIZE + bytes;
+
+   m->comm = c->handle;
+   m->source = c->global_rank;
+   m->dest = dest;
+   m->tag = tag;
+   m->count = count;
+
+   DEBUG(2, "Packing message into send buffer");
+
+   // Copy the data to the message (TODO: is this needed ??)
+   error = PMPI_Pack(buf, count, t->type, &(m->payload), bytes, &tmp, c->comm);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to pack MPI message into message buffer!");
+      return TRANSLATE_ERROR(error);
+   }
+
+   DEBUG(1, "Forwarding message to gateway %d", my_gateway);
+
+   // Send the message to the gateway.
+   error = PMPI_Send(m, DATA_MESSAGE_SIZE + bytes, MPI_BYTE, my_gateway, TAG_DATA_MSG + get_cluster_rank(c, dest), mpi_comm_gateway_and_application_optimistic);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to forward message to gateway %d!", my_gateway);
+      return TRANSLATE_ERROR(error);
+   }
+
+   return EMPI_SUCCESS;
+}
+
+static int do_rendezvous_send(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c, int bytes)
+{
+   int error, tmp, target;
+   int rendezvous_message[2];
+   int rendezvous_reply[2];
+   data_message *m;
+
+   MPI_Request r;
+   MPI_Status s;
+
+   // Start by posting an irecv for the rendezvous reply.
+
+   error = PMPI_Irecv(&rendezvous_reply, 2, MPI_INT, my_gateway, TAG_RENDEZVOUS_REPLY, mpi_comm_gateway_and_application_rendezvous, &r);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to post rendezvous receive from gateway %d!", my_gateway);
+      return TRANSLATE_ERROR(error);
+   }
+
+   target = get_pid(c, dest);
+
+   rendezvous_message[0] = bytes;
+   rendezvous_message[1] = target;
+
+   // We start by informing the gateway that we will send it a rendezvous message!
+   error = PMPI_Send(&rendezvous_message, 2*sizeof(int), MPI_BYTE, my_gateway, TAG_RENDEZVOUS_REQUEST, mpi_comm_gateway_and_application_optimistic);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to forward rendezvous request to gateway %d!", my_gateway);
+      return TRANSLATE_ERROR(error);
+   }
+
+   // Allocate a data message, and fill the header.
+   m = create_data_message(opcode, get_pid(c, dest), c->handle, c->global_rank, dest, tag, count, bytes);
+
+   if (m == NULL) {
+      ERROR(1, "Failed to allocate MPI message buffer!");
+      return EMPI_ERR_INTERN;
+   }
+
+   DEBUG(2, "Packing message into send buffer");
+
+   tmp = 0;
+
+   // Copy the data to the message (TODO: is this needed ??)
+   error = PMPI_Pack(buf, count, t->type, &(m->payload), bytes, &tmp, c->comm);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to pack MPI message into message buffer!");
+      return TRANSLATE_ERROR(error);
+   }
+
+   // We are done preparing the message. Now wait for the reply from the gateway.
+   error = MPI_Wait(&r, &s);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to wait for rendezvous reply! (error=%d)", error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   // Sanity check
+   if (rendezvous_reply != rendezvous_message) {
+      ERROR(1, "Got unexpected rendezvous reply %d != %d! (error=%d)", error, rendezvous_message, rendezvous_reply);
+      return EMPI_ERR_INTERN;
+   }
+
+   DEBUG(1, "Forwarding message to gateway %d", my_gateway);
+
+   // Send the message to the gateway. Use Rsend because we are sure there is a receive waiting for us.
+   // FIXME!!! -- This TAG is incorrect ??
+   error = PMPI_Rsend(m, DATA_MESSAGE_SIZE + bytes, MPI_BYTE, my_gateway, /*TAG_DATA_MSG + get_cluster_rank(c, dest)*/ TAG_DATA_MSG , mpi_comm_gateway_and_application_rendezvous);
+
+   // Free the message buffer.
+   free_data_message(m);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to forward message to gateway %d!", my_gateway);
+      return TRANSLATE_ERROR(error);
+   }
+
+   return EMPI_SUCCESS;
+}
+
+static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c)
+{
+   // We have already checked the various parameters, so all we have to so is send the lot!
+   int bytes, error;
+
+   DEBUG(1, "Forwarding message to gateway %d", my_gateway);
+
+   // Get the data size
+   error = PMPI_Pack_size(count, t->type, c->comm, &bytes);
+
+   if (error != MPI_SUCCESS) {
+      return TRANSLATE_ERROR(error);
+   }
+
+   DEBUG(2, "Message size is %d bytes", bytes);
+
+   if (bytes + DATA_MESSAGE_SIZE <= MAX_OPTIMISTIC_MESSAGE_SIZE) {
+      // The message is small enough for an optimistic send!
+      return do_optimistic_send(opcode, buf, count, t, dest, tag, c, bytes);
+   } else {
+      return do_rendezvous_send(opcode, buf, count, t, dest, tag, c, bytes);
+   }
+}
 
 // Send a wide area message.
 int messaging_send(void* buf, int count, datatype *t, int dest, int tag, communicator* c)
@@ -554,7 +954,7 @@ int messaging_receive(void *buf, int count, datatype *t, int source, int tag, EM
 
    while (m == NULL) {
 
-      error = probe_mpi_data_message(&m, 1);
+      error = probe_mpi_data_message(1, c->handle, source, tag, &m);
 
       if (error != EMPI_SUCCESS) {
          ERROR(1, "Failed to probe for MPI DATA message (error=%d)", error);
@@ -564,12 +964,6 @@ int messaging_receive(void *buf, int count, datatype *t, int source, int tag, EM
       DEBUG(5, "Message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
                     m->header.opcode, m->header.src_pid, m->header.dst_pid, m->header.length,
                     m->comm, m->source, m->dest, m->tag, m->count);
-
-      if (!match_message(m, c->handle, source, tag)) {
-         DEBUG(5, "No match. Storing message");
-         store_message(m);
-         m = NULL;
-      }
    }
 
    error = unpack_message(buf, count, t, c, m, status);
@@ -628,25 +1022,13 @@ int messaging_probe_receive(request *r, int blocking)
    do {
       m = NULL;
 
-      error = probe_mpi_data_message(&m, blocking);
+      error = probe_mpi_data_message(blocking, r->c->handle, r->source_or_dest, r->tag, &m);
 
       if (error != EMPI_SUCCESS) {
          ERROR(1, "Failed to probe for MPI DATA message (error=%d)", error);
          r->error = error;
          r->flags |= REQUEST_FLAG_COMPLETED;
          return error;
-      }
-
-      if (m != NULL) {
-         // We've received a message. Let's see if it matches our requirements...
-         if (match_message(m, r->c->handle, r->source_or_dest, r->tag)) {
-            r->message = m;
-            r->flags |= REQUEST_FLAG_COMPLETED;
-            return EMPI_SUCCESS;
-         }
-
-         DEBUG(5, "No match. Storing message");
-         store_message(m);
       }
 
    } while (blocking);
@@ -699,7 +1081,7 @@ static int send_server_request(unsigned char *data, int len)
 
    DEBUG(1, "Sending server message to %d of length %d", server_gateway, len);
 
-   error = PMPI_Send(data, len, MPI_BYTE, server_gateway, TAG_SERVER_REQUEST, mpi_comm_gateway_and_application);
+   error = PMPI_Send(data, len, MPI_BYTE, server_gateway, TAG_SERVER_REQUEST, mpi_comm_gateway_and_application_server);
 
    if (error != MPI_SUCCESS) {
       ERROR(1, "Failed to send server request to gateway! (error=%d)", error);
@@ -715,7 +1097,7 @@ static int receive_server_message(unsigned char *data, int len)
 
    DEBUG(1, "Waiting for server message from %d", server_gateway);
 
-   error = PMPI_Recv(data, len, MPI_BYTE, server_gateway, TAG_SERVER_REPLY, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
+   error = PMPI_Recv(data, len, MPI_BYTE, server_gateway, TAG_SERVER_REPLY, mpi_comm_gateway_and_application_server, MPI_STATUS_IGNORE);
 
    DEBUG(1, "Received server message (error=%d)", error);
 
@@ -732,7 +1114,7 @@ static int receive_server_message_varlen(unsigned char **data, int *len)
    int error;
    MPI_Status status;
 
-   error = PMPI_Probe(server_gateway, TAG_SERVER_REPLY, mpi_comm_gateway_and_application, &status);
+   error = PMPI_Probe(server_gateway, TAG_SERVER_REPLY, mpi_comm_gateway_and_application_server, &status);
 
    if (error != MPI_SUCCESS) {
       ERROR(1, "Failed to probe server reply (varlen)! (error=%d)", error);

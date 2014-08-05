@@ -39,6 +39,8 @@
 
 //#define DETAILED_MESSAGE_INFO 1
 
+#define MAX_OPTIMISTIC_MESSAGE_SIZE (16*1024)
+
 #define MAX_POLL_MISS_COUNT (100)
 
 #define MAX_MESSAGE_SIZE (1*1024*1024)
@@ -179,11 +181,7 @@ int gateway_rank;
 //static MPI_Comm mpi_comm_application_only;
 MPI_Comm mpi_comm_gateways_only;
 
-extern MPI_Comm mpi_comm_gateway_and_application;
-
-//extern MPI_Comm mpi_comm_gateway_and_application_server;
-//extern MPI_Comm mpi_comm_gateway_and_application_optimistic;
-//extern MPI_Comm mpi_comm_gateway_and_application_rendezvous;
+//extern MPI_Comm mpi_comm_gateway_and_application;
 
 // The file descriptor used to epoll the gateway connections.
 // static int epollfd;
@@ -213,6 +211,21 @@ static uint64_t pending_data_size;
 
 // Timing offset.
 uint64_t gateway_start_time;
+
+// This lot is needed to post ireceives for incoming small messages.
+extern MPI_Comm mpi_comm_gateway_and_application_server;
+extern MPI_Comm mpi_comm_gateway_and_application_optimistic;
+extern MPI_Comm mpi_comm_gateway_and_application_rendezvous;
+
+extern generic_message **messages;
+extern MPI_Request *requests;
+extern MPI_Status *statusses;
+
+extern int receive_count;
+extern int requests_ready;
+extern int *requests_ready_indices;
+
+extern int prepare_optimistic_message(int index, int new_alloc);
 
 static message_buffer *create_message_buffer()
 {
@@ -1654,7 +1667,67 @@ static int process_gateway_message(generic_message *m, int *done)
 
 // NOTE: Assiumption here is that "generic_message *m" points to a shared buffer, and
 // we therefore need to copy any data that is cannot be reused after this call returns!!
-static int forward_mpi_message(generic_message *m, int pid, int len, int tag)
+static int forward_mpi_data_message(generic_message *m, int pid, int len)
+{
+   int cluster, rank, error, rendezvous_message;
+   mpi_message *mpi_msg;
+
+   cluster = GET_CLUSTER_RANK(pid);
+   rank = GET_PROCESS_RANK(pid);
+
+   DEBUG(1, "Forwarding message to MPI %d:%d tag=%d len-%d", cluster, rank, tag, len);
+
+   if (cluster != cluster_rank) {
+      ERROR(1, "Received message for wrong cluster! dst=%d me=%d!", cluster, cluster_rank);
+      return EMPI_ERR_INTERN;
+   }
+
+   if (len > MAX_OPTIMISTIC_MESSAGE_SIZE) {
+      // Send a rendezvous request to the receiver
+      rendezvous_message = len;
+
+      // NOTE: Assumption here is that this message will alway proceed due to its small size!!!
+      error = PMPI_Send(&rendezvous_message, sizeof(int), MPI_BYTE, rank, TAG_RENDEZVOUS_REQUEST, mpi_comm_gateway_and_application_optimistic);
+
+      if (error != MPI_SUCCESS) {
+         ERROR(1, "Failed to forward rendezvous request to client %d!", rank);
+         return TRANSLATE_ERROR(error);
+      }
+
+      mpi_msg = create_mpi_message(m, len);
+
+      if (mpi_msg == NULL) {
+         ERROR(1, "Failed to allocate MPI request!");
+         return EMPI_ERR_INTERN;
+      }
+
+      error = PMPI_Isend(&(mpi_msg->data[0]), len, MPI_BYTE, rank, TAG_FORWARDED_DATA_MSG, mpi_comm_gateway_and_application_rendezvous, &(mpi_msg->r));
+
+   } else {
+
+      mpi_msg = create_mpi_message(m, len);
+
+      if (mpi_msg == NULL) {
+         ERROR(1, "Failed to allocate MPI request!");
+         return EMPI_ERR_INTERN;
+      }
+
+      error = PMPI_Isend(&(mpi_msg->data[0]), len, MPI_BYTE, rank, TAG_FORWARDED_DATA_MSG, mpi_comm_gateway_and_application_optimistic, &(mpi_msg->r));
+   }
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to perform Isend! (error=%d)", error);
+      free(mpi_msg);
+      return TRANSLATE_ERROR(error);
+   }
+
+   mpi_msg->next = mpi_messages;
+   mpi_messages = mpi_msg;
+
+   return EMPI_SUCCESS;
+}
+
+static int forward_mpi_server_message(generic_message *m, int pid, int len)
 {
    int cluster, rank, error;
    mpi_message *mpi_msg;
@@ -1662,7 +1735,7 @@ static int forward_mpi_message(generic_message *m, int pid, int len, int tag)
    cluster = GET_CLUSTER_RANK(pid);
    rank = GET_PROCESS_RANK(pid);
 
-   DEBUG(1, "Forwarding message to MPI %d:%d tag=%d len-%d", cluster, rank, tag, len);
+   DEBUG(1, "Forwarding server message to MPI %d:%d tag=%d len-%d", cluster, rank, TAG_SERVER_REPLY, len);
 
    if (cluster != cluster_rank) {
       ERROR(1, "Received message for wrong cluster! dst=%d me=%d!", cluster, cluster_rank);
@@ -1676,7 +1749,7 @@ static int forward_mpi_message(generic_message *m, int pid, int len, int tag)
       return EMPI_ERR_INTERN;
    }
 
-   error = PMPI_Isend(&(mpi_msg->data[0]), len, MPI_BYTE, rank, tag, mpi_comm_gateway_and_application, &(mpi_msg->r));
+   error = PMPI_Isend(&(mpi_msg->data[0]), len, MPI_BYTE, rank, TAG_SERVER_REPLY, mpi_comm_gateway_and_application_server, &(mpi_msg->r));
 
    if (error != MPI_SUCCESS) {
       ERROR(1, "Failed to perform Isend! (error=%d)", error);
@@ -1802,7 +1875,7 @@ static int process_socket_buffer(socket_info *info, int *done)
                 break;
              }
          } else {
-             error = forward_mpi_message(m, pid, len, TAG_SERVER_REPLY);
+             error = forward_mpi_server_message(m, pid, len);
          }
 
          if (error != MPI_SUCCESS) {
@@ -1810,7 +1883,7 @@ static int process_socket_buffer(socket_info *info, int *done)
             return error;
          }
       } else {
-         error = forward_mpi_message(m, pid, len, TAG_FORWARDED_DATA_MSG);
+         error = forward_mpi_data_message(m, pid, len);
 
          if (error != MPI_SUCCESS) {
             ERROR(1, "Failed to forward message to MPI! (error=%d)", error);
@@ -1991,6 +2064,7 @@ static int process_socket_messages(int *done)
    return EMPI_SUCCESS;
 }
 
+/*
 static int receive_message(int count, MPI_Status *status, message_buffer *buffer)
 {
 #ifdef DETAILED_MESSAGE_INFO
@@ -2039,6 +2113,7 @@ static int receive_message(int count, MPI_Status *status, message_buffer *buffer
 
    return EMPI_SUCCESS;
 }
+*/
 
 static int receive_server_reply(int *done)
 {
@@ -2046,7 +2121,7 @@ static int receive_server_reply(int *done)
    unsigned char *buffer;
    MPI_Status status;
 
-   error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_SERVER_REPLY, mpi_comm_gateway_and_application, &flag, &status);
+   error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_SERVER_REPLY, mpi_comm_gateway_and_application_server, &flag, &status);
 
    if (error != MPI_SUCCESS) {
       ERROR(1, "Failed to probe MPI for TAG_SERVER_REQUEST! (error=%d)", error);
@@ -2076,7 +2151,7 @@ static int receive_server_reply(int *done)
    DEBUG(2, "Receiving MPI server reply from source %d, with tag %d and size %d", status.MPI_SOURCE, status.MPI_TAG, count);
 
    // NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting -- IS THIS TRUE???
-   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
+   error = PMPI_Recv(buffer, count, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, mpi_comm_gateway_and_application_server, MPI_STATUS_IGNORE);
 
    if (error != MPI_SUCCESS) {
       DEBUG(1, "Failed to receive MPI server message! source=%d tag=%d count=%d (error=%d)", status.MPI_SOURCE, status.MPI_TAG, count, error);
@@ -2087,6 +2162,8 @@ static int receive_server_reply(int *done)
    return process_gateway_message((generic_message *)buffer, done);
 }
 
+
+/*
 static int receive_mpi_message(message_buffer *buffer, int tag, int *wouldblock, int *nospace, int *received_data, int *messages)
 {
    int error, flag, count, space;
@@ -2125,6 +2202,130 @@ static int receive_mpi_message(message_buffer *buffer, int tag, int *wouldblock,
 
    return receive_message(count, &status, buffer);
 }
+*/
+
+
+static int receive_data_from_mpi()
+{
+   int error, count, pos, msglen, i, index;
+   size_t len;
+   unsigned char *buffer;
+
+   MPI_Status s;
+   MPI_Request r;
+
+// TODO: loop over testsome ... len (count while len < some_threshold & itt < some_count & there are requests left)
+
+   // Test if 0 or more of the optimisic receive buffers have received any data.
+   error = PMPI_Testsome(receive_count, requests, &requests_ready, requests_ready_indices, statusses);
+
+   if (error != MPI_SUCCESS) {
+      ERROR(1, "Failed to probe MPI! (error=%d)", error);
+      return TRANSLATE_ERROR(error);
+   }
+
+   if (requests_ready == 0) {
+      return EMPI_SUCCESS;
+   }
+
+   // Now iterate over the available messages and process them. NOTE: MPI will 'deactivate' all requests
+   // that are returned. Therefore, we -MUST- process all of them here and post a new Irecv for every
+   // request that was received.
+   len = 0;
+
+   for (i=0;i<requests_ready;i++) {
+
+      index = requests_ready_indices[i];
+
+      if (statusses[index].MPI_TAG == TAG_FORWARDED_DATA_MSG) {
+         // messages[index] contains a complete data message.
+         len += ((message_header *) messages[index])->length;
+      } else if (statusses[index].MPI_TAG == TAG_RENDEZVOUS_REQUEST) {
+         // messages[index] contains a rendezvous request for a large message.
+         // The size of the large messages is send as the payload in messages[index];
+         len += ((int *) messages[index])[0];
+      }
+   }
+
+   // len now contains the total amount of data we need to receive, so allocate buffer, and receive the data.
+
+   // TODO: will break with very large messages!
+   // TODO: fix for multiple destination clusters!
+   // TODO: used fixed buffer size ??
+   buffer = malloc(len);
+
+   pos = 0;
+
+   for (i=0;i<requests_ready;i++) {
+
+      index = requests_ready_indices[i];
+
+      if (statusses[index].MPI_TAG == TAG_FORWARDED_DATA_MSG) {
+         // messages[index] contains a complete (but smalll) data message, so we need to copy it!
+         msglen = ((message_header *) messages[index])->length;
+
+         memcpy(buffer + pos, &messages[index], msglen);
+
+         pos += msglen;
+
+         // Reset the Irecv for this index;
+         error = prepare_optimistic_message(index, 0);
+
+         if (error != EMPI_SUCCESS) {
+            return error;
+         }
+
+      } else if (statusses[index].MPI_TAG == TAG_RENDEZVOUS_REQUEST) {
+         // messages[index] contains a rendezvous request for a large message.
+         // The size of the large messages is send as the payload in messages[index];
+         msglen = ((int *) messages[index])[0];
+
+// TODO: FIXME: post multiple request before waiting!!!!!!
+
+         // Post an Irecv to receive the message data
+         error = PMPI_Irecv(buffer + pos, msglen, MPI_BYTE, statusses[index].MPI_SOURCE, TAG_FORWARDED_DATA_MSG, mpi_comm_gateway_and_application_rendezvous, &r);
+
+         if (error != MPI_SUCCESS) {
+            ERROR(1, "Failed to ireceive rendezvous data message! source=%d tag=%d count=%d (error=%d)", statusses[index].MPI_SOURCE, TAG_FORWARDED_DATA_MSG, count, error);
+            return TRANSLATE_ERROR(error);
+         }
+
+         // Inform the sender that we are ready for the rendezvous data! We use an Rsend, since we are 100% sure the other side it ready for this message!
+         error = PMPI_Rsend(((int *)messages[index]), 2, MPI_INT, statusses[index].MPI_SOURCE, TAG_RENDEZVOUS_REPLY, mpi_comm_gateway_and_application_rendezvous);
+
+         if (error != MPI_SUCCESS) {
+            ERROR(1, "Failed to rsend rendezvous reply! source=%d tag=%d count=%d (error=%d)", statusses[index].MPI_SOURCE, TAG_RENDEZVOUS_REPLY, 2, error);
+            return TRANSLATE_ERROR(error);
+         }
+
+         // Wait for the data to arrive.
+         error = MPI_Wait(&r, &s);
+
+         if (error != MPI_SUCCESS) {
+            ERROR(1, "Failed to wait for rendezvous data! (error=%d)", error);
+            return TRANSLATE_ERROR(error);
+         }
+
+         pos += msglen;
+
+         // Reset the Irecv for this index;
+         error = prepare_optimistic_message(index, 1);
+
+         if (error != EMPI_SUCCESS) {
+            return error;
+         }
+      }
+   }
+
+   // buffer now contains all messages we need to forward. What shall we do with it ???
+
+
+
+}
+
+
+
+
 
 static int receive_from_mpi(int *done)
 {
@@ -2142,6 +2343,13 @@ static int receive_from_mpi(int *done)
    // We keep receiving until we have received enough data, or all receivers run out of MPI messages or buffer space.
 //   while (received_data < MAX_SINGLE_MPI_RECEIVE && ((wouldblock + nospace) < cluster_count-1)) {
 //   while (miss < MAX_POLL_MISS_COUNT && received_data < MAX_SINGLE_MPI_RECEIVE) {
+
+
+/*
+
+HIERO
+
+HIERO - replace new data receive code!
 
    do {
 
@@ -2172,6 +2380,9 @@ static int receive_from_mpi(int *done)
       }
 
    } while (miss < MAX_POLL_MISS_COUNT && buffered_data < MIN_INTERESTING_BUFFER_SIZE);
+
+
+*/
 
 //if (received_data > 0) {
 //   fprintf(stderr, "Stopped receiving MPI data after %d bytes, wouldblock=%d, nospace=%d messages %d\n",
