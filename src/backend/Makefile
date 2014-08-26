@@ -1,6 +1,6 @@
 include ../../empi.config
 
-OBJECTS = linked_queue.o logical.o communicator.o debugging.o file.o group.o message_queue.o data_message_queue.o operation.o request.o datatype.o empi.o info.o messaging.o reduce_ops.o status.o gateway.o
+OBJECTS = socket_util.o linked_queue.o blocking_linked_queue.o logical.o communicator.o debugging.o file.o group.o message_queue.o data_message_queue.o operation.o request.o datatype.o empi.o info.o messaging.o reduce_ops.o status.o gateway.o
 
 LIBDIR  = $(EMPI_HOME)/lib
 

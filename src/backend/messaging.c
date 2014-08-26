@@ -524,7 +524,8 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
    DEBUG(1, "Forwarding message to gateway %d", my_gateway);
 
    // Send the message to the gateway.
-   error = TRANSLATE_ERROR(PMPI_Send(m, DATA_MESSAGE_SIZE + bytes, MPI_BYTE, my_gateway, TAG_DATA_MSG + get_cluster_rank(c, dest), mpi_comm_gateway_and_application));
+   error = TRANSLATE_ERROR(PMPI_Send(m, DATA_MESSAGE_SIZE + bytes, MPI_BYTE, my_gateway, TAG_DATA_MSG
+		   /*+ get_cluster_rank(c, dest)*/, mpi_comm_gateway_and_application));
 
    // Free the message buffer.
    free_data_message(m);
