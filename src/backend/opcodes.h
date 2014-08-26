@@ -28,10 +28,14 @@
 #define OPCODE_COLLECTIVE_BCAST           60
 
 // Tags use for MPI communication between the gateway and application nodes.
-#define TAG_FORWARDED_DATA_MSG 42
-#define TAG_DATA_MSG           43
-#define TAG_SERVER_REQUEST     44
-#define TAG_SERVER_REPLY       45
+//
+// Note that the rank of the target cluster is added to TAG_DATA_MSG. As a
+// result all tags between TAG_DATA_MSG ... (TAG_DATA_MSG+NUM_CLUSTERS) may
+// be in use in the gateway.
+#define TAG_SERVER_REQUEST      0
+#define TAG_SERVER_REPLY        1
+#define TAG_FORWARDED_DATA_MSG  2
+#define TAG_DATA_MSG            3
 
 #endif // _OPCODES_H_
 

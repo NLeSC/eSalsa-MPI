@@ -84,7 +84,7 @@ static int add_communicator(int handle, MPI_Comm comm, int initial,
       *out = c;
    }
 
-   data_message_queue_init(&(c->queue));
+   c->queue = data_message_queue_create();
 
    return EMPI_SUCCESS;
 }
@@ -526,7 +526,7 @@ void store_message(data_message *m)
       return;
    }
 
-   data_message_enqueue(&(c->queue), m);
+   data_message_enqueue(c->queue, m);
 
 //   m->next = NULL;
 
@@ -555,7 +555,7 @@ int match_message(data_message *m, int comm, int source, int tag)
 
 data_message *find_pending_message(communicator *c, int source, int tag)
 {
-   return data_message_dequeue_matching(&(c->queue), c->handle, source, tag);
+   return data_message_dequeue_matching(c->queue, c->handle, source, tag);
 }
 
 /*

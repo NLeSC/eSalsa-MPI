@@ -5,18 +5,21 @@
 #include "mpi.h"
 
 // Total data to send per pair (must be power of two)
-//#define TOTAL_DATA   (1024L*1024L*1024L)
-#define TOTAL_DATA   (128*1024L*1024L)
+#define TOTAL_DATA   (1024L*1024L*1024L)
+//#define TOTAL_DATA   (10*1024L*1024L)
 
 // Min message size used (must be power of two)
-#define MIN_MSG_SIZE (256)
+//#define MIN_MSG_SIZE (256)
 
 // Max message size used (must be power of two)
 //#define MAX_MSG_SIZE (1024L*1024L)
-#define MAX_MSG_SIZE (8*1024L*1024L)
+//#define MAX_MSG_SIZE (8*1024L*1024L)
 
 // Number of times to repeat a test
 #define REPEAT (1)
+
+static int message_sizes [] = { 5040, 10080, 15120, 20160, 25200, 30240, 35280, 40320, 45360, 70560, 75600 };
+static int num_message_sizes = 11;
 
 static uint64_t current_time_micros()
 {
@@ -32,13 +35,12 @@ static uint64_t current_time_micros()
 
 int run_test(int rank, int size, int sender, int peer, int msgsize)
 {
-    uint64_t start, end, tpt, tpl, time;
+    uint64_t start, end;
     long total, count, msg_per_process;
     int i, j, error;
+    double time, tpt, tpl;
 
-    unsigned char *buf;
-
-    buf = malloc(msgsize);
+    unsigned char *buf = malloc(msgsize);
 
     if (buf == NULL) {
        fprintf(stderr, "Failed to allocate buffer of size %d\n", msgsize);
@@ -64,11 +66,11 @@ int run_test(int rank, int size, int sender, int peer, int msgsize)
        fprintf(stderr, "Test will be repeated %d times\n", REPEAT);
     }
 
-    if (sender) {
-       fprintf(stderr, "I am a sender\n");
-    } else {
-       fprintf(stderr, "I am a receiver\n");
-    }
+//    if (sender) {
+//       fprintf(stderr, "I am a sender\n");
+//    } else {
+//       fprintf(stderr, "I am a receiver\n");
+//    }
 
     error = MPI_Barrier(MPI_COMM_WORLD);
 
@@ -107,17 +109,17 @@ int run_test(int rank, int size, int sender, int peer, int msgsize)
 
        end = current_time_micros();
 
-       // Time in micro seconds
-       time = (end-start);
+       // Time in seconds
+       time = (end-start)/1000000.0;
 
-       // Total data volume in bits (as send by all senders)
-       tpt = (8L*total);
+       // Total data volume in gbits (as send by all senders)
+       tpt = (8L*total)/(1000.0*1000.0*1000.0);
 
-       // Local data volume in bits (as send by this sender)
-       tpl = (8L * msgsize * msg_per_process);
+       // Local data volume in gbits (as send by this sender)
+       tpl = (8L * msgsize * msg_per_process) / (1000.0*1000.0);
 
        if (rank == 0) {
-          fprintf(stderr, "Test %d - %d of %d took %ld usec for %ld bytes = %ld Mbit/sec total, %ld MBit/sec local.\n", msgsize, i, REPEAT, time, total, (tpt/time), (tpl/time));
+          fprintf(stderr, "Test %d - %d of %d took %ld usec for %ld bytes = %f Gbit/sec total, %f MBit/sec local.\n", msgsize, i, REPEAT, (end-start), total, (tpt/time), (tpl/time));
        }
     }
 
@@ -130,7 +132,7 @@ int main(int argc, char *argv[])
 {
     int size, rank, sender, peer, i, result;
 
-    int msgsize = MIN_MSG_SIZE;
+//    int msgsize = MIN_MSG_SIZE;
 
     MPI_Init(&argc, &argv);
 
@@ -146,23 +148,22 @@ int main(int argc, char *argv[])
     if (rank < size/2) {
        sender = 1;
        peer = size/2 + rank;
-       fprintf(stderr, "My rank is %d and I will send to %d\n", rank, peer);
+//       fprintf(stderr, "My rank is %d and I will send to %d\n", rank, peer);
     } else {
        sender = 0;
        peer = rank - size/2;
-       fprintf(stderr, "My rank is %d and I will receive from %d\n", rank, peer);
+//       fprintf(stderr, "My rank is %d and I will receive from %d\n", rank, peer);
     }
 
-    while (msgsize <= MAX_MSG_SIZE) {
-       result = run_test(rank, size, sender, peer, msgsize);
+    for (i=0;i<num_message_sizes;i++) {
+
+       result = run_test(rank, size, sender, peer, message_sizes[i]);
 
        if (result != 0) {
-          fprintf(stderr, "Test failed! (msgsize=%d)\n", msgsize);
+          fprintf(stderr, "Test failed! (msgsize=%d)\n", message_sizes[i]);
           MPI_Finalize();
           return 1;
        }
-
-       msgsize *= 2;
     }
 
     fprintf(stderr, "Done!\n");

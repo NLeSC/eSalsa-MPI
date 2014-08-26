@@ -14,10 +14,10 @@ all: $(OBJECTS)
 	$(AR) -cr $(OBJLIB) $(OBJECTS)
 
 .c.o:
-	$(CC) -c $(OPT) $(CFLAGS) $(INCLUDE) $(SHARED) $(BACKEND) $< -o $@
+	$(CC) -c $(OPT) $(DEBUG) $(PROF) $(CFLAGS) $(INCLUDE) $(SHARED) $(BACKEND) $< -o $@
 
 .f.o:
-	$(FC) -c $(OPT) $(FFLAGS) $< -o $@
+	$(FC) -c $(OPT) $(DEBUG) $(PROF) $(FFLAGS) $< -o $@
 
 clean:
 	$(RM) -f $(OBJLIB) $(OBJECTS)

@@ -1,74 +1,108 @@
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "logging.h"
 #include "messaging.h"
 #include "message_queue.h"
 #include "empi.h"
 
-int message_queue_init(message_queue *q)
+message_queue *message_queue_create()
 {
-   if (q == NULL) {
+   message_queue *tmp = malloc(sizeof(message_queue));
+
+   if (tmp == NULL) {
+      return NULL;
+   }
+
+   tmp->size = MESSAGE_QUEUE_INITIAL_SIZE;
+   tmp->used = 0;
+   tmp->head = 0;
+   tmp->tail = 0;
+
+   tmp->entries = malloc(MESSAGE_QUEUE_INITIAL_SIZE * sizeof(generic_message *));
+
+   memset((void *) tmp->entries, 0, MESSAGE_QUEUE_INITIAL_SIZE * sizeof(generic_message *));
+
+   return tmp;
+}
+
+//message_queueint message_queue_init(message_queue *q)
+//{
+//   if (q == NULL) {
+//      return -1;
+//   }
+//
+//   q->head = NULL;
+//   q->tail = NULL;
+//
+//   return 0;
+//}
+
+static int grow(message_queue *q)
+{
+   generic_message **tmp = realloc(q->entries, q->size*2);
+
+   if (tmp == NULL) {
       return -1;
    }
 
-   q->head = NULL;
-   q->tail = NULL;
+   q->entries = tmp;
+   return 0;
+}
+
+
+static int ensure_space(message_queue *q)
+{
+   if (q->used == q->size) {
+      return grow(q);
+   }
 
    return 0;
 }
 
 int message_enqueue(message_queue *q, generic_message *m)
 {
-   message_info *info = malloc(sizeof(message_info));
-
-   if (info == NULL) {
+   if (ensure_space(q) == -1) {
       return -1;
    }
 
-   info->message = m;
-   info->next = NULL;
-
-   if (q->head == NULL) {
-      q->head = q->tail = info;
-   } else {
-      q->tail->next = info;
-      q->tail = info;
-   }
-
+   q->entries[q->tail] = m;
+   q->tail = (q->tail+1) % q->size;
+   q->used++;
    return 0;
 }
 
 generic_message *message_dequeue(message_queue *q)
 {
-   message_info *current;
    generic_message *message;
 
-   if (q->head == NULL) {
+   if (q->used == 0) {
       return NULL;
    }
 
-   current = q->head;
-   message = current->message;
+   message = q->entries[q->head];
 
-   if (q->head == q->tail) {
-      q->head = q->tail = NULL;
+   q->used--;
+
+   if (q->used == 0) {
+      q->head = 0;
+      q->tail = 0;
    } else {
-      q->head = q->head->next;
+      q->head = (q->head+1) % q->size;
    }
-
-   free(current);
 
    return message;
 }
 
 int message_queue_empty(message_queue *q)
 {
-   return (q->head == NULL);
+   return (q->used == 0);
 }
 
-int data_message_queue_init(data_message_queue *q)
+/*
+data_message_queue *data_message_queue_create(data_message_queue *q)
 {
-   return message_queue_init(&(q->queue));
+   return (data_message_queue *) message_queue_create();
 }
 
 int data_message_enqueue(data_message_queue *q, data_message *m)
@@ -85,6 +119,7 @@ int data_message_queue_empty(data_message_queue *q)
 {
    return message_queue_empty(&(q->queue));
 }
+*/
 
 /*
 static int match_message(data_message *m, int comm, int source, int tag)
@@ -101,57 +136,67 @@ static int match_message(data_message *m, int comm, int source, int tag)
 }
 */
 
+/*
+
 data_message *data_message_dequeue_matching(data_message_queue *q, int comm, int source, int tag)
 {
-   message_info *curr, *prev;
+   int curr, i, next;
    data_message *result;
 
    DEBUG(4, "FIND_PENDING_MESSAGE: Checking for pending messages in comm=%d from source=%d tag=%d", comm, source, tag);
 
-   if (q->queue.head == NULL) {
+   if (q->queue.used == 0) {
       DEBUG(4, "FIND_PENDING_MESSAGE: No pending messages");
       return NULL;
    }
 
    curr = q->queue.head;
-   prev = NULL;
 
-   while (curr != NULL) {
+   for (i=0;i<q->queue.used;i++) {
 
-      if (match_message((data_message *)curr->message, comm, source, tag)) {
+      if (match_message((data_message *) q->queue.entries[curr], comm, source, tag)) {
+
+          result = (data_message *) q->queue.entries[curr];
+
           if (curr == q->queue.head) {
-              // delete head. check if list empty
-              if (q->queue.head == q->queue.tail) {
-                 q->queue.head = q->queue.tail = NULL;
-              } else {
-                 q->queue.head = q->queue.head->next;
-              }
-          } else if (curr == q->queue.tail) {
-              // delete tail. set tail to prev
-              q->queue.tail = prev;
-              q->queue.tail->next = NULL;
-          } else {
-              // delete middle.
-              prev->next = curr->next;
-          }
 
-          curr->next = NULL;
-          result = (data_message *) curr->message;
-          free(curr);
+              q->queue.head = (q->queue.head+1) % q->queue.size;
+              q->queue.used--;
+
+              if (q->queue.used == 0) {
+                 q->queue.head = 0;
+                 q->queue.tail = 0;
+              }
+
+          } else if (curr == q->queue.tail) {
+
+              // delete tail. set tail to prev
+              q->queue.tail = (q->queue.tail + q->queue.size-1) % q->queue.size;
+              q->queue.used--;
+
+          } else {
+              // delete middle by moving the tail part.
+              while (curr != q->queue.tail) {
+                 q->queue.entries[curr] = q->queue.entries[(curr+1) % q->queue.size];
+                 curr = (curr+1) % q->queue.size;
+              }
+
+              q->queue.used--;
+              q->queue.tail = (q->queue.tail + q->queue.size-1) % q->queue.size;
+          }
 
           DEBUG(4, "FIND_PENDING_MESSAGE: Found pending message from %d", result->source);
 
           return result;
       }
 
-      prev = curr;
-      curr = curr->next;
+      curr = (curr+1) % q->queue.size;
    }
 
    DEBUG(4, "FIND_PENDING_MESSAGE: No matching messages");
 
    return NULL;
 }
-
+*/
 
 
