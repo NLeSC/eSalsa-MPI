@@ -34,6 +34,9 @@ bool blocking_linked_queue_destroy(blocking_linked_queue *queue);
 // Enqueue an element at the tail of the queue.
 bool blocking_linked_queue_enqueue(blocking_linked_queue *queue, void *elt, size_t size, int64_t timeout_usec);
 
+// Will an enqueue block ?
+bool blocking_linked_queue_enqueue_will_block(blocking_linked_queue *queue);
+
 // Dequeue a single element from the head of the queue. If the queue is empty,
 // wait for at most timeout_usec for an element to appear. If no element
 // is available within the specified timeout, NULL is returned.

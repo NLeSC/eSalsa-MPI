@@ -137,6 +137,22 @@ bool blocking_linked_queue_enqueue(blocking_linked_queue *queue, void *elt, size
 	return true;
 }
 
+bool blocking_linked_queue_enqueue_will_block(blocking_linked_queue *queue)
+{
+	bool result = false;
+
+	// Lock the queue first.
+	pthread_mutex_lock(&queue->mutex);
+
+	if (queue->max_data_size > 0) {
+		result = linked_queue_data_size(queue->queue) > queue->max_data_size;
+	}
+
+	// Unlock the queue.
+	pthread_mutex_unlock(&queue->mutex);
+	return result;
+}
+
 static bool wait_for_element(blocking_linked_queue *queue, int64_t timeout_usec)
 {
 	int error;

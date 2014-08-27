@@ -45,8 +45,11 @@ bool linked_queue_destroy(linked_queue *queue);
 // Enqueue an element at the tail of the queue.
 bool linked_queue_enqueue(linked_queue *queue, void *elt, size_t size);
 
-// Dequeue an element from the head of the queue.
+// Dequeue the element from the head of the queue.
 void *linked_queue_dequeue(linked_queue *queue);
+
+// Return the element from the head of the queue, without removeing it from the queue.
+void *linked_queue_peek(linked_queue *queue);
 
 // Dequeue up to count elements from the head of the queue.
 int linked_queue_bulk_dequeue(linked_queue *queue, void **buffer, int size);

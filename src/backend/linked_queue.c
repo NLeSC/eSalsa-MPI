@@ -136,6 +136,15 @@ void *linked_queue_dequeue(linked_queue *queue)
 	return elt;
 }
 
+void *linked_queue_peek(linked_queue *queue)
+{
+	if (queue->head == NULL) {
+		return NULL;
+	} else {
+		return queue->head->data;
+	}
+}
+
 int linked_queue_bulk_dequeue(linked_queue *queue, void **buffer, int count)
 {
 	int stored = 0;
