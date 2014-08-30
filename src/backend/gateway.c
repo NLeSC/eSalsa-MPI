@@ -38,6 +38,7 @@
 #include "linked_queue.h"
 #include "blocking_linked_queue.h"
 #include "socket_util.h"
+#include "udt_util.h"
 
 //#define DETAILED_MESSAGE_INFO 1
 
@@ -75,8 +76,9 @@
 //#define STATE_RW (1)
 //#define STATE_RO (0)
 
-#define TYPE_SERVER (0)
-#define TYPE_DATA   (1)
+#define TYPE_SERVER     (0)
+#define TYPE_TCP_DATA   (1)
+#define TYPE_UDT_DATA   (2)
 
 // Error codes used internally.
 #define CONNECT_OK                      0
@@ -343,7 +345,7 @@ void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
 }
 
 // Sender thread for sockets.
-void* sender_thread(void *arg)
+void* tcp_sender_thread(void *arg)
 {
 	socket_info *info;
 	bool done;
@@ -391,6 +393,56 @@ void* sender_thread(void *arg)
 	return NULL;
 }
 
+// Sender thread for sockets.
+void* udt_sender_thread(void *arg)
+{
+	socket_info *info;
+	bool done;
+	message_header *mh;
+	int error;
+	uint64_t last_write, now, data, count;
+
+	info = (socket_info *) arg;
+	done = false;
+
+	now = last_write = current_time_micros();
+	data = 0;
+	count = 0;
+
+	// FIXME: how to stop ?
+	while (!done) {
+		mh = blocking_linked_queue_dequeue(info->output_queue, -1);
+
+		if (mh != NULL) {
+
+			error = udt_sendfully(info->socketfd, (unsigned char *)mh, mh->length);
+
+			if (error != SOCKET_OK) {
+				ERROR(1, "Failed to send message!");
+				return NULL;
+			}
+
+			count++;
+			data += mh->length;
+
+			free(mh);
+
+			now = current_time_micros();
+
+			// write stats at most once per second.
+			if (now > last_write + 1000000) {
+				store_sender_thread_stats(info->index, data, count, now);
+				last_write = now;
+				count = 0;
+				data = 0;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+
 // Sender thread for socket connected to server.
 void* server_sender_thread(void *arg)
 {
@@ -422,7 +474,7 @@ void* server_sender_thread(void *arg)
 }
 
 // Receiver thread for sockets.
-void* receiver_thread(void *arg)
+void* tcp_receiver_thread(void *arg)
 {
 	socket_info *info;
 	bool done;
@@ -487,6 +539,71 @@ void* receiver_thread(void *arg)
 	return NULL;
 }
 
+// Receiver thread for sockets.
+void* udt_receiver_thread(void *arg)
+{
+	socket_info *info;
+	bool done;
+	message_header mh;
+	void *buffer;
+	int error;
+	uint64_t last_write, now, data, count;
+
+	info = (socket_info *) arg;
+	done = false;
+
+	now = last_write = current_time_micros();
+	data = 0;
+	count = 0;
+
+	// FIXME: how to stop ?
+	while (!done) {
+
+		error = udt_receivefully(info->socketfd, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
+
+		if (error != SOCKET_OK) {
+			ERROR(1, "Failed to receive header!");
+			return NULL;
+		}
+
+		if (mh.length < 0 || mh.length > MAX_MESSAGE_SIZE) {
+			ERROR(1, "Receive invalid message header length=%d!\n", mh.length);
+			return NULL;
+		}
+
+		buffer = malloc(mh.length);
+
+		if (buffer == NULL) {
+			ERROR(1, "Failed to allocate space for message of length=%d!\n", mh.length);
+			return NULL;
+		}
+
+		memcpy(buffer, &mh, MESSAGE_HEADER_SIZE);
+
+		error = udt_receivefully(info->socketfd, buffer + MESSAGE_HEADER_SIZE, mh.length-MESSAGE_HEADER_SIZE);
+
+		if (error != SOCKET_OK) {
+			ERROR(1, "Failed to receive message payload!");
+			return NULL;
+		}
+
+		blocking_linked_queue_enqueue(info->input_queue, buffer, mh.length, -1);
+
+		data += mh.length;
+		count++;
+		now = current_time_micros();
+
+		// write stats at most once per second.
+		if (now > last_write + 1000000) {
+			store_receiver_thread_stats(info->index, data, count, now);
+			last_write = now;
+			count = 0;
+			data = 0;
+		}
+	}
+
+	return NULL;
+}
 // Receiver thread for sockets.
 void* server_receiver_thread(void *arg)
 {
@@ -752,18 +869,34 @@ static int init_socket_info_threads(socket_info *info)
 			fprintf(stderr, "Failed to create server sender thread for socket %d!\n", info->socketfd);
 			return CONNECT_ERROR_ALLOCATE;
 		}
-	} else {
-		error = pthread_create(&info->receive_thread, NULL, &receiver_thread, info);
+
+	} else if (info->type == TYPE_TCP_DATA) {
+		error = pthread_create(&info->receive_thread, NULL, &tcp_receiver_thread, info);
 
 		if (error != 0) {
-			fprintf(stderr, "Failed to create receive thread for socket %d!\n", info->socketfd);
+			fprintf(stderr, "Failed to create TCP receive thread for socket %d!\n", info->socketfd);
 			return CONNECT_ERROR_ALLOCATE;
 		}
 
-		error = pthread_create(&info->send_thread, NULL, &sender_thread, info);
+		error = pthread_create(&info->send_thread, NULL, &tcp_sender_thread, info);
 
 		if (error != 0) {
-			fprintf(stderr, "Failed to create sender thread for socket %d!\n", info->socketfd);
+			fprintf(stderr, "Failed to create TCP sender thread for socket %d!\n", info->socketfd);
+			return CONNECT_ERROR_ALLOCATE;
+		}
+
+ 	} else if (info->type == TYPE_UDT_DATA) {
+		error = pthread_create(&info->receive_thread, NULL, &udt_receiver_thread, info);
+
+		if (error != 0) {
+			fprintf(stderr, "Failed to create UDT receive thread for socket %d!\n", info->socketfd);
+			return CONNECT_ERROR_ALLOCATE;
+		}
+
+		error = pthread_create(&info->send_thread, NULL, &udt_sender_thread, info);
+
+		if (error != 0) {
+			fprintf(stderr, "Failed to create UDT sender thread for socket %d!\n", info->socketfd);
 			return CONNECT_ERROR_ALLOCATE;
 		}
 	}
@@ -992,12 +1125,17 @@ static int send_gateway_info(int rank, struct in_addr *ip4ads, int ip4count)
 	return CONNECT_OK;
 }
 
-static int receive_gateway_ready_opcode(int socketfd)
+static int receive_gateway_ready_opcode(int index)
 {
 	int status;
 	int opcode;
+	int socketfd = gateway_connections[index].sockets[0].socketfd;
 
-	status = socket_receivefully(socketfd, (unsigned char *) &opcode, 4);
+	if (gateway_connections[index].sockets[0].type == TYPE_TCP_DATA) {
+		status = socket_receivefully(socketfd, (unsigned char *) &opcode, 4);
+	} else if (gateway_connections[index].sockets[0].type == TYPE_UDT_DATA) {
+		status = udt_receivefully(socketfd, (unsigned char *) &opcode, 4);
+	}
 
 	if (status != SOCKET_OK) {
 		ERROR(1, "Handshake with gateway failed! (%d)", status);
@@ -1007,12 +1145,17 @@ static int receive_gateway_ready_opcode(int socketfd)
 	return CONNECT_OK;
 }
 
-static int send_gateway_ready_opcode(int socketfd)
+static int send_gateway_ready_opcode(int index)
 {
 	int status;
 	int opcode = OPCODE_GATEWAY_READY;
+	int socketfd = gateway_connections[index].sockets[0].socketfd;
 
-	status = socket_sendfully(socketfd, (unsigned char *) &opcode, 4);
+	if (gateway_connections[index].sockets[0].type == TYPE_TCP_DATA) {
+		status = socket_sendfully(socketfd, (unsigned char *) &opcode, 4);
+	} else if (gateway_connections[index].sockets[0].type == TYPE_UDT_DATA) {
+		status = udt_sendfully(socketfd, (unsigned char *) &opcode, 4);
+	}
 
 	if (status != SOCKET_OK) {
 		ERROR(1, "Handshake with gateway failed! (%d)", status);
@@ -1026,6 +1169,10 @@ static int connect_to_gateways(int crank, int local_port)
 {
 	int remoteIndex, i, s;
 	int status, socket;
+
+	// FIXME: hardcoded data transfer type. Should be in server config!
+
+	int type = TYPE_UDT_DATA;
 
 	if (crank == cluster_rank) {
 		// I must initiate the connection!
@@ -1042,23 +1189,29 @@ static int connect_to_gateways(int crank, int local_port)
 
 				INFO(2, "Connecting to gateway stream %d.%d.%d -> index = %d", i, gateway_rank, s, remoteIndex);
 
-				// Create a path to the target gateway.
-				status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
-						&socket);
+				if (type == TYPE_TCP_DATA) {
+					// Create a path to the target gateway.
+					status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
+							&socket);
+				} else if (type == TYPE_UDT_DATA) {
+					status = udt_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
+							&socket);
+				}
 
 				if (status != CONNECT_OK) {
 					ERROR(1, "Failed to connect!");
 					return status;
 				}
 
-				init_socket_info(&(gateway_connections[i].sockets[s]), socket, TYPE_DATA, MAX_BLOCKED_QUEUE_SIZE, MAX_BLOCKED_QUEUE_SIZE);
+				init_socket_info(&(gateway_connections[i].sockets[s]), socket, type, MAX_BLOCKED_QUEUE_SIZE,
+						MAX_BLOCKED_QUEUE_SIZE);
 
 				INFO(1, "Created connection to remote gateway stream %d.%d.%d socket = %d!", i, gateway_rank, s, socket);
 			}
 		}
 
 		for (i=cluster_rank+1;i<cluster_count;i++) {
-			send_gateway_ready_opcode(gateway_connections[i].sockets[0].socketfd);
+			send_gateway_ready_opcode(i);
 		}
 
 	} else if (crank < cluster_rank) {
@@ -1073,15 +1226,20 @@ static int connect_to_gateways(int crank, int local_port)
 
 			INFO(2, "Accepting from gateway stream %d.%d.%d -> index = %d", crank, gateway_rank, s, remoteIndex);
 
-			// Create a path to the target gateway.
-			status = socket_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
+			if (type == TYPE_TCP_DATA) {
+				// Create a path to the target gateway.
+				status = socket_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
+			} else if (type == TYPE_UDT_DATA) {
+				status = udt_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
+			}
 
 			if (status != CONNECT_OK) {
 				ERROR(1, "Failed to accept!");
 				return status;
 			}
 
-			init_socket_info(&(gateway_connections[crank].sockets[s]), socket, TYPE_DATA, MAX_BLOCKED_QUEUE_SIZE, MAX_BLOCKED_QUEUE_SIZE);
+			init_socket_info(&(gateway_connections[crank].sockets[s]), socket, type, MAX_BLOCKED_QUEUE_SIZE,
+					MAX_BLOCKED_QUEUE_SIZE);
 
 			INFO(1, "Accepted connection from remote gateway %d.%d.%d socket = %d!", crank, gateway_rank, s, socket);
 		}
@@ -1091,7 +1249,7 @@ static int connect_to_gateways(int crank, int local_port)
 		// This ensures that the gateway that initiated the
 		// connection has finished completely (needed to prevent
 		// race conditions during connection setup).
-		receive_gateway_ready_opcode(gateway_connections[crank].sockets[0].socketfd);
+		receive_gateway_ready_opcode(crank);
 	}
 
 	return CONNECT_OK;

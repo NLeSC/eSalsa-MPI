@@ -1,5 +1,5 @@
-#ifndef _SOCKET_UTIL_H_
-#define _SOCKET_UTIL_H_
+#ifndef _UDT_UTIL_H_
+#define _UDT_UTIL_H_
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,7 +16,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#define SEND_BUFFER_SIZE (32*1024*1024)
+#define SEND_BUFFER_SIZE    (32*1024*1024)
 #define RECEIVE_BUFFER_SIZE (32*1024*1024)
 
 #define SOCKET_OK                    0
@@ -36,36 +36,16 @@
 #define SOCKET_ERROR_CANNOT_FIND_IP 23
 #define SOCKET_ERROR_ALLOCATE       24
 
-// Translate a hostname into an IPv4 address
-int socket_get_ipv4_address(char *name, long *ipv4);
 
-// Get all locally available IPv4 addresses.
-int get_local_ips(struct in_addr **ip4ads, int *ip4count);
-
-int socket_set_non_blocking(int socketfd);
-int socket_set_blocking(int socketfd);
-int socket_sendfully(int socketfd, unsigned char *buffer, size_t len);
-int socket_receivefully(int socketfd, unsigned char *buffer, size_t len);
-
-// Set buffer sizes for socket.
-//
-// WARNING: changing these values after a socket is connected may not work!
-//
-// send_buffer or receive_buffer == 0 means don't set, < 0 means use default, > 0 means set value.
-int socket_set_buffers(int socket, int send_buffer, int receive_buffer);
-
-// Set the TCP_NODELAY option of socket.
-//
-// If TRUE, any data written to the socket will be send as soon as possible.
-// If FALSE, data may be buffered for while to1 allow larger packets to be send.
-int socket_set_nodelay(int socket, bool nodelay);
+int udt_sendfully(int socketfd, unsigned char *buffer, size_t len);
+int udt_receivefully(int socketfd, unsigned char *buffer, size_t len);
 
 // Create a new socket and connect it to the specified IP:port destination. The new socket is returned in socketfd.
 //
 // Use send_buffer and receive_buffer to specify the desired TCP window sizes to use for the socket. These must be set before the
 // socket is connected, or they may not work. Use 0 to for autotuning and < 0 to use the default.
 //
-int socket_connect(unsigned long ipv4, unsigned short port, int send_buffer, int receive_buffer, int *socketfd);
+int udt_connect(unsigned long ipv4, unsigned short port, int send_buffer, int receive_buffer, int *socketfd);
 
 // Create a new socket at local port, and wait for a connection from the expected host. The socket is returned in socketfd.
 //
@@ -75,6 +55,6 @@ int socket_connect(unsigned long ipv4, unsigned short port, int send_buffer, int
 // Use send_buffer and receive_buffer to specify the desired TCP window sizes to use for the socket. These must be set before the
 // socket is connected, or they may not work. Use 0 to for autotuning and < 0 to use the default.
 //
-int socket_accept(unsigned short local_port, uint32_t expected_host, int send_buffer, int receive_buffer, int *socketfd);
+int udt_accept(unsigned short local_port, uint32_t expected_host, int send_buffer, int receive_buffer, int *socketfd);
 
 #endif
