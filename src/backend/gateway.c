@@ -138,6 +138,7 @@ typedef struct {
 typedef struct {
 	int socketfd;
 	int type;
+	int index;
 
 	pthread_t receive_thread;
 	pthread_t send_thread;
@@ -199,7 +200,7 @@ static generic_message **current_isend_messages;
 static size_t pending_isend_data;
 static size_t max_pending_isend_data;
 
-static bool enqueue_block_warning = true;
+//static bool enqueue_block_warning = true;
 
 // The name of this cluster (must be unique).
 static char *cluster_name;
@@ -275,7 +276,71 @@ static uint64_t pending_data_size;
 // Timing offset.
 uint64_t gateway_start_time;
 
+static uint64_t send_data = 0;
+static uint64_t send_count = 0;
 
+static uint64_t received_data = 0;
+static uint64_t received_count = 0;
+
+static pthread_mutex_t send_data_mutex;
+static pthread_mutex_t received_data_mutex;
+
+static uint64_t current_time_micros()
+{
+	uint64_t result;
+	struct timeval t;
+
+	gettimeofday(&t,NULL);
+
+	result = (t.tv_sec * 1000000LU) + t.tv_usec;
+
+	return result;
+}
+
+void store_sender_thread_stats(int index, uint64_t data, uint64_t count, uint64_t time)
+{
+	// Lock the send data first
+	pthread_mutex_lock(&send_data_mutex);
+
+	send_data += data;
+	send_count += count;
+
+	pthread_mutex_unlock(&send_data_mutex);
+}
+
+void retrieve_sender_thread_stats(uint64_t *data, uint64_t *count)
+{
+	// Lock the send data first
+	pthread_mutex_lock(&send_data_mutex);
+
+	*data = send_data;
+	*count = send_count;
+
+	pthread_mutex_unlock(&send_data_mutex);
+}
+
+void store_receiver_thread_stats(int index, uint64_t data, uint64_t count, uint64_t time)
+{
+	// Lock the send data first
+	pthread_mutex_lock(&received_data_mutex);
+
+	received_data += data;
+	received_count += count;
+
+	pthread_mutex_unlock(&received_data_mutex);
+
+}
+
+void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
+{
+	// Lock the send data first
+	pthread_mutex_lock(&send_data_mutex);
+
+	*data = received_data;
+	*count = received_count;
+
+	pthread_mutex_unlock(&send_data_mutex);
+}
 
 // Sender thread for sockets.
 void* sender_thread(void *arg)
@@ -284,9 +349,14 @@ void* sender_thread(void *arg)
 	bool done;
 	message_header *mh;
 	int error;
+	uint64_t last_write, now, data, count;
 
 	info = (socket_info *) arg;
 	done = false;
+
+	now = last_write = current_time_micros();
+	data = 0;
+	count = 0;
 
 	// FIXME: how to stop ?
 	while (!done) {
@@ -296,11 +366,24 @@ void* sender_thread(void *arg)
 
 			error = socket_sendfully(info->socketfd, (unsigned char *)mh, mh->length);
 
-			free(mh);
-
 			if (error != SOCKET_OK) {
 				ERROR(1, "Failed to send message!");
 				return NULL;
+			}
+
+			count++;
+			data += mh->length;
+
+			free(mh);
+
+			now = current_time_micros();
+
+			// write stats at most once per second.
+			if (now > last_write + 1000000) {
+				store_sender_thread_stats(info->index, data, count, now);
+				last_write = now;
+				count = 0;
+				data = 0;
 			}
 		}
 	}
@@ -346,9 +429,14 @@ void* receiver_thread(void *arg)
 	message_header mh;
 	void *buffer;
 	int error;
+	uint64_t last_write, now, data, count;
 
 	info = (socket_info *) arg;
 	done = false;
+
+	now = last_write = current_time_micros();
+	data = 0;
+	count = 0;
 
 	// FIXME: how to stop ?
 	while (!done) {
@@ -382,6 +470,18 @@ void* receiver_thread(void *arg)
 		}
 
 		blocking_linked_queue_enqueue(info->input_queue, buffer, mh.length, -1);
+
+		data += mh.length;
+		count++;
+		now = current_time_micros();
+
+		// write stats at most once per second.
+		if (now > last_write + 1000000) {
+			store_receiver_thread_stats(info->index, data, count, now);
+			last_write = now;
+			count = 0;
+			data = 0;
+		}
 	}
 
 	return NULL;
@@ -465,17 +565,6 @@ void* server_receiver_thread(void *arg)
 //	return tmp;
 //}
 
-static uint64_t current_time_micros()
-{
-	uint64_t result;
-	struct timeval t;
-
-	gettimeofday(&t,NULL);
-
-	result = (t.tv_sec * 1000000LU) + t.tv_usec;
-
-	return result;
-}
 
 /*****************************************************************************/
 /*                      Initialization / Finalization                        */
@@ -1201,6 +1290,20 @@ int generic_gateway_init(int rank, int size)
 	INFO(1, "I am one of the gateways -- performing generic gateway init!");
 
 	gateway_start_time = current_time_micros();
+
+	error = pthread_mutex_init(&send_data_mutex, NULL);
+
+	if (error != 0) {
+		ERROR(1, "Failed to init mutex!");
+		return EMPI_ERR_INTERN;
+	}
+
+	error = pthread_mutex_init(&received_data_mutex, NULL);
+
+	if (error != 0) {
+		ERROR(1, "Failed to init mutex!");
+		return EMPI_ERR_INTERN;
+	}
 
 //	mpi_messages = NULL;
 //	mpi_messages_count = 0;
@@ -2879,11 +2982,6 @@ static void print_gateway_statistics(uint64_t deltat)
 {
 	int i,j;
 
-	uint64_t sec;
-	uint64_t millis;
-
-	sec = deltat / 1000000UL;
-	millis = (deltat % 1000000UL) / 1000UL;
 
 	for (i=0;i<cluster_count;i++) {
 		if (i != cluster_rank) {
@@ -2908,25 +3006,43 @@ static void print_gateway_statistics(uint64_t deltat)
 }
 */
 
+static void print_gateway_statistics(uint64_t deltat)
+{
+	uint64_t sec, millis, receive_data, receive_count, send_data, send_count;
+
+	sec = deltat / 1000000UL;
+	millis = (deltat % 1000000UL) / 1000UL;
+
+	// Retrieve stats for sending and receiving
+	retrieve_receiver_thread_stats(&receive_data, &receive_count);
+	retrieve_sender_thread_stats(&send_data, &send_count);
+
+	printf("STATS FOR GATEWAY %d AFTER %ld.%03ld IN %ld %ld OUT %ld %ld\n", cluster_rank, sec, millis,
+			receive_data, receive_count, send_data, send_count);
+
+	fflush(stdout);
+
+}
+
 int messaging_run_gateway(int rank, int size, int empi_size)
 {
 	int error;
 	bool done = false;
 
-#ifdef SIMPLE_TIMING
+//#ifdef SIMPLE_TIMING
 	uint64_t start, last;
 	uint64_t current;
-#endif
+//#endif
 
 	pending_data_messages = 0;
 	pending_data_size = 0;
 
-#ifdef SIMPLE_TIMING
+//#ifdef SIMPLE_TIMING
 
 	start = current_time_micros();
 	last = start;
 
-#endif // SIMPLE_TIMING
+//#endif // SIMPLE_TIMING
 
 	fprintf(stderr, "GATEWAY %d.%d starting!\n", cluster_rank, gateway_rank);
 
@@ -2958,7 +3074,7 @@ int messaging_run_gateway(int rank, int size, int empi_size)
 //			break;
 //		}
 
-#ifdef SIMPLE_TIMING
+//#ifdef SIMPLE_TIMING
 		current = current_time_micros();
 
 		// Check if a second has passed
@@ -2966,7 +3082,7 @@ int messaging_run_gateway(int rank, int size, int empi_size)
 			last = current;
 			print_gateway_statistics(current-start);
 		}
-#endif // SIMPLE_TIMING
+//#endif // SIMPLE_TIMING
 	}
 
 	// We need a barrier to ensure everybody (application and gateway nodes) is ready to finalize.
@@ -2982,13 +3098,13 @@ int messaging_run_gateway(int rank, int size, int empi_size)
 
 	// Print final statistics about the communcation with other gateways.
 
-#ifdef END_TIMING
+//#ifdef END_TIMING
 	current = current_time_micros();
 
 	print_gateway_statistics(current-start);
 
 	printf("GATEWAY %d.%d finished after %ld usec\n", cluster_rank, gateway_rank, (current-start));
-#endif // END_TIMING
+//#endif // END_TIMING
 
 	error = PMPI_Finalize();
 
