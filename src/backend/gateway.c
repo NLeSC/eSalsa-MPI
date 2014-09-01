@@ -278,14 +278,20 @@ static uint64_t pending_data_size;
 // Timing offset.
 uint64_t gateway_start_time;
 
-static uint64_t send_data = 0;
-static uint64_t send_count = 0;
+static uint64_t wa_send_data = 0;
+static uint64_t wa_send_count = 0;
 
-static uint64_t received_data = 0;
-static uint64_t received_count = 0;
+static uint64_t wa_received_data = 0;
+static uint64_t wa_received_count = 0;
 
 static pthread_mutex_t send_data_mutex;
 static pthread_mutex_t received_data_mutex;
+
+static uint64_t mpi_send_data = 0;
+static uint64_t mpi_send_count = 0;
+
+static uint64_t mpi_received_data = 0;
+static uint64_t mpi_received_count = 0;
 
 static uint64_t current_time_micros()
 {
@@ -304,8 +310,8 @@ void store_sender_thread_stats(int index, uint64_t data, uint64_t count, uint64_
 	// Lock the send data first
 	pthread_mutex_lock(&send_data_mutex);
 
-	send_data += data;
-	send_count += count;
+	wa_send_data += data;
+	wa_send_count += count;
 
 	pthread_mutex_unlock(&send_data_mutex);
 }
@@ -315,8 +321,8 @@ void retrieve_sender_thread_stats(uint64_t *data, uint64_t *count)
 	// Lock the send data first
 	pthread_mutex_lock(&send_data_mutex);
 
-	*data = send_data;
-	*count = send_count;
+	*data = wa_send_data;
+	*count = wa_send_count;
 
 	pthread_mutex_unlock(&send_data_mutex);
 }
@@ -326,8 +332,8 @@ void store_receiver_thread_stats(int index, uint64_t data, uint64_t count, uint6
 	// Lock the send data first
 	pthread_mutex_lock(&received_data_mutex);
 
-	received_data += data;
-	received_count += count;
+	wa_received_data += data;
+	wa_received_count += count;
 
 	pthread_mutex_unlock(&received_data_mutex);
 
@@ -338,8 +344,8 @@ void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
 	// Lock the send data first
 	pthread_mutex_lock(&send_data_mutex);
 
-	*data = received_data;
-	*count = received_count;
+	*data = wa_received_data;
+	*count = wa_received_count;
 
 	pthread_mutex_unlock(&send_data_mutex);
 }
@@ -401,6 +407,7 @@ void* udt_sender_thread(void *arg)
 	message_header *mh;
 	int error;
 	uint64_t last_write, now, data, count;
+	UDT4_Statistics stats;
 
 	info = (socket_info *) arg;
 	done = false;
@@ -435,6 +442,14 @@ void* udt_sender_thread(void *arg)
 				last_write = now;
 				count = 0;
 				data = 0;
+
+				udt4_perfmon(info->socketfd, &stats, true);
+
+				fprintf(stderr, "UDT4 SEND STATS estbw=%f sendrate=%f send=%ld sendloss=%d inflight=%d RTT=%f window=%d us=%f ACK=%d NACK=%d\n",
+						stats.mbpsBandwidth, stats.mbpsSendRate, stats.pktSent, stats.pktSndLoss, stats.pktFlightSize,
+						stats.msRTT, stats.pktCongestionWindow, stats.usPktSndPeriod, stats.pktRecvACK, stats.pktRecvNAK);
+
+
 			}
 		}
 	}
@@ -548,6 +563,7 @@ void* udt_receiver_thread(void *arg)
 	void *buffer;
 	int error;
 	uint64_t last_write, now, data, count;
+	UDT4_Statistics stats;
 
 	info = (socket_info *) arg;
 	done = false;
@@ -599,6 +615,13 @@ void* udt_receiver_thread(void *arg)
 			last_write = now;
 			count = 0;
 			data = 0;
+
+			udt4_perfmon(info->socketfd, &stats, true);
+
+			fprintf(stderr, "UDT4 RCV STATS estbw=%f rcvrate=%f received=%ld receiveloss=%d RTT=%f window=%d ACK=%d NACK=%d\n",
+					stats.mbpsBandwidth, stats.mbpsRecvRate, stats.pktRecv, stats.pktRcvLoss, stats.msRTT,
+					stats.pktCongestionWindow, stats.pktSentACK, stats.pktSentNAK);
+
 		}
 	}
 
@@ -2109,6 +2132,8 @@ static int forward_mpi_message_with_isend(int rank)
 
 		if (tmp != NULL) {
 			length = tmp->header.length;
+			mpi_send_data += length;
+			mpi_send_count++;
 		}
 	}
 
@@ -2178,7 +2203,7 @@ static int forward_mpi_data_message(generic_message *m)
 		return EMPI_ERR_INTERN;
 	}
 
-	// Queue the message at the pensing message queue for the destination.
+	// Queue the message at the pending message queue for the destination.
 	if (!linked_queue_enqueue(pending_isend_messages[rank], m, m->header.length)) {
 		ERROR(1, "Failed to enqueue message for isend to %d", rank);
 		return EMPI_ERR_INTERN;
@@ -2877,6 +2902,9 @@ static int receive_data_message_from_mpi(int cluster, bool *got_message, bool *w
 		return EMPI_ERR_INTERN;
 	}
 
+	mpi_received_data += count;
+	mpi_received_count++;
+
 	*got_message = true;
 
 	return EMPI_SUCCESS;
@@ -3175,11 +3203,12 @@ static void print_gateway_statistics(uint64_t deltat)
 	retrieve_receiver_thread_stats(&receive_data, &receive_count);
 	retrieve_sender_thread_stats(&send_data, &send_count);
 
-	printf("STATS FOR GATEWAY %d AFTER %ld.%03ld IN %ld %ld OUT %ld %ld\n", cluster_rank, sec, millis,
-			receive_data, receive_count, send_data, send_count);
+	printf("STATS FOR GATEWAY %d AFTER %ld.%03ld - WA_IN %ld %ld MPI_OUT %ld %ld - MPI_IN %ld %ld WA_OUT %ld %ld\n",
+			cluster_rank, sec, millis,
+			receive_data, receive_count, mpi_send_data, mpi_send_count,
+			mpi_received_data, mpi_received_count, send_data, send_count);
 
 	fflush(stdout);
-
 }
 
 int messaging_run_gateway(int rank, int size, int empi_size)

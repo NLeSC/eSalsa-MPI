@@ -74,11 +74,13 @@ int udt_connect(unsigned long ipv4, unsigned short port, int send_buffer, int re
 {
 	struct sockaddr_in address;
 	socklen_t addrlen;
-	int error;
-	int connected = 0;
-	int attempts = 0;
+	int error, connected, attempts, tmp;
+	uint64_t long_tmp;
 	char ipstring[INET_ADDRSTRLEN+1];
 	struct addrinfo hints, *local;
+
+	connected = 0;
+	attempts = 0;
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 
@@ -99,13 +101,54 @@ int udt_connect(unsigned long ipv4, unsigned short port, int send_buffer, int re
 		return SOCKET_ERROR_CREATE_SOCKET;
 	}
 
-	// FIXME: set socket options here!!
-	// TODO
-	//error = socket_set_buffers(*socketfd, send_buffer, receive_buffer);
+	// FIXME: Hardcoded options!
+	tmp = 9000;
+	error = udt4_setsockopt(*socketfd, 0, UDT4_MSS, &tmp, sizeof(int));
 
-	///if (error != 0) {
-	//WARN(1, "Failed to set buffers for socket %d (error = %d)!", *socketfd, error);
-	//}
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_MSS option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 150*1024*1024;
+	error = udt4_setsockopt(*socketfd, 0, UDT4_SNDBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_SNDBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 150*1024*1024;
+	error = udt4_setsockopt(*socketfd, 0, UDT4_RCVBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_RCVBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 32*1024*1024;
+	error = udt4_setsockopt(*socketfd, 0, UDT4_UDP_SNDBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_UDP_SNDBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 32*1024*1024;
+	error = udt4_setsockopt(*socketfd, 0, UDT4_UDP_RCVBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_UDP_RCVBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	long_tmp = 9L*125000000L;
+	error = udt4_setsockopt(*socketfd, 0, UDT4_MAXBW, &long_tmp, sizeof(uint64_t));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_MAXBW option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
 
 	freeaddrinfo(local);
 
@@ -145,11 +188,10 @@ int udt_connect(unsigned long ipv4, unsigned short port, int send_buffer, int re
 
 int udt_accept(unsigned short local_port, uint32_t expected_host,int send_buffer, int receive_buffer, int *socketfd)
 {
-	int sd, new_socket;
-	int error;
+	int sd, new_socket, error, addrlen, tmp;
 	uint32_t host;
+	uint64_t long_tmp;
 	struct sockaddr_in address;
-	int addrlen;
 	char buffer[INET_ADDRSTRLEN+1];
 
 	struct addrinfo hints, *res;
@@ -173,7 +215,54 @@ int udt_accept(unsigned short local_port, uint32_t expected_host,int send_buffer
 		return SOCKET_ERROR_CREATE_SOCKET;
 	}
 
-	// FIXME: set options here!
+	// FIXME: Hardcoded options!
+	tmp = 9000;
+	error = udt4_setsockopt(sd, 0, UDT4_MSS, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_MSS option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 150*1024*1024;
+	error = udt4_setsockopt(sd, 0, UDT4_SNDBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_SNDBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 150*1024*1024;
+	error = udt4_setsockopt(sd, 0, UDT4_RCVBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_RCVBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 16*1024*1024;
+	error = udt4_setsockopt(sd, 0, UDT4_UDP_SNDBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_UDP_SNDBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	tmp = 16*1024*1024;
+	error = udt4_setsockopt(sd, 0, UDT4_UDP_RCVBUF, &tmp, sizeof(int));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_UDP_RCVBUF option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
+
+	long_tmp = 9L*125000000L;
+	error = udt4_setsockopt(sd, 0, UDT4_MAXBW, &long_tmp, sizeof(uint64_t));
+
+	if (error != 0) {
+		ERROR(1, "Failed to set UDT4_MAXBW option to %d.", tmp);
+		return SOCKET_ERROR_OPTIONS;
+	}
 
 	address.sin_family = AF_INET;
 	address.sin_addr.s_addr = INADDR_ANY;

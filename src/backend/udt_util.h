@@ -16,6 +16,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include "udt4.h"
+
 #define SEND_BUFFER_SIZE    (32*1024*1024)
 #define RECEIVE_BUFFER_SIZE (32*1024*1024)
 
