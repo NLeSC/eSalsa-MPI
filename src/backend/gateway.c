@@ -42,7 +42,7 @@
 
 //#define DETAILED_MESSAGE_INFO 1
 
-#define MAX_MPI_RECEIVE_POLL 1
+#define MAX_MPI_RECEIVE_POLL 10
 #define MAX_MPI_POLL_MISS 5
 #define MAX_MPI_MESSAGE_FORWARD 1
 
@@ -120,7 +120,7 @@ int read_timing_count;
 //   uint32_t messages;
 //   unsigned char data[];
 //} message_buffer;
-
+//
 //static bounded_array_list *waiting_mpi_buffers;
 //static data_buffer *mpi_receive_buffer = NULL;
 
@@ -182,22 +182,22 @@ typedef struct {
 	int next_input_stream;
 } gateway_connection;
 
-/*
 typedef struct s_mpi_message {
-	MPI_Request r;
 	struct s_mpi_message *next;
+	struct s_mpi_message *prev;
+	MPI_Request r;
+	int length;
 	generic_message *message;
 } mpi_message;
-*/
 
-static MPI_Request *isend_requests;
-static MPI_Status *isend_statusses;
-static int *isend_requests_ready;
+//static MPI_Request *isend_requests;
+//static MPI_Status *isend_statusses;
+//static int *isend_requests_ready;
 
-static linked_queue **pending_isend_messages;
-static linked_queue **pending_isend_server_messages;
+//static linked_queue **pending_isend_messages;
+//static linked_queue **pending_isend_server_messages;
 
-static generic_message **current_isend_messages;
+//static generic_message **current_isend_messages;
 
 static size_t pending_isend_data;
 static size_t max_pending_isend_data;
@@ -259,9 +259,11 @@ static socket_info server_info;
 //static linked_queue *incoming_queue;
 
 // Queue of pending MPI_Isends.
-//static mpi_message *mpi_messages;
-//static int mpi_messages_count;
-//static int mpi_messages_count_max;
+static mpi_message *mpi_messages_head;
+static mpi_message *mpi_messages_tail;
+
+static int mpi_messages_count;
+static int mpi_messages_count_max;
 
 // Used for pending receive operations
 //static int pending_receive = 0;
@@ -400,6 +402,7 @@ void* tcp_sender_thread(void *arg)
 }
 
 // Sender thread for sockets.
+/*
 void* udt_sender_thread(void *arg)
 {
 	socket_info *info;
@@ -456,6 +459,70 @@ void* udt_sender_thread(void *arg)
 
 	return NULL;
 }
+*/
+
+void* udt_sender_thread(void *arg)
+{
+	socket_info *info;
+	bool done;
+	message_header *mh[1024];
+	message_header *tmp;
+	int error, msg, i;
+	uint64_t last_write, now, data, count;
+	UDT4_Statistics stats;
+
+	info = (socket_info *) arg;
+	done = false;
+
+	now = last_write = current_time_micros();
+	data = 0;
+	count = 0;
+
+	while (!done) {
+
+		msg = blocking_linked_queue_bulk_dequeue(info->output_queue, mh, 1024, -1);
+
+		for (i=0;i<msg;i++) {
+
+			tmp = mh[i];
+
+			if (mh != NULL) {
+
+				error = udt_sendfully(info->socketfd, (unsigned char *)tmp, tmp->length);
+
+				if (error != SOCKET_OK) {
+					ERROR(1, "Failed to send message!");
+					return NULL;
+				}
+
+				count++;
+				data += tmp->length;
+
+				free(tmp);
+				mh[i] = NULL;
+
+				now = current_time_micros();
+
+				// write stats at most once per second.
+				if (now > last_write + 1000000) {
+					store_sender_thread_stats(info->index, data, count, now);
+					last_write = now;
+					count = 0;
+					data = 0;
+
+					udt4_perfmon(info->socketfd, &stats, true);
+
+					fprintf(stderr, "UDT4 SEND STATS estbw=%f sendrate=%f send=%ld sendloss=%d inflight=%d RTT=%f window=%d us=%f ACK=%d NACK=%d\n",
+							stats.mbpsBandwidth, stats.mbpsSendRate, stats.pktSent, stats.pktSndLoss, stats.pktFlightSize,
+							stats.msRTT, stats.pktCongestionWindow, stats.usPktSndPeriod, stats.pktRecvACK, stats.pktRecvNAK);
+				}
+			}
+		}
+	}
+
+	return NULL;
+}
+
 
 
 // Sender thread for socket connected to server.
@@ -678,18 +745,25 @@ void* server_receiver_thread(void *arg)
 	return NULL;
 }
 
+/*
+static message_buffer *create_message_buffer()
+{
+   message_buffer *tmp = malloc(sizeof(message_buffer) + MAX_MESSAGE_SIZE);
 
-//static message_buffer *create_message_buffer()
-//{
-//   message_buffer *tmp = malloc(sizeof(message_buffer) + 2*MAX_MESSAGE_SIZE);
-//
-//   tmp->size = 2*MAX_MESSAGE_SIZE;
-//   tmp->start = 0;
-//   tmp->end = 0;
-//   tmp->messages = 0;
-//
-//   return tmp;
-//}
+   tmp->size = MAX_MESSAGE_SIZE;
+   tmp->start = 0;
+   tmp->end = 0;
+   tmp->messages = 0;
+
+   return tmp;
+}
+
+static  void release_message_buffer(message_buffer *mb)
+{
+	// TODO: cache these ?
+	free(mb);
+}
+*/
 
 //static mpi_message *create_mpi_message(generic_message *m)
 //{
@@ -1486,13 +1560,15 @@ int generic_gateway_init(int rank, int size)
 		return EMPI_ERR_INTERN;
 	}
 
-//	mpi_messages = NULL;
-//	mpi_messages_count = 0;
-//	mpi_messages_count_max = 0;
+	mpi_messages_head = NULL;
+	mpi_messages_tail = NULL;
+	mpi_messages_count = 0;
+	mpi_messages_count_max = 0;
 
 	pending_isend_data = 0;
 	max_pending_isend_data = MAX_PENDING_ISEND_DATA;
 
+/*
 	isend_requests = malloc(local_application_size * sizeof(MPI_Request));
 
 	if (isend_requests == NULL) {
@@ -1554,7 +1630,7 @@ int generic_gateway_init(int rank, int size)
 			return EMPI_ERR_INTERN;
 		}
 	}
-
+*/
 #ifdef DETAILED_TIMING
 	write_timing_count = 0;
 	read_timing_count = 0;
@@ -2114,6 +2190,7 @@ static int process_gateway_message(generic_message *m, bool *done)
 	return EMPI_SUCCESS;
 }
 
+/*
 static int forward_mpi_message_with_isend(int rank)
 {
 	int error, tag, length;
@@ -2263,6 +2340,151 @@ static int poll_mpi_requests()
 
 	return EMPI_SUCCESS;
 }
+*/
+
+
+static void enqueue_mpi_message(mpi_message *m)
+{
+	pending_isend_data += m->length;
+
+	if (mpi_messages_count == 0) {
+		m->next = m->prev = NULL;
+		mpi_messages_head = mpi_messages_tail = m;
+		mpi_messages_count = 1;
+		return;
+	}
+
+	m->next = NULL;
+	m->prev = mpi_messages_tail;
+	mpi_messages_tail->next = m;
+	mpi_messages_tail = m;
+	mpi_messages_count++;
+
+	if (mpi_messages_count > mpi_messages_count_max) {
+		mpi_messages_count_max = mpi_messages_count;
+	}
+}
+
+static int forward_mpi_message_with_isend(generic_message *m, int length, int rank, int tag)
+{
+	int error;
+	mpi_message *tmp;
+
+	tmp = malloc(sizeof(mpi_message));
+	tmp->message = m;
+	tmp->length = length;
+
+	error = PMPI_Isend(m, length, MPI_BYTE, rank, tag, mpi_comm_gateway_and_application, &(tmp->r));
+
+	if (error != MPI_SUCCESS) {
+		ERROR(1, "Failed to perform Isend to %d! (error=%d)", rank, error);
+		return TRANSLATE_ERROR(error);
+	}
+
+	enqueue_mpi_message(tmp);
+	return EMPI_SUCCESS;
+}
+
+static int forward_mpi_server_message(generic_message *m)
+{
+	int cluster, rank, length, tag;
+
+	cluster = GET_CLUSTER_RANK(ntohl(m->header.dst_pid));
+	rank = GET_PROCESS_RANK(ntohl(m->header.dst_pid));
+
+	DEBUG(1, "Forwarding message to MPI %d:%d tag=%d len-%d", cluster, rank, m->header.length);
+
+	if (cluster != cluster_rank) {
+		ERROR(1, "Received message for wrong cluster! dst=%d me=%d!", cluster, cluster_rank);
+		return EMPI_ERR_INTERN;
+	}
+
+	length = ntohl(m->header.length);
+	tag = TAG_SERVER_REPLY;
+
+	return forward_mpi_message_with_isend(m, length, rank, tag);
+}
+
+static int forward_mpi_data_message(generic_message *m)
+{
+	int cluster, rank, length, tag;
+
+	cluster = GET_CLUSTER_RANK(m->header.dst_pid);
+	rank = GET_PROCESS_RANK(m->header.dst_pid);
+
+	DEBUG(1, "Forwarding message to MPI %d:%d tag=%d len-%d", cluster, rank, m->header.length);
+
+	if (cluster != cluster_rank) {
+		ERROR(1, "Received message for wrong cluster! dst=%d me=%d!", cluster, cluster_rank);
+		return EMPI_ERR_INTERN;
+	}
+
+	tag = TAG_FORWARDED_DATA_MSG;
+	length = m->header.length;
+
+	mpi_send_data += length;
+	mpi_send_count++;
+
+	return forward_mpi_message_with_isend(m, length, rank, tag);
+}
+
+static int poll_mpi_requests()
+{
+	int error, flag;
+	mpi_message *tmp, *curr;
+	MPI_Status status;
+
+	curr = mpi_messages_head;
+
+	while (curr != NULL) {
+
+		flag = 0;
+
+		error = PMPI_Test(&(curr->r), &flag, &status);
+
+		if (error != MPI_SUCCESS) {
+			ERROR(1, "Failed to test status of MPI_Isend! (error=%d)", error);
+			return TRANSLATE_ERROR(error);
+		}
+
+		if (flag) {
+			// Operation has finished, so remove element
+			pending_isend_data -= curr->length;
+			tmp = curr;
+			mpi_messages_count--;
+
+			if (mpi_messages_count == 0) {
+				// We are removing the only element
+				mpi_messages_head = mpi_messages_tail = NULL;
+				curr = NULL;
+			} else if (curr->prev == NULL) {
+				// We are removing the head
+				mpi_messages_head = curr->next;
+				mpi_messages_head->prev = NULL;
+				curr = curr->next;
+			} else if (curr->next == NULL) {
+				// We are removing the tail
+				mpi_messages_tail = curr->prev;
+				mpi_messages_tail->next = NULL;
+				curr = NULL;
+			} else {
+				// We are removing some element in the middle.
+				curr->prev->next = curr->next;
+				curr->next->prev = curr->prev;
+				curr = curr->next;
+			}
+
+			free(tmp->message);
+			free(tmp);
+		} else {
+			curr = curr->next;
+		}
+	}
+
+	return EMPI_SUCCESS;
+}
+
+
 
 /*
 static int process_socket_buffer(socket_info *info, int *done)
@@ -2829,8 +3051,67 @@ static int receive_server_message_from_mpi(bool *got_message)
 	return EMPI_SUCCESS;
 }
 
-static generic_message *pending_message = NULL;
-static int pending_message_count = 0;
+//static generic_message *pending_message = NULL;
+//static int pending_message_count = 0;
+
+/*
+static int receive_data_message_from_mpi(int cluster, message_buffer *buf, bool *got_message, bool* no_space)
+{
+	int flag, count, error;
+	MPI_Status status;
+
+	*got_message = false;
+	*no_space = false;
+
+	error = PMPI_Iprobe(MPI_ANY_SOURCE, TAG_DATA_MSG + cluster, mpi_comm_gateway_and_application, &flag, &status);
+
+	if (error != MPI_SUCCESS) {
+		ERROR(1, "Failed to probe MPI for ANY data message! (error=%d)", error);
+		return TRANSLATE_ERROR(error);
+	}
+
+	if (!flag) {
+		// No messages.
+		return EMPI_SUCCESS;
+	}
+
+	*got_message = true;
+
+	DEBUG(1, "Incoming MPI data message from %d!", status.MPI_SOURCE);
+
+	error = PMPI_Get_count(&status, MPI_BYTE, &count);
+
+	if (error != MPI_SUCCESS) {
+		ERROR(1, "Failed to get size of MPI data message from %d with! (error=%d)", status.MPI_SOURCE, error);
+		return TRANSLATE_ERROR(error);
+	}
+
+	if (count < 0 || count > MAX_MESSAGE_SIZE) {
+		ERROR(1, "Received MPI data message with invalid size %d from %d! (error=%d)", count, status.MPI_SOURCE);
+		return EMPI_ERR_INTERN;
+	}
+
+	if (buf->end + count > buf->size) {
+		*no_space = true;
+		return EMPI_SUCCESS;
+	}
+
+	// NOTE: Blocking receive should NOT block, as the probe already told us a message is waiting -- IS THIS TRUE???
+	error = PMPI_Recv(&(buf->data) + buf->end, count, MPI_BYTE, status.MPI_SOURCE, TAG_DATA_MSG + cluster,
+			mpi_comm_gateway_and_application, MPI_STATUS_IGNORE);
+
+	if (error != MPI_SUCCESS) {
+		ERROR(1, "Failed to receive MPI data message! source=%d count=%d (error=%d)", status.MPI_SOURCE, count, error);
+		return TRANSLATE_ERROR(error);
+	}
+
+	buf->end += count;
+	mpi_received_data += count;
+	mpi_received_count++;
+
+	return EMPI_SUCCESS;
+}
+*/
 
 static int receive_data_message_from_mpi(int cluster, bool *got_message, bool *would_block)
 {
@@ -2911,7 +3192,6 @@ static int receive_data_message_from_mpi(int cluster, bool *got_message, bool *w
 }
 
 
-
 // Forward all data messages received from other gateways to their destinations using MPI.
 static int forward_data_messages_to_mpi(int cluster)
 {
@@ -2928,7 +3208,7 @@ static int forward_data_messages_to_mpi(int cluster)
    // (read end-to-end) flow control can prevent this....
 
    if (pending_isend_data > max_pending_isend_data) {
-	   fprintf(stderr, "NOT FORWARDING! Limit of %ld has been reached (%ld)\n", max_pending_isend_data, pending_isend_data);
+//	   fprintf(stderr, "EEP! Limit of %ld has been reached (%ld)\n", max_pending_isend_data, pending_isend_data);
 	   return EMPI_SUCCESS;
    }
 
@@ -2988,8 +3268,73 @@ static int forward_server_messages_to_mpi(bool *done)
 
 	return EMPI_SUCCESS;
 }
+/*
+static int receive_data_messages_from_mpi(int cluster)
+{
+	bool got_message, nospace;
+	int error, miss, i;
 
+	miss = 0;
 
+	message_buffer *buf = create_message_buffer();
+
+	// Third, receive messages from MPI
+	for (i=0;i<MAX_MPI_RECEIVE_POLL;i++) {
+
+//		if (enqueue_will_block(cluster)) {
+//
+//			if (enqueue_block_warning) {
+//				WARN(1, "Will not receive for cluster %d since enqueue would block!");
+//				enqueue_block_warning = false;
+//			}
+			//return EMPI_SUCCESS;
+		//}
+
+//		enqueue_block_warning = true;
+		got_message = false;
+
+		error = receive_data_message_from_mpi(cluster, buf, &got_message, &nospace);
+
+		if (error != EMPI_SUCCESS) {
+			ERROR(1, "Failed to receive MPI data messages! (error=%d)", error);
+			return error;
+		}
+
+		if (!got_message) {
+			// No message was received
+			miss++;
+
+			if (miss > MAX_MPI_POLL_MISS) {
+				break;
+			}
+		} else if (nospace) {
+			// We received a message, but there was not enough space in the buffer to receive it!
+			if (!enqueue_buffer(cluster, buf, -1)) {
+				ERROR(1, "Failed to enqueue buffer!");
+				return EMPI_ERR_INTERN;
+			}
+
+			// Since we managed to fill a buffer, we decided not ro receive more
+			return EMPI_SUCCESS;
+		}
+
+		// else, we keep going
+	}
+
+	if (buf->end != 0) {
+		// The buffer is not empty, so queue it!
+		if (!enqueue_buffer(cluster, buf, -1)) {
+			ERROR(1, "Failed to enqueue buffer!");
+			return EMPI_ERR_INTERN;
+		}
+	} else {
+		// The buffer was empty, so release it!
+		release_message_buffer(buf);
+	}
+
+	return EMPI_SUCCESS;
+}
+*/
 
 static int receive_data_messages_from_mpi(int cluster)
 {

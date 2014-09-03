@@ -59,6 +59,9 @@ void *blocking_linked_queue_dequeue(blocking_linked_queue *queue, int64_t timeou
 // will block until an element becomes available.
 int blocking_linked_queue_bulk_dequeue(blocking_linked_queue *queue, void **buffer, int count, int64_t timeout_usec);
 
+// will block until an element becomes available.
+linked_queue *blocking_linked_queue_all_dequeue(blocking_linked_queue *queue, int64_t timeout_usec);
+
 // Is the queue empty ?
 bool blocking_linked_queue_isempty(blocking_linked_queue *queue);
 

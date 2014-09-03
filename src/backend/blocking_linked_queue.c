@@ -231,6 +231,34 @@ void *blocking_linked_queue_dequeue(blocking_linked_queue *queue, int64_t timeou
 	return elt;
 }
 
+linked_queue *blocking_linked_queue_all_dequeue(blocking_linked_queue *queue, int64_t timeout_usec)
+{
+	linked_queue *result;
+
+	// Lock the queue first.
+	pthread_mutex_lock(&queue->mutex);
+
+	// Make sure there is an element in the queue, or wait for it.
+	if (!wait_for_element(queue, timeout_usec)) {
+		pthread_mutex_unlock(&queue->mutex);
+		return NULL;
+	}
+
+	result = queue->queue;
+	queue->queue = linked_queue_create(result->max_node_cache_size);
+
+	// Check if we may need to wake up a blocked enqueue thread.
+	if (queue->max_data_size > 0) {
+		// We we're over the size limit before the dequeue.
+		// See if we are under the limit now. If so, wakeup any blocked threads.
+		pthread_cond_broadcast(&queue->cond);
+	}
+
+	// Release the lock and return the queue
+	pthread_mutex_unlock(&queue->mutex);
+	return result;
+}
+
 int blocking_linked_queue_bulk_dequeue(blocking_linked_queue *queue, void **buffer, int count, int64_t timeout_usec)
 {
 	int stored;

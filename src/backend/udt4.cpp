@@ -85,6 +85,11 @@ extern "C" int udt4_send(int udt4_socket, const char* buf, int len, int flags)
 
 extern "C" int udt4_recv(int udt4_socket, char* buf, int len, int flags)
 {
+	// Does this do anything ?
+	int rcv_size;
+	int var_size = sizeof(int);
+	UDT::getsockopt(udt4_socket, 0, UDT_RCVDATA, &rcv_size, &var_size);
+
 	return UDT::recv(udt4_socket, buf, len, flags);
 }
 
