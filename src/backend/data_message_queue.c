@@ -120,5 +120,29 @@ data_message *data_message_dequeue_matching(data_message_queue *q, int comm, int
    return NULL;
 }
 
+bool data_message_contains_matching(data_message_queue *q, int comm, int source, int tag)
+{
+   data_message_info *curr;
+
+   DEBUG(4, "FIND_PENDING_MESSAGE: Checking for pending messages in comm=%d from source=%d tag=%d", comm, source, tag);
+
+   if (q->head == NULL) {
+      DEBUG(4, "FIND_PENDING_MESSAGE: No pending messages");
+      return NULL;
+   }
+
+   curr = q->head;
+
+   while (curr != NULL) {
+
+      if (match_message(curr->message, comm, source, tag)) {
+    	  return true;
+      }
+      curr = curr->next;
+   }
+
+   return false;
+}
+
 
 

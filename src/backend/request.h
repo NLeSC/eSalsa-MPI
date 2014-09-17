@@ -32,10 +32,19 @@ struct s_request {
 
      int handle;
 
+     // The source of the received message (set when MPI_ANY_SOURCE is used).
+     int message_source;
+
+     // The tag of the received message (set when MPI_ANY_TAG is used).
+     int message_tag;
+
+     // The count of the received message (set when MPI_ANY_TAG is used).
+     int message_count;
+
      // This is the real MPI_Request
      MPI_Request req;
 
-     // This is the matching message
+     // This is the matching message (used in receive operations).
      data_message *message;
 };
 

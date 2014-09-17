@@ -8,12 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 
-//import esalsa.junk.Connection;
-//import esalsa.junk.DataMessage;
-
 public class Communicator {
-
-    private final static boolean SANITY = true;
 
     private static final int COMM_FLAG_LOCAL  = (1 << 0);
     private static final int COMM_FLAG_REMOTE = (1 << 1);
@@ -36,14 +31,9 @@ public class Communicator {
 
     private long commMessages;
     private long commReplies;
-    private long dataMessages;
-    private long bcastMessages;
-
     private long commBytes;
     private long commReplyBytes;
-    private long dataBytes;
-    private long bcastBytes;
-
+    
     private class ClusterInfo {
         final Cluster cluster;
         //final int clusterRank;
@@ -151,9 +141,9 @@ public class Communicator {
         return ((pid & 0xFF000000) >> 24) & 0xFF;
     }
     
-    private int getProcessRank(int pid) {
-        return (pid & 0xFFFFFF);
-    }
+//    private int getProcessRank(int pid) {
+//        return (pid & 0xFFFFFF);
+//    }
     
     public int getNumber() {
         return communicator;
@@ -476,17 +466,16 @@ public class Communicator {
         for (int i=0;i<parent.getNumberOfClusters();i++) {
 
             Cluster c = parent.getCluster(i);            
-            int size = c.getApplicationSize();
             
             // We send to non-master gateways first, since the master gateway needs to forward
             // these messages (and therefore remain active until all messages are forwarded).
             for (int j=1;j<parent.getNumberOfGatewaysPerCluster();j++) {
-                int pid = parent.getPID(i, size+j-1);
+                int pid = parent.getPID(i, Server.MAX_PROCESSES_PER_CLUSTER-1);
                 enqueueReply(new FinalizeReply(pid));
             }
             
             // Finally send to the master gateway.
-            enqueueReply(new FinalizeReply(parent.getPID(i, size + parent.getNumberOfGatewaysPerCluster()-1)));
+            enqueueReply(new FinalizeReply(parent.getPID(i, Server.MAX_PROCESSES_PER_CLUSTER-1)));
         }
     }
        
@@ -526,10 +515,9 @@ public class Communicator {
 
         case Protocol.OPCODE_FINALIZE:
             processFinalize();
-            break;
-//            terminate();
+            terminate();
 //            parent.terminateCommunicator(this);
-//            break;
+            break;
         default:
             Logging.error("Unknown opcode collective communicator operation! " + opcode);
             return; // FIXME: This return will hang the program!

@@ -1,6 +1,5 @@
 package esalsa;
 
-import java.io.DataInputStream;
 import java.io.IOException;
 
 public class GroupRequest extends CommunicatorRequest {
@@ -11,7 +10,7 @@ public class GroupRequest extends CommunicatorRequest {
     // The group members.
     public final int [] pids;
 
-    GroupRequest(DataInputStream in) throws IOException {
+    GroupRequest(EndianDataInputStream in) throws IOException {
 
         super(Protocol.OPCODE_GROUP, in);
 

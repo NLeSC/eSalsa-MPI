@@ -23,7 +23,7 @@
 
 #define OPCODE_CLOSE_LINK                127
 
-// These are only used to communincate with other gateways.
+// These are only used to communicate with other gateways.
 #define OPCODE_DATA                       50
 #define OPCODE_COLLECTIVE_BCAST           60
 
@@ -36,6 +36,7 @@
 #define TAG_SERVER_REPLY        1
 #define TAG_FORWARDED_DATA_MSG  2
 #define TAG_DATA_MSG            3
+
 
 #endif // _OPCODES_H_
 

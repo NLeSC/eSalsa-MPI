@@ -1,4 +1,4 @@
-DIRS = src/shared src/frontend src/backend src/test
+DIRS = src/shared src/frontend src/backend src/gateway src/test 
 
 all: check-env
 	mkdir -p lib

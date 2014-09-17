@@ -1,6 +1,5 @@
 package esalsa;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class SplitReply extends Message {
@@ -70,7 +69,7 @@ public class SplitReply extends Message {
         this.localRanks = localRanks;
     }
 
-    void write(DataOutputStream out) throws IOException {
+    void write(EndianDataOutputStream out) throws IOException {
         super.write(out);
         out.writeInt(newComm);
         out.writeInt(rank);

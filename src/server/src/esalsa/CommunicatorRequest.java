@@ -16,7 +16,6 @@
 
 package esalsa;
 
-import java.io.DataInputStream;
 import java.io.IOException;
 
 /**
@@ -43,7 +42,7 @@ public class CommunicatorRequest extends Message {
      * @throws IOException
      *          If an IO error occurred while reading the request. 
      */
-    protected CommunicatorRequest(int opcode, DataInputStream in) throws IOException {
+    protected CommunicatorRequest(int opcode, EndianDataInputStream in) throws IOException {
         super(opcode, in);
         communicator = in.readInt();
         rank = in.readInt();

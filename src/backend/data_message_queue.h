@@ -24,5 +24,6 @@ int data_message_queue_empty(data_message_queue *q);
 
 data_message *data_message_dequeue(data_message_queue *q);
 data_message *data_message_dequeue_matching(data_message_queue *q, int comm, int source, int tag);
+bool data_message_contains_matching(data_message_queue *q, int comm, int source, int tag);
 
 #endif // _DATA_MESSAGE_QUEUE_H_

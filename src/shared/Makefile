@@ -1,6 +1,6 @@
 include ../../empi.config
 
-OBJECTS = logging.o profiling.o 
+OBJECTS = logging.o profiling.o socket_util.o linked_queue.o sync_linked_queue.o blocking_linked_queue.o message_buffer.o
 
 LIBDIR  = $(EMPI_HOME)/lib
 

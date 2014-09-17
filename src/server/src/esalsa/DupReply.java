@@ -1,6 +1,5 @@
 package esalsa;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class DupReply extends Message {
@@ -13,7 +12,7 @@ public class DupReply extends Message {
         this.newComm = newComm;
     }
 
-    void write(DataOutputStream out) throws IOException {
+    void write(EndianDataOutputStream out) throws IOException {
         super.write(out);
         out.writeInt(newComm);
     }

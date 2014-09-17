@@ -558,6 +558,12 @@ data_message *find_pending_message(communicator *c, int source, int tag)
    return data_message_dequeue_matching(c->queue, c->handle, source, tag);
 }
 
+bool have_matching_message(communicator *c, int source, int tag)
+{
+   return data_message_contains_matching(c->queue, c->handle, source, tag);
+}
+
+
 /*
    data_message *curr, *prev;
 

@@ -1,6 +1,5 @@
 package esalsa;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class GroupReply extends Message {
@@ -74,7 +73,7 @@ public class GroupReply extends Message {
         this.type = TYPE_ACTIVE;
     }
 
-    void write(DataOutputStream out) throws IOException {
+    void write(EndianDataOutputStream out) throws IOException {
 
         super.write(out);
         out.writeInt(newComm);

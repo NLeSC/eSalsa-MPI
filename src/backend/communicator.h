@@ -106,6 +106,8 @@ int comm_cluster_rank_to_cluster_index(communicator *c, int cluster_rank);
 void store_message(data_message *m);
 
 data_message *find_pending_message(communicator *c, int source, int tag);
+bool have_matching_message(communicator *c, int source, int tag);
+
 
 // int match_message(data_message *m, int comm, int source, int tag);
 

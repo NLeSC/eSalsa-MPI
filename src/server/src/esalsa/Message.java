@@ -1,7 +1,5 @@
 package esalsa;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 
 public abstract class Message {
@@ -30,7 +28,7 @@ public abstract class Message {
      * @throws IOException
      *          If an IO error occurred while reading the message. 
      */
-    protected Message(int opcode, DataInputStream in) throws IOException {
+    protected Message(int opcode, EndianDataInputStream in) throws IOException {
         this.opcode = opcode;
         source = in.readInt();
         destination = in.readInt();
@@ -66,7 +64,7 @@ public abstract class Message {
      * @throws IOException
      *          If an IO error occurred while writing the message. 
      */
-    void write(DataOutputStream out) throws IOException {
+    void write(EndianDataOutputStream out) throws IOException {
         out.writeInt(opcode);
         out.writeInt(source);
         out.writeInt(destination);

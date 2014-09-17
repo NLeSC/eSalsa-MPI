@@ -1,7 +1,5 @@
 package esalsa;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -103,15 +101,15 @@ public class Cluster {
     /** Socket connected to the master gateway in this cluster. */
     private Socket socket; 
 
-    /** DataInputStream used to read data from the master gateway. */
-    private DataInputStream in;
+    /** EndianDataInputStream used to read data from the master gateway. */
+    private EndianDataInputStream in;
 
-    /** DataOutputStream used to write data to the master gateway. */
-    private DataOutputStream out;
+    /** EndianDataOutputStream used to write data to the master gateway. */
+    private EndianDataOutputStream out;
 
-    /** Is this cluster ready ? (has the initialization completed ?) */
+    /** Is the gateway ready ? (has the local initialization completed ?) */
     private boolean ready = false;
-
+    
     /** Is this cluster done ? (has the application terminated ?) */
     private boolean done = false;
 
@@ -205,7 +203,7 @@ public class Cluster {
      * @throws Exception
      *          If the connection was set.  
      */
-    public synchronized void setConnection(Socket socket, DataInputStream in, DataOutputStream out) throws Exception {
+    public synchronized void setConnection(Socket socket, EndianDataInputStream in, EndianDataOutputStream out) throws Exception {
 
         if (this.socket != null) { 
             throw new Exception("Cluster " + name + " is already connected!");
@@ -432,7 +430,6 @@ public class Cluster {
             Cluster c = owner.getCluster(i);
             
             for (int j=0;j<owner.getNumberOfGatewaysPerCluster();j++) {
-                
                 GatewayInfo info = c.getGatewayInfo(j);
                 sendGatewayInfo(info);
             }
@@ -440,23 +437,54 @@ public class Cluster {
         
         out.flush();
     }
+    
+    private void allClearBarrier() throws Exception {
 
+        int opcode = in.readInt();
+        
+        if (opcode != Protocol.OPCODE_GATEWAY_READY) {
+            throw new Exception("Invalid opcode " + opcode);
+        }
+
+        synchronized (this) {
+            ready = true;
+            notifyAll();
+        }
+  
+        for (int i=0;i<owner.getNumberOfClusters();i++) { 
+            owner.getCluster(i).waitUntilReady();
+        }
+        
+        out.writeInt(opcode);
+        out.flush();
+    }
 
     public void performHandshake() throws Exception {
 
         sendHandshakeReply();
         receiveAllGatewayInfo();
         sendAllGatewayInfo();
-
-        synchronized (this) {
-            ready = true;
-        }
+        allClearBarrier();
     }
 
     public synchronized boolean isReady() {
         return ready;
     }
 
+    public synchronized boolean waitUntilReady() {
+        
+        if (!ready) {
+            try { 
+                wait();
+            } catch (InterruptedException e) { 
+                return false;
+            }
+        } 
+        
+        return true;
+    }
+
+    
     private void done() {
         synchronized (incoming) {
             done = true;
@@ -539,8 +567,9 @@ public class Cluster {
             break;
 
         case Protocol.OPCODE_FINALIZE:
-//            Logging.println("Cluster " + name + " - Reading FINALIZE message.");
+            Logging.println("Cluster " + name + " - Reading FINALIZE message.");
             req = new FinalizeRequest(in);
+            Logging.println("Cluster " + name + " - Delivering FINALIZE message.");
             break;
         case Protocol.OPCODE_CLOSE_LINK:
 //            Logging.println("Cluster " + name + " - Closing link.");

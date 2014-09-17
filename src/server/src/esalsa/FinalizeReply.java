@@ -1,6 +1,5 @@
 package esalsa;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class FinalizeReply extends Message {
@@ -8,7 +7,7 @@ public class FinalizeReply extends Message {
         super(Protocol.OPCODE_FINALIZE_REPLY, 0xFFFFFFFF, destination, 0);
     }
     
-    void write(DataOutputStream out) throws IOException {
+    void write(EndianDataOutputStream out) throws IOException {
         super.write(out);
     }
 }

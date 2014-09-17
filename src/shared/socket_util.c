@@ -17,6 +17,7 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/epoll.h>
 #include <arpa/inet.h>
 
 #include <netinet/in.h>
@@ -25,6 +26,7 @@
 #include "settings.h"
 #include "logging.h"
 #include "socket_util.h"
+#include "message_buffer.h"
 
 /*****************************************************************************/
 /*                          Socket operations                                */
@@ -145,6 +147,121 @@ int socket_receivefully(int socketfd, unsigned char *buffer, size_t len)
    return SOCKET_OK;
 }
 
+int socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking, size_t *bytes_read)
+{
+	ssize_t tmp;
+	int flags;
+
+	if (blocking) {
+		flags = MSG_WAITALL;
+	} else {
+		flags = MSG_DONTWAIT;
+	}
+
+	tmp = recv(socketfd, buffer, len, flags);
+
+	if (tmp < 0) {
+		if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			*bytes_read = 0;
+			return SOCKET_OK;
+		}
+
+		ERROR(1, "socket_receive failed! (%s) blocking=%d errno=%d", strerror(errno), blocking, errno);
+        return SOCKET_ERROR_RECEIVE_FAILED;
+	}
+
+	if (tmp == 0) {
+		// Other side has shut down the connection!
+		*bytes_read = 0;
+		return SOCKET_DISCONNECT;
+	}
+
+	*bytes_read = tmp;
+	return SOCKET_OK;
+}
+
+int socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking)
+{
+	int error;
+	size_t space, bytes_read;
+
+	space = message_buffer_max_write(buffer);
+
+	if (space == 0) {
+		return SOCKET_OK;
+	}
+
+	error = socket_receive(socketfd, buffer->data + buffer->end, space, blocking, &bytes_read);
+
+	if (error != SOCKET_OK) {
+		return error;
+	}
+
+	buffer->end += bytes_read;
+	return SOCKET_OK;
+}
+
+//int socket_receive(int socketfd, unsigned char *buffer, size_t len, size_t *bytes_read)
+//{
+//	ssize_t tmp = read(socketfd, buffer, len);
+//
+//	if (tmp < 0) {
+//        ERROR(1, "socket_receive failed! (%s)", strerror(errno));
+//        return SOCKET_ERROR_RECEIVE_FAILED;
+//	}
+//
+//	*bytes_read = tmp;
+//	return SOCKET_OK;
+//}
+
+int socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking, size_t *bytes_send)
+{
+	ssize_t tmp;
+	int flags;
+
+	if (blocking) {
+		flags = 0;
+	} else {
+		flags = MSG_DONTWAIT;
+	}
+
+	tmp = send(socketfd, buffer, len, flags);
+
+	if (tmp < 0) {
+        ERROR(1, "socket_send failed! (%s)", strerror(errno));
+        return SOCKET_ERROR_SEND_FAILED;
+	}
+
+	*bytes_send = tmp;
+	return SOCKET_OK;
+}
+
+int socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
+{
+	int error;
+	size_t avail, bytes_sent;
+
+	avail = message_buffer_max_read(buffer);
+
+	if (avail == 0) {
+		return SOCKET_OK;
+	}
+
+	error = socket_send(socketfd, buffer->data+buffer->start, avail, blocking, &bytes_sent);
+
+	if (error != SOCKET_OK) {
+		return error;
+	}
+
+	buffer->start += bytes_sent;
+
+	if (buffer->start == buffer->end) {
+		buffer->start = buffer->end = 0;
+	}
+
+	return SOCKET_OK;
+}
+
 int socket_get_options(int socket, int *send_buffer, int *receive_buffer, bool *nodelay)
 {
 	int error;
@@ -233,7 +350,7 @@ int socket_set_buffers(int socket, int send_buffer, int receive_buffer)
 	   }
 
 	   if (sndbuf != tmp) {
-		   WARN(1, "Socket %d send buffer set to %d but asked for %d\n", socket, tmp, sndbuf);
+		   WARN(1, "Socket %d send buffer set to %d but asked for %d", socket, tmp, sndbuf);
 	   }
    }
 
@@ -260,7 +377,7 @@ int socket_set_buffers(int socket, int send_buffer, int receive_buffer)
 	   }
 
 	   if (sndbuf != tmp) {
-		   WARN(1, "Socket %d receive buffer set to %d but asked for %d\n", socket, tmp, rcvbuf);
+		   WARN(1, "Socket %d receive buffer set to %d but asked for %d", socket, tmp, rcvbuf);
 	   }
    }
 
@@ -274,6 +391,7 @@ int socket_connect(unsigned long ipv4, unsigned short port, int send_buffer, int
    int error;
    int connected = 0;
    int attempts = 0;
+   useconds_t timeout;
    char ipstring[INET_ADDRSTRLEN+1];
 
    address.sin_family = AF_INET;
@@ -299,13 +417,21 @@ int socket_connect(unsigned long ipv4, unsigned short port, int send_buffer, int
 
    addrlen = sizeof(struct sockaddr_in);
 
+   // Start with 100 usec timeout, and keep doubling until 1 sec is reached.
+   timeout = 100;
+
    while (attempts < 1000) {
 
       error = connect(*socketfd, (struct sockaddr *)&address, addrlen);
 
       if (error != 0) {
-         WARN(1, "Failed to connect to %s:%d (error = %d) -- will retry!", ipstring, port, error);
-         sleep(1);
+         WARN(1, "Failed to connect to %s:%d (error = %d) -- will retry after %ld usec!", ipstring, port, error, timeout);
+         usleep(timeout);
+         timeout *= 2;
+
+         if (timeout > 1000000) {
+        	 timeout = 1000000;
+         }
       } else {
          connected = 1;
          break;
@@ -323,57 +449,123 @@ int socket_connect(unsigned long ipv4, unsigned short port, int send_buffer, int
    return SOCKET_OK;
 }
 
-int socket_accept(unsigned short local_port, uint32_t expected_host,int send_buffer, int receive_buffer, int *socketfd)
+int socket_listen(unsigned short local_port, int send_buffer, int receive_buffer, int backlog, int *listenfd)
 {
-   int sd, new_socket;
-   int error;
+	int sd, error, flag;
+	struct sockaddr_in address;
+
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (sd < 0) {
+		ERROR(1, "Failed to create socket!");
+		return SOCKET_ERROR_CREATE_SOCKET;
+	}
+
+	address.sin_family = AF_INET;
+	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_port = htons(local_port);
+
+	flag = 1;
+
+	error = setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *) &flag, sizeof(int));
+
+	if (error != 0) {
+		close(sd);
+		ERROR(1, "Failed to set SO_REUSEADDR on server socket!");
+		return SOCKET_ERROR_BIND;
+	}
+
+	error = socket_set_buffers(sd, send_buffer, receive_buffer);
+
+	if (error != 0) {
+		WARN(1, "Failed to set buffers for socket %d (error = %d)!", sd, error);
+	}
+
+	error = bind(sd,(struct sockaddr *)&address, sizeof(address));
+
+	if (error != 0) {
+		close(sd);
+		ERROR(1, "Failed to bind socket to port %d!", local_port);
+		return SOCKET_ERROR_BIND;
+	}
+
+	error = listen(sd, backlog);
+
+	if (error != 0) {
+		close(sd);
+		ERROR(1, "Failed to listen to socket on port %d!", local_port);
+		return SOCKET_ERROR_LISTEN;
+	}
+
+//	if (!blocking) {
+//		error = socket_set_non_blocking(sd);
+//
+//		if (error != 0) {
+//			close(sd);
+//			ERROR(1, "Failed to set listen socket to non-blocking!");
+//			return SOCKET_ERROR_BLOCKING;
+//		}
+//	}
+
+	*listenfd = sd;
+	return SOCKET_OK;
+}
+
+int socket_accept_one(unsigned short local_port, uint32_t expected_host, int send_buffer, int receive_buffer, int *socketfd)
+{
+   int sd, new_socket, error;
    uint32_t host;
    struct sockaddr_in address;
-   int flag = 1;
    socklen_t addrlen;
    char buffer[INET_ADDRSTRLEN+1];
 
-   sd = socket(AF_INET, SOCK_STREAM, 0);
-
-   if (sd < 0) {
-      ERROR(1, "Failed to create socket!");
-      return SOCKET_ERROR_CREATE_SOCKET;
-   }
-
-   address.sin_family = AF_INET;
-   address.sin_addr.s_addr = INADDR_ANY;
-   address.sin_port = htons(local_port);
+//   sd = socket(AF_INET, SOCK_STREAM, 0);
+//
+//   if (sd < 0) {
+//      ERROR(1, "Failed to create socket!");
+//      return SOCKET_ERROR_CREATE_SOCKET;
+//   }
+//
+//   address.sin_family = AF_INET;
+//   address.sin_addr.s_addr = INADDR_ANY;
+//   address.sin_port = htons(local_port);
 
    INFO(2, "Accepting connection from host %s on port %d", inet_ntop(AF_INET, &expected_host, buffer, INET_ADDRSTRLEN+1), local_port);
 
-   error = setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *) &flag, sizeof(int));
+//   error = setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char *) &flag, sizeof(int));
+//
+//   if (error != 0) {
+//      close(sd);
+//      ERROR(1, "Failed to set SO_REUSEADDR on server socket!");
+//      return SOCKET_ERROR_BIND;
+//   }
+//
+//   error = socket_set_buffers(sd, send_buffer, receive_buffer);
+//
+//   if (error != 0) {
+//	   WARN(1, "Failed to set buffers for socket %d (error = %d)!", sd, error);
+//   }
+//
+//   error = bind(sd,(struct sockaddr *)&address, sizeof(address));
+//
+//   if (error != 0) {
+//      close(sd);
+//      ERROR(1, "Failed to bind socket to port %d!", local_port);
+//      return SOCKET_ERROR_BIND;
+//   }
+//
+//   error = listen(sd, 1);
+//
+//   if (error != 0) {
+//      close(sd);
+//      ERROR(1, "Failed to listen to socket on port %d!", local_port);
+//      return SOCKET_ERROR_LISTEN;
+//   }
+
+   error = socket_listen(local_port, send_buffer, receive_buffer, 1, &sd);
 
    if (error != 0) {
-      close(sd);
-      ERROR(1, "Failed to set SO_REUSEADDR on server socket!");
-      return SOCKET_ERROR_BIND;
-   }
-
-   error = socket_set_buffers(sd, send_buffer, receive_buffer);
-
-   if (error != 0) {
-	   WARN(1, "Failed to set buffers for socket %d (error = %d)!", sd, error);
-   }
-
-   error = bind(sd,(struct sockaddr *)&address, sizeof(address));
-
-   if (error != 0) {
-      close(sd);
-      ERROR(1, "Failed to bind socket to port %d!", local_port);
-      return SOCKET_ERROR_BIND;
-   }
-
-   error = listen(sd, 1);
-
-   if (error != 0) {
-      close(sd);
-      ERROR(1, "Failed to listen to socket on port %d!", local_port);
-      return SOCKET_ERROR_LISTEN;
+	   return error;
    }
 
    addrlen = sizeof(struct sockaddr_in);
@@ -402,7 +594,7 @@ int socket_accept(unsigned short local_port, uint32_t expected_host,int send_buf
    return SOCKET_OK;
 }
 
-int get_local_ips(struct in_addr **ip4ads, int *ip4count)
+int socket_get_local_ips(struct in_addr **ip4ads, int *ip4count)
 {
    int count, index, status;
    struct in_addr *output;
@@ -489,5 +681,133 @@ int get_local_ips(struct in_addr **ip4ads, int *ip4count)
 
    return SOCKET_OK;
 }
+
+int socket_add_to_epoll(int epollfd, int socketfd, void *data)
+{
+   int error;
+   struct epoll_event event;
+
+   DEBUG(1, "Adding socket %d to epoll %d", socketfd, epollfd);
+
+   event.data.ptr = data;
+   event.events = EPOLLIN;
+
+   error = epoll_ctl (epollfd, EPOLL_CTL_ADD, socketfd, &event);
+
+   if (error == -1) {
+      ERROR(1, "Failed to add socket to epoll (error=%d %s)", errno, strerror(errno));
+      return SOCKET_ERROR_ADD_EPOLL;
+   }
+
+   return SOCKET_OK;
+}
+
+int socket_remove_from_epoll(int epollfd, int socketfd)
+{
+   int error;
+
+   DEBUG(1, "Removinf socket %d from epoll %d", socketfd, epollfd);
+
+   error = epoll_ctl (epollfd, EPOLL_CTL_DEL, socketfd, NULL);
+
+   if (error == -1) {
+      ERROR(1, "Failed to remove socket from epoll (error=%d %s)", errno, strerror(errno));
+      return SOCKET_ERROR_DEL_EPOLL;
+   }
+
+   return SOCKET_OK;
+}
+
+int socket_set_rw(int epollfd, int socketfd, void *data)
+{
+   int error;
+   struct epoll_event event;
+
+   DEBUG(1, "Setting socket %d to RW in epoll %d", socketfd, epollfd);
+
+   event.data.ptr = data;
+   event.events = EPOLLIN | EPOLLOUT;
+
+   error = epoll_ctl (epollfd, EPOLL_CTL_MOD, socketfd, &event);
+
+   if (error != 0) {
+      ERROR(1, "Failed to set socket to RW (%d %d error=%d %s )", epollfd, socketfd, errno, strerror(errno));
+      return SOCKET_ERROR_SET_EPOLL;
+   }
+
+   return SOCKET_OK;
+}
+
+int socket_set_ro(int epollfd, int socketfd, void *data)
+{
+   int error;
+   struct epoll_event event;
+
+   INFO(1, "Setting socket %d to RO in epoll %d", socketfd, epollfd);
+
+   event.data.ptr = data;
+   event.events = EPOLLIN;
+
+   error = epoll_ctl (epollfd, EPOLL_CTL_MOD, socketfd, &event);
+
+   if (error != 0) {
+      ERROR(1, "Failed to set socket to RO (socket=%d error=%d %s)", socketfd, error, strerror(errno));
+      return SOCKET_ERROR_SET_EPOLL;
+   }
+
+   return SOCKET_OK;
+}
+
+int socket_set_wo(int epollfd, int socketfd, void *data)
+{
+   int error;
+   struct epoll_event event;
+
+   DEBUG(1, "Setting socket %d to WO in epoll %d", socketfd, epollfd);
+
+   event.data.ptr = data;
+   event.events = EPOLLOUT;
+
+   error = epoll_ctl (epollfd, EPOLL_CTL_MOD, socketfd, &event);
+
+   if (error != 0) {
+      ERROR(1, "Failed to set socket to WO (socket=%d error=%d %s )", socketfd, errno, strerror(errno));
+      return SOCKET_ERROR_SET_EPOLL;
+   }
+
+   return SOCKET_OK;
+}
+
+int socket_set_idle(int epollfd, int socketfd, void *data)
+{
+   int error;
+   struct epoll_event event;
+
+   DEBUG(1, "Setting socket %d to IDLE in epoll %d", socketfd, epollfd);
+
+   event.data.ptr = data;
+   event.events = 0;
+
+   error = epoll_ctl (epollfd, EPOLL_CTL_MOD, socketfd, &event);
+
+   if (error != 0) {
+      ERROR(1, "Failed to set socket to IDLE (%d %d error=%d %s )", epollfd, socketfd, errno, strerror(errno));
+      return SOCKET_ERROR_SET_EPOLL;
+   }
+
+   return SOCKET_OK;
+}
+
+/*
+int socket_epoll_event(int epollfd, int timeout, struct epoll_event *events, int max_events, int *count)
+{
+   *count = epoll_wait (epollfd, events, max_events, timeout);
+
+   DEBUG(1, "Got %d socket events", *count);
+
+   return SOCKET_OK;
+}
+*/
+
 
 

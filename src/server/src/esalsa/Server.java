@@ -3,8 +3,6 @@ package esalsa;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -16,9 +14,9 @@ import java.util.StringTokenizer;
 
 public class Server {
 
-    private static final int MAX_CLUSTERS = 256;
-    private static final int MAX_PROCESSES_PER_CLUSTER = 16777216;
-    private static final int MAX_LENGTH_CLUSTER_NAME = 128;
+    public static final int MAX_CLUSTERS = 256;
+    public static final int MAX_PROCESSES_PER_CLUSTER = 16777216;
+    public static final int MAX_LENGTH_CLUSTER_NAME = 128;
     
     class AcceptThread extends Thread { 
 
@@ -214,23 +212,50 @@ public class Server {
     }
  
     private void connectionHandshake(Socket s) throws Exception {
-
-        Logging.println("Got connection from " + s);
-
+        
         s.setTcpNoDelay(true);
 
-        //in = new DataInputStream(new NoisyInputStream(s.getInputStream()));
-        DataInputStream in = new DataInputStream(new BufferedInputStream(s.getInputStream()));
-        DataOutputStream out = new DataOutputStream(new BufferedOutputStream(s.getOutputStream()));
+        BufferedInputStream in = new BufferedInputStream(s.getInputStream());
+        BufferedOutputStream out = new BufferedOutputStream(s.getOutputStream());
+        
+        // Read the incoming handshake. We read an integer as 4 separate bytes here to determine the endianness of the machine
+        // connecting to us....
+        
+        byte [] opcode = new byte[4];
+        
+        int pos = 0; 
+        int length = 4;
+        int read;
+        
+        while (pos != length) { 
+            read = in.read(opcode, pos, length-pos);
+        
+            if (read < 0) { 
+                throw new Exception("Unexpected EOF while reading opcode");
+            }
+            
+            pos += read;
+        }
 
-        // Read the incoming handshake.
-        int opcode = in.readInt();
-
-        if (opcode != Protocol.OPCODE_HANDSHAKE) {
+        EndianDataInputStream din;
+        EndianDataOutputStream dout;
+        
+        if (opcode[0] == 42) {
+            // Little endian machine on the other side!
+            din = new LittleEndianDataInputStream(in);
+            dout = new LittleEndianDataOutputStream(out);
+            Logging.println("Got connection from " + s + " (little endian)");
+        } else if (opcode[3] == 42) { 
+            // Big endian machine on the other side!
+            din = new BigEndianDataInputStream(in);
+            dout = new BigEndianDataOutputStream(out);
+            Logging.println("Got connection from " + s + " (big endian)");
+        } else { 
+            Logging.println("Rejecting connection from " + s + " (UNKNOWN OPCODE)");
             throw new Exception("Unexpected opcode " + opcode);
         }
 
-        int len = in.readInt();
+        int len = din.readInt();
         
         if (len <= 0 || len > MAX_LENGTH_CLUSTER_NAME) {
             throw new Exception("Illegal cluster name length " + len);
@@ -238,7 +263,7 @@ public class Server {
         
         byte [] tmp = new byte[len];
         
-        in.readFully(tmp);
+        din.readFully(tmp);
         
         String name = new String(tmp);
         
@@ -246,16 +271,14 @@ public class Server {
         
         if (c == null) { 
             // unknown cluster!
-            out.writeInt(Protocol.OPCODE_HANDSHAKE_REJECTED);
-            out.close();
+            dout.writeInt(Protocol.OPCODE_HANDSHAKE_REJECTED);
+            dout.close();
             throw new Exception("Unknown cluster: " + name);
         }
         
-        c.setConnection(s, in, out);
-        c.performHandshake();
-        
-        // From this moment on, the cluster gateways should be completely initialized.
-        
+        c.setConnection(s, din, dout);
+        c.performHandshake();        
+        // From this moment on, the cluster gateways should be completely initialized.       
     }
     
     private synchronized Cluster getCluster(String name) {
