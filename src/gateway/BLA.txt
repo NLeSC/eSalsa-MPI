@@ -1,0 +1,1 @@
+gcc -Wall -g  -I/home/jason/Workspace/eSalsa-MPI-MT/src/shared gateway.c socket_util.o udt_util.o blocking_linked_queue.o linked_queue.o udt4.o /home/jason/Workspace/udt4/src/libudt.a  /home/jason/Workspace/eSalsa-MPI-MT/lib/libempi-shared.a -lstdc++ -lpthread -o gateway.exe

@@ -616,7 +616,7 @@ static int probe_mpi_data_message(data_message **message, int blocking)
 static int probe_gateway_message(message_header *mh, bool blocking)
 {
 	int error;
-	size_t tmp;
+	size_t tmp, avail;
 
 	// NOTE: we may receive any combination of message here.
 	do {
@@ -628,8 +628,13 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 			return EMPI_ERR_GATEWAY;
 		}
 
+		//INFO(1, "XXX Received message from socket %d start=%d end=%d size=%d", gatewayfd, gateway_in_buffer->start,
+				//gateway_in_buffer->end, gateway_in_buffer->size);
+
+		avail = message_buffer_max_read(gateway_in_buffer);
+
 		// Next, we check if there is enough data available for a message header.
-		if (message_buffer_max_read(gateway_in_buffer) >= MESSAGE_HEADER_SIZE) {
+		if (avail >= MESSAGE_HEADER_SIZE) {
 			// There should be at least a message header in the buffer!
 			tmp = message_buffer_peek(gateway_in_buffer, (unsigned char *)mh, MESSAGE_HEADER_SIZE);
 
@@ -639,10 +644,18 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 				return EMPI_ERR_INTERN;
 			}
 
-			if (message_buffer_max_read(gateway_in_buffer) >= mh->length) {
+			INFO(1, "GOT DATA MESSAGE WA opcode=%d src=%d:%d dst=%d:%d length=%d", mh->opcode,
+						GET_CLUSTER_RANK(mh->src_pid), GET_PROCESS_RANK(mh->src_pid),
+						GET_CLUSTER_RANK(mh->dst_pid), GET_PROCESS_RANK(mh->dst_pid),
+						mh->length);
+
+			if (avail >= mh->length) {
 				// There is a complete message in the buffer!
+				INFO(2, "MESSAGE COMPLETE");
 				return 0;
 			}
+
+			INFO(2, "MESSAGE INCOMPLETE");
 
 			// No complete message yet. Check if the message will fit in the buffer.
 			if (message_buffer_max_write(gateway_in_buffer) < mh->length) {
@@ -652,6 +665,8 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 					ERROR(1, "Failed to receive wide area message as it is larger than receive buffer!");
 					return -1;
 				}
+
+				INFO(5, "WILL COMPACT BUFFER TO RECEIVE MESSAGE");
 
 				// We need to compact the buffer or the message will not fit!
 				message_buffer_compact(gateway_in_buffer);
@@ -1082,7 +1097,7 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 		// There is a data message in the gateway_in_buffer. Check if there is a matching message in the receive queue.
 		m = (data_message *) message_buffer_direct_read_access(gateway_in_buffer, 0);
 
-		DEBUG(4, "Message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
+		INFO(4, "Message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
 				m->header.opcode, m->header.src_pid, m->header.dst_pid, m->header.length,
 				m->comm, m->source, m->dest, m->tag, m->count);
 
@@ -1090,7 +1105,7 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 
 		if (req != NULL) {
 			// Found a matching pending receive
-			DEBUG(5, "Matched pending receive. Directly unpacking message to application buffer!");
+			INFO(5, "Matched pending receive. Directly unpacking message to application buffer!");
 
 			// Skip the header.
 			message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
@@ -1116,6 +1131,8 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 				message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
 
 				buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
+
+				position = 0;
 
 				error = PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, buf, count, t->type, c->comm);
 
@@ -1457,6 +1474,7 @@ int messaging_probe_receive(request *r, int blocking)
 }*/
 
 // Finalize a pending receive request.
+/*
 int messaging_finalize_receive(request *r, EMPI_Status *status)
 {
 	if (!(r->flags & REQUEST_FLAG_COMPLETED)) {
@@ -1472,7 +1490,7 @@ int messaging_finalize_receive(request *r, EMPI_Status *status)
 
 	return r->error;
 }
-
+*/
 
 /*****************************************************************************/
 /*               Server Communication on Application Process                 */
