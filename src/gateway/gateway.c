@@ -26,7 +26,7 @@
 #include "socket_util.h"
 #include "udt_util.h"
 
-#include "blocking_linked_queue.h"
+// #include "blocking_linked_queue.h"
 
 
 //#define DETAILED_MESSAGE_INFO 1
@@ -79,7 +79,6 @@
 #define STATE_READ_PAYLOAD       5
 #define STATE_TERMINATING        6
 #define STATE_TERMINATED         7
-
 
 // Error codes used internally.
 #define CONNECT_OK                      0
@@ -152,48 +151,31 @@ typedef struct {
 	int state;
 	int index;
 
+	// Receiver thread (only used in gateway-to-gateway connections).
 	pthread_t receive_thread;
+
+	// Sender thread (only used in gateway-to-gateway connections).
 	pthread_t send_thread;
 
-	blocking_linked_queue *output_queue;
-	blocking_linked_queue *input_queue;
-
+	// Current message that is being written.
 	message_buffer *out_msg;
+
+	// Current message that is read.
 	message_buffer *in_msg;
 
-	//   uint64_t in_bytes;
-	//   uint64_t in_messages;
+	// Queue for the messages that need to written to the socket.
+	linked_queue *output_queue;
 
-	//#ifdef DETAILED_TIMING
-	//   uint64_t in_starttime;
-	//#endif // DETAILED_TIMING
-	//
-	//   uint64_t out_bytes;
-	//   uint64_t out_messages;
-	//
-	//#ifdef DETAILED_TIMING
-	//   uint64_t out_starttime;
-	//#endif // DETAILED_TIMING
-	//
-	//
-	////   linked_queue *out_queue;
+	// A mutex to make the queue thread safe.
+	pthread_mutex_t output_mutex;
+
+	// A condition variable that allows dequeue to block.
+	pthread_cond_t output_cond;
+
+	// Queue for the messages that have been received from the socket (only in gateway-to-gateway TCP connections).
+	linked_queue *input_queue;
 
 } socket_info;
-
-/*
-typedef struct {
-	int socketfd;
-	int state;
-	int rank;
-
-	sync_linked_queue *output_queue;
-//	blocking_linked_queue *input_queue;
-
-	message_buffer *out_msg;
-	message_buffer *in_msg;
-
-} socket_info2;
-*/
 
 // A type to store gateway information.
 typedef struct {
@@ -238,8 +220,6 @@ static size_t max_pending_isend_data;
 static char *cluster_name;
 static gateway_address *gateway_addresses;
 static gateway_connection *gateway_connections;
-
-//static blocking_linked_queue *incoming_queue;
 
 // The number of clusters and the rank of our cluster in this set.
 uint32_t cluster_count;
@@ -485,12 +465,127 @@ void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
 //	return true;
 //}
 
+static bool enqueue_message_at_socket_info(socket_info *info, message_buffer *m)
+{
+	bool result;
+	int error = SOCKET_OK;
+
+//	fprintf(stderr, "##### Enqueue for socket_info %d", info->socketfd);
+
+	// Lock the queue first.
+	pthread_mutex_lock(&info->output_mutex);
+
+//	fprintf(stderr, "###### Storing message in queue of length %d (socket_info %d)", linked_queue_length(info->output_queue), info->socketfd);
+
+	result = linked_queue_enqueue(info->output_queue, m, message_buffer_max_read(m));
+
+	if (linked_queue_length(info->output_queue) == 1) {
+
+		// We've just inserted a message into an empty queue, so set the socket to the correct mode (if needed),
+		// and wake up any waiting threads.
+		if (info->type == TYPE_SERVER || info->type == TYPE_COMPUTE_NODE_TCP) {
+			error = socket_set_rw(epollfd, info->socketfd, info);
+		}
+
+//		fprintf(stderr, "##### Sending bcast to wake up threads! (socket_info %d)", info->socketfd);
+
+		pthread_cond_broadcast(&info->output_cond);
+	}
+
+	// Unlock the queue.
+	pthread_mutex_unlock(&info->output_mutex);
+
+//	fprintf(stderr, "##### Enqueue done for socket_info %d", info->socketfd);
+
+	return (error == SOCKET_OK) && result;
+}
+
+static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64_t timeout_usec)
+{
+	message_buffer *m;
+	struct timespec alarm;
+	struct timeval now;
+	int error = SOCKET_OK;
+
+//	fprintf(stderr, "##### Dequeue message from socket_info %d", info->socketfd);
+
+	// Lock the queue first.
+	pthread_mutex_lock(&(info->output_mutex));
+
+//	fprintf(stderr, "##### Dequeue grabbed lock! (socket_info %d)", info->socketfd);
+
+	m = linked_queue_dequeue(info->output_queue);
+
+//	fprintf(stderr, "##### Dequeue got message %p (socket_info %d)", m, info->socketfd);
+
+	while (m == NULL) {
+
+		if (timeout_usec == 0) {
+			// We don't wait for an element to appear, but return immediately!
+			break;
+		}
+
+		if (timeout_usec < 0) {
+			// negative timeout, so perform a blocking wait.
+			error = pthread_cond_wait(&info->output_cond, &info->output_mutex);
+
+			if (error != 0) {
+				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
+			}
+		} else {
+			// positive timeout, so perform a timed wait.
+
+	//		fprintf(stderr, "##### Dequeue will sleep for %ld usec (socket_info %d)", timeout_usec, info->socketfd);
+
+			gettimeofday(&now, NULL);
+			alarm.tv_sec = now.tv_sec + (timeout_usec / 1000000);
+			alarm.tv_nsec = (now.tv_usec + (timeout_usec % 1000000)) * 1000;
+
+			if (alarm.tv_nsec >= 1000000000) {
+				alarm.tv_sec++;
+				alarm.tv_nsec -= 1000000000;
+			}
+
+			error = pthread_cond_timedwait(&info->output_cond, &info->output_mutex, &alarm);
+
+		//	fprintf(stderr, "##### Dequeue woke up!(socket_info %d)", info->socketfd);
+
+			if (error == ETIMEDOUT) {
+				// If the timeout expired we return.
+	//			fprintf(stderr, "##### Dequeue got timeout!(socket_info %d)", info->socketfd);
+				break;
+			}
+
+			if (error != 0) {
+				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
+			}
+		}
+
+		m = linked_queue_dequeue(info->output_queue);
+	}
+
+	if (m == NULL && (info->type == TYPE_SERVER || info->type == TYPE_COMPUTE_NODE_TCP)) {
+		// TODO: only set when needed, as this results in a system call!
+		error = socket_set_ro(epollfd, info->socketfd, info);
+
+		if (error != 0) {
+			WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
+		}
+	}
+
+	// Unlock the queue.
+	pthread_mutex_unlock(&info->output_mutex);
+
+//	fprintf(stderr, "##### Dequeue released lock! (socket_info %d)", info->socketfd);
+
+	return m;
+}
+
 static bool enqueue_message_from_server(message_buffer *m)
 {
-	// Message from the server are destined for a local compute node or (rarely) for this gateway.
-	// Since the server link is handled by a single epoll thread (together with all compute node links), only one of these calls
-	// is active at a time.
-	int cluster, index, rank;
+	// Message from the server are destined for a local compute node or (rarely) for the gateway itself. Since the server link
+	// is handled by a single epoll thread (together with all compute node links), only one of these calls is active at a time.
+	int rank;
 	message_header mh;
 
 	message_buffer_peek(m, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
@@ -509,8 +604,6 @@ static bool enqueue_message_from_server(message_buffer *m)
 		return true;
 	}
 
-
-
 	INFO(1, "ENQ SERVER REPLY opcode=%d dst=%d:%d length=%d", mh.opcode, GET_CLUSTER_RANK(mh.dst_pid), GET_PROCESS_RANK(mh.dst_pid), mh.length);
 
 	rank = GET_PROCESS_RANK(mh.dst_pid);
@@ -520,14 +613,7 @@ static bool enqueue_message_from_server(message_buffer *m)
 		local_compute_nodes[rank]->state = STATE_TERMINATING;
 	}
 
-	// FIXME: enqueue and socket state should be single atomic action!!!! - else we get race conditions!
-	if (!blocking_linked_queue_enqueue(local_compute_nodes[rank]->output_queue, m, 0, -1)) {
-		return false;
-	}
-
-	// FIXME: only set when needed!!
-	socket_set_rw(epollfd, local_compute_nodes[rank]->socketfd, local_compute_nodes[rank]);
-	return true;
+	return enqueue_message_at_socket_info(local_compute_nodes[rank], m);
 }
 
 static bool enqueue_message_from_compute_node(message_buffer *m)
@@ -535,7 +621,7 @@ static bool enqueue_message_from_compute_node(message_buffer *m)
 	// Message from compute nodes are usually headed for the WA link, although they may also be destined for the server.
 	// Since all compute node links are handled by a single epoll thread (together with the server link), only one of these calls
 	// is active at a time.
-	int cluster, index, rank;
+	int cluster, index;
 	message_header mh;
 
 	message_buffer_peek(m, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
@@ -543,15 +629,7 @@ static bool enqueue_message_from_compute_node(message_buffer *m)
 	if (mh.dst_pid == server_pid) {
 		// This message contains a request for the server!
 		INFO(1, "ENQ SERVER REQUEST opcode=%d src=%d:%d length=%d", mh.opcode, GET_CLUSTER_RANK(mh.src_pid), GET_PROCESS_RANK(mh.src_pid), mh.length);
-
-		// FIXME: enqueue and socket state should be single atomic action!!!! - else we get race conditions!
-		if (!blocking_linked_queue_enqueue(server_info->output_queue, m, 0, -1)) {
-			return false;
-		}
-
-		// FIXME: only set when needed!!
-		socket_set_rw(epollfd, server_info->socketfd, server_info);
-		return true;
+		return enqueue_message_at_socket_info(server_info, m);
 	}
 
 	// This message must be forwarded to another gateway.
@@ -569,17 +647,13 @@ static bool enqueue_message_from_compute_node(message_buffer *m)
 
 	index = gateway_connections[cluster].next_output_stream;
 
-	// FIXME: may block -- is this acceptable ??!!
-	if (index < 0 || index > gateway_connections[cluster].stream_count) {
-		ERROR(1, "Stream index out of bounds %d ~ %d-%d", index, 0, gateway_connections[cluster].stream_count);
-	}
-
-	if (!blocking_linked_queue_enqueue(gateway_connections[cluster].sockets[index]->output_queue, m, 0, -1)) {
-		return false;
-	}
+//	if (index < 0 || index > gateway_connections[cluster].stream_count) {
+//		ERROR(1, "Stream index out of bounds %d ~ %d-%d", index, 0, gateway_connections[cluster].stream_count);
+//	}
 
 	gateway_connections[cluster].next_output_stream = (index + 1) % gateway_connections[cluster].stream_count;
-	return true;
+
+	return enqueue_message_at_socket_info(gateway_connections[cluster].sockets[index], m);
 }
 
 static bool enqueue_message_from_wa_link(message_buffer *m)
@@ -587,7 +661,7 @@ static bool enqueue_message_from_wa_link(message_buffer *m)
 	// Messages from the WA link are always destined for a local compute node.
 	// Depening on the implementation, multiple threads may be used to receive WA messages, so multiple of these calls may be
 	// active at the same time.
-	int cluster, index, rank;
+	int rank;
 	message_header mh;
 
 	message_buffer_peek(m, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
@@ -599,14 +673,7 @@ static bool enqueue_message_from_wa_link(message_buffer *m)
 
 	rank = GET_PROCESS_RANK(mh.dst_pid);
 
-	// FIXME: enqueue and socket state should be single atomic action!!!! - else we get race conditions!
-	if (!blocking_linked_queue_enqueue(local_compute_nodes[rank]->output_queue, m, 0, -1)) {
-		return false;
-	}
-
-	// FIXME: only set when needed!!
-	socket_set_rw(epollfd, local_compute_nodes[rank]->socketfd, local_compute_nodes[rank]);
-	return true;
+	return enqueue_message_at_socket_info(local_compute_nodes[rank], m);
 }
 
 static int write_message(socket_info *info)
@@ -616,16 +683,9 @@ static int write_message(socket_info *info)
 
 	// If there was no message in progress, we try to dequeue one.
 	if (info->out_msg == NULL) {
-		info->out_msg = (message_buffer *) blocking_linked_queue_dequeue(info->output_queue, 0);
+		info->out_msg = dequeue_message_from_socket_info(info, 0);
 
 		if (info->out_msg == NULL) {
-			// No output message available, so set the socket to read-only
-			error = socket_set_ro(epollfd, info->socketfd, info);
-
-			if (error != SOCKET_OK) {
-				return ERROR_CONNECTION;
-			}
-
 			return 0;
 		}
 	}
@@ -637,21 +697,14 @@ static int write_message(socket_info *info)
 		return ERROR_CONNECTION;
 	}
 
-	if (message_buffer_max_write(info->out_msg) == 0) {
+	if (message_buffer_max_read(info->out_msg) == 0) {
 		// Full message has been written, so destroy it and dequeue the next message.
 		// If no message is available, the socket will be set to read only mode until more message arrive.
 		message_buffer_destroy(info->out_msg);
 
-		info->out_msg = (message_buffer *) blocking_linked_queue_dequeue(info->output_queue, 0);
-
-		if (info->out_msg == NULL) {
-			// No output message available, so set the socket to read-only
-			error = socket_set_ro(epollfd, info->socketfd, info);
-
-			if (error != SOCKET_OK) {
-				return ERROR_CONNECTION;
-			}
-		}
+		// TODO FIXME: Which is better ?
+		// info->out_msg = dequeue_message_from_socket_info(info, 0);
+		info->out_msg = NULL;
 	}
 
 	return 0;
@@ -755,9 +808,12 @@ void* tcp_sender_thread(void *arg)
 	data = 0;
 	count = 0;
 
+// FIXME: BROKEN!!!
+
 	// FIXME: how to stop ?
 	while (!done) {
-		mh = blocking_linked_queue_dequeue(info->output_queue, -1);
+		// TODO: should use timed wait here
+		mh = dequeue_message_from_socket_info(info, -1);
 
 		if (mh != NULL) {
 
@@ -913,24 +969,34 @@ void* udt_sender_thread(void *arg)
 	}
 */
 
+	//fprintf(stderr, "#### UDT Sender starting! socketfd=%d type=%d state=%d index=%d ", info->socketfd, info->type, info->state, info->index);
+
 	while (!done) {
+		m = dequeue_message_from_socket_info(info, 1000000);
 
-		m = blocking_linked_queue_dequeue(info->output_queue, -1);
+		if (m != NULL) {
 
-		avail = message_buffer_max_read(m);
+			avail = message_buffer_max_read(m);
 
-		p = message_buffer_direct_read_access(m, avail);
+		//	fprintf(stderr, "#### UDT Sender sending message of %ld bytes", avail);
 
-		error = udt_sendfully(info->socketfd, p, avail);
+			p = message_buffer_direct_read_access(m, avail);
 
-		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to send message!");
-			return NULL;
+			error = udt_sendfully(info->socketfd, p, avail);
+
+			if (error != SOCKET_OK) {
+				ERROR(1, "Failed to send message!");
+				return NULL;
+			}
+
+			message_buffer_destroy(m);
+
+		} else {
+//			fprintf(stderr, "#### UDT Sender got empty message .. will retry...");
 		}
-
-		message_buffer_destroy(m);
 	}
 
+	//INFO(1, "UDT Sender done!");
 
 	return NULL;
 }
@@ -985,6 +1051,8 @@ void* tcp_receiver_thread(void *arg)
 	void *buffer;
 	int error;
 	uint64_t last_write, now, data, count;
+	message_buffer *m;
+
 
 	info = (socket_info *) arg;
 	done = false;
@@ -1024,7 +1092,11 @@ void* tcp_receiver_thread(void *arg)
 			return NULL;
 		}
 
-		blocking_linked_queue_enqueue(info->input_queue, buffer, mh.length, -1);
+		m = message_buffer_wrap(buffer, mh.length);
+		m->end = mh.length;
+
+		// FIXME: WILL LEAK??
+		enqueue_message_from_wa_link(m);
 
 		data += mh.length;
 		count++;
@@ -1096,6 +1168,7 @@ void* udt_receiver_thread(void *arg)
 		m = message_buffer_wrap(buffer, mh.length);
 		m->end = mh.length;
 
+		// FIXME: WILL LEAK??
 		enqueue_message_from_wa_link(m);
 
 //		blocking_linked_queue_enqueue(info->input_queue, buffer, mh.length, -1);
@@ -1189,6 +1262,7 @@ static  void release_message_buffer(message_buffer *mb)
 
 static socket_info *create_socket_info(int socketfd, int type, int state)
 {
+	int error;
 	socket_info *info;
 
 	info = (socket_info *) malloc(sizeof(socket_info));
@@ -1209,10 +1283,24 @@ static socket_info *create_socket_info(int socketfd, int type, int state)
 	info->out_msg = NULL;
 
 	info->input_queue = NULL;
-	info->output_queue = blocking_linked_queue_create(-1, MAX_BLOCKED_QUEUE_SIZE);
+	info->output_queue = linked_queue_create(-1);
 
-	//info->receive_thread = NULL;
-	//info->send_thread = NULL;
+	error = pthread_cond_init(&(info->output_cond), NULL);
+
+	if (error != 0) {
+		linked_queue_destroy(info->output_queue);
+		free(info);
+		return NULL;
+	}
+
+	error = pthread_mutex_init(&(info->output_mutex), NULL);
+
+	if (error != 0) {
+		pthread_cond_destroy(&(info->output_cond));
+		linked_queue_destroy(info->output_queue);
+		free(info);
+		return NULL;
+	}
 
 	return info;
 }
@@ -1260,14 +1348,14 @@ static int init_socket_info_threads(socket_info *info)
 	} else
 */
 	if (info->type == TYPE_GATEWAY_TCP) {
-		error = pthread_create(&info->receive_thread, NULL, &tcp_receiver_thread, info);
+		error = pthread_create(&(info->receive_thread), NULL, &tcp_receiver_thread, info);
 
 		if (error != 0) {
 			ERROR(1, "Failed to create TCP receive thread for socket %d!", info->socketfd);
 			return ERROR_ALLOCATE;
 		}
 
-		error = pthread_create(&info->send_thread, NULL, &tcp_sender_thread, info);
+		error = pthread_create(&(info->send_thread), NULL, &tcp_sender_thread, info);
 
 		if (error != 0) {
 			ERROR(1, "Failed to create TCP sender thread for socket %d!", info->socketfd);
@@ -1275,14 +1363,14 @@ static int init_socket_info_threads(socket_info *info)
 		}
 
  	} else if (info->type == TYPE_GATEWAY_UDT) {
-		error = pthread_create(&info->receive_thread, NULL, &udt_receiver_thread, info);
+		error = pthread_create(&(info->receive_thread), NULL, &udt_receiver_thread, info);
 
 		if (error != 0) {
 			ERROR(1, "Failed to create UDT receive thread for socket %d!", info->socketfd);
 			return ERROR_ALLOCATE;
 		}
 
-		error = pthread_create(&info->send_thread, NULL, &udt_sender_thread, info);
+		error = pthread_create(&(info->send_thread), NULL, &udt_sender_thread, info);
 
 		if (error != 0) {
 			ERROR(1, "Failed to create UDT sender thread for socket %d!", info->socketfd);
@@ -1303,6 +1391,8 @@ static int start_gateway_threads(int index)
     }
 
     for (i=0;i<gateway_connections[index].stream_count;i++) {
+
+    	INFO(1, "Starting gatways thread %d.%d", index, i);
 
     	status = init_socket_info_threads(gateway_connections[index].sockets[i]);
 
@@ -1371,7 +1461,6 @@ static int connect_to_gateways(int crank, int local_port)
 		// I must initiate the connection!
 		for (i=cluster_rank+1;i<cluster_count;i++) {
 			remoteIndex = i*gateway_count + gateway_rank;
-
 
 			gateway_connections[i].stream_count = gateway_addresses[remoteIndex].streams;
 			gateway_connections[i].sockets = malloc(gateway_connections[i].stream_count * sizeof(socket_info *));
@@ -2646,7 +2735,7 @@ static int receive_server_reply(int *done)
 
 
 
-
+/*
 static generic_message *dequeue_message(int cluster, int timeout_usec)
 {
 	generic_message *tmp;
@@ -2666,6 +2755,7 @@ static generic_message *dequeue_message(int cluster, int timeout_usec)
 
 	return tmp;
 }
+*/
 
 /***
 static int receive_from_mpi(int *done, int *got_message)
@@ -4164,6 +4254,19 @@ static int accept_local_connections()
 
 	INFO(2, "All %d local compute are connected", local_application_size);
 
+	// Switching all sockets to the local compute nodes to read mode.
+	for (i=0;i<local_application_size;i++) {
+		error = socket_set_ro(epollfd, local_compute_nodes[i]->socketfd, local_compute_nodes[i]);
+
+		if (error != SOCKET_OK) {
+			ERROR(1, "Failed to set connection to compute node %d to read mode!", i);
+			return ERROR_CONNECTION;
+		}
+
+		local_compute_nodes[i]->state = STATE_READ_HEADER;
+		local_compute_nodes[i]->in_msg = message_buffer_create(MESSAGE_HEADER_SIZE);
+	}
+
 	return 0;
 }
 
@@ -4376,13 +4479,6 @@ static int gateway_init(int argc, char **argv)
 		return error;
 	}
 
-	//status = init_socket_info_threads(server_info);
-
-	//if (status != 0) {
-//		close(serverfd);
-		//return status;
-//	}
-
 	INFO(2, "Gateway initialized!");
 
 	return 0;
@@ -4403,19 +4499,6 @@ static int process_messages()
 	if (events == NULL) {
 		ERROR(1, "Failed to allocate space for epoll events!");
 		return ERROR_ALLOCATE;
-	}
-
-	// Switching all sockets to the local compute nodes to read mode.
-	for (i=0;i<local_application_size;i++) {
-		error = socket_set_ro(epollfd, local_compute_nodes[i]->socketfd, local_compute_nodes[i]);
-
-		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to set connection to compute node %d to read mode!", i);
-			return ERROR_CONNECTION;
-		}
-
-		local_compute_nodes[i]->state = STATE_READ_HEADER;
-		local_compute_nodes[i]->in_msg = message_buffer_create(MESSAGE_HEADER_SIZE);
 	}
 
 	active_connections = local_application_size + 1;
