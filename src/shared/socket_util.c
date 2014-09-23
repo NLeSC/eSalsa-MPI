@@ -147,10 +147,14 @@ int socket_receivefully(int socketfd, unsigned char *buffer, size_t len)
    return SOCKET_OK;
 }
 
-int socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking, size_t *bytes_read)
+size_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking)
 {
 	ssize_t tmp;
 	int flags;
+
+	if (len <= 0) {
+		return 0;
+	}
 
 	if (blocking) {
 		flags = MSG_WAITALL;
@@ -162,8 +166,7 @@ int socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blockin
 
 	if (tmp < 0) {
 		if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-			*bytes_read = 0;
-			return SOCKET_OK;
+			return 0;
 		}
 
 		ERROR(1, "socket_receive failed! (%s) blocking=%d errno=%d", strerror(errno), blocking, errno);
@@ -172,33 +175,24 @@ int socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blockin
 
 	if (tmp == 0) {
 		// Other side has shut down the connection!
-		*bytes_read = 0;
 		return SOCKET_DISCONNECT;
 	}
 
-	*bytes_read = tmp;
-	return SOCKET_OK;
+	return tmp;
 }
 
-int socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking)
+size_t socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking)
 {
-	int error;
-	size_t space, bytes_read;
+	size_t bytes_read;
 
-	space = message_buffer_max_write(buffer);
+	bytes_read = socket_receive(socketfd, buffer->data + buffer->end, buffer->size-buffer->end, blocking);
 
-	if (space == 0) {
-		return SOCKET_OK;
-	}
-
-	error = socket_receive(socketfd, buffer->data + buffer->end, space, blocking, &bytes_read);
-
-	if (error != SOCKET_OK) {
-		return error;
+	if (bytes_read <= 0) {
+		return bytes_read;
 	}
 
 	buffer->end += bytes_read;
-	return SOCKET_OK;
+	return bytes_read;
 }
 
 //int socket_receive(int socketfd, unsigned char *buffer, size_t len, size_t *bytes_read)
@@ -214,10 +208,14 @@ int socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking)
 //	return SOCKET_OK;
 //}
 
-int socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking, size_t *bytes_send)
+size_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking)
 {
 	ssize_t tmp;
 	int flags;
+
+	if (len <= 0) {
+		return 0;
+	}
 
 	if (blocking) {
 		flags = 0;
@@ -232,25 +230,17 @@ int socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking, 
         return SOCKET_ERROR_SEND_FAILED;
 	}
 
-	*bytes_send = tmp;
-	return SOCKET_OK;
+	return tmp;
 }
 
-int socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
+size_t socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
 {
-	int error;
-	size_t avail, bytes_sent;
+	size_t bytes_sent;
 
-	avail = message_buffer_max_read(buffer);
+	bytes_sent = socket_send(socketfd, buffer->data+buffer->start, buffer->end-buffer->start, blocking);
 
-	if (avail == 0) {
-		return SOCKET_OK;
-	}
-
-	error = socket_send(socketfd, buffer->data+buffer->start, avail, blocking, &bytes_sent);
-
-	if (error != SOCKET_OK) {
-		return error;
+	if (bytes_sent < 0) {
+		return bytes_sent;
 	}
 
 	buffer->start += bytes_sent;
@@ -259,7 +249,7 @@ int socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
 		buffer->start = buffer->end = 0;
 	}
 
-	return SOCKET_OK;
+	return bytes_sent;
 }
 
 int socket_get_options(int socket, int *send_buffer, int *receive_buffer, bool *nodelay)

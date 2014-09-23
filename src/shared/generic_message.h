@@ -12,6 +12,14 @@ typedef struct {
 
 #define MESSAGE_HEADER_SIZE (4*sizeof(uint32_t))
 
+// This is an ack message, used as a data acknowledgement in flow control.
+typedef struct {
+   message_header header;
+   size_t bytes;
+} ack_message;
+
+#define ACK_MESSAGE_SIZE (MESSAGE_HEADER_SIZE + sizeof(size_t))
+
 // This is a generic message, consisting of a header plus some data.
 typedef struct {
    message_header header;

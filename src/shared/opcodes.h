@@ -10,6 +10,9 @@
 #define OPCODE_GATEWAY_INFO               45
 #define OPCODE_GATEWAY_READY              46
 
+// This is used to acknowledge the receipt of data
+#define OPCODE_ACK                        32
+
 // These are used by all processes to communicate with the server.
 #define OPCODE_SPLIT                      51
 #define OPCODE_SPLIT_REPLY                52

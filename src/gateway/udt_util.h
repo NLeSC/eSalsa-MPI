@@ -21,23 +21,28 @@
 #define SEND_BUFFER_SIZE    (32*1024*1024)
 #define RECEIVE_BUFFER_SIZE (32*1024*1024)
 
-#define SOCKET_OK                    0
-#define SOCKET_ERROR_CREATE_SOCKET  10
-#define SOCKET_ERROR_CONNECT        11
-#define SOCKET_ERROR_OPTIONS        12
-#define SOCKET_ERROR_BIND           13
-#define SOCKET_ERROR_LISTEN         14
-#define SOCKET_ERROR_ACCEPT         15
-#define SOCKET_ERROR_HOST           16
-#define SOCKET_ERROR_SEND_FAILED    17
-#define SOCKET_ERROR_RECEIVE_FAILED 18
-#define SOCKET_ERROR_CNTL_GET       19
-#define SOCKET_ERROR_CNTL_SET       20
-#define SOCKET_ERROR_HOST_NOT_FOUND 21
-#define SOCKET_ERROR_ADDRESS_TYPE   22
-#define SOCKET_ERROR_CANNOT_FIND_IP 23
-#define SOCKET_ERROR_ALLOCATE       24
 
+#define SOCKET_OK                     0
+#define SOCKET_DISCONNECT            -1
+#define SOCKET_ERROR_CREATE_SOCKET  -10
+#define SOCKET_ERROR_CONNECT        -11
+#define SOCKET_ERROR_OPTIONS        -12
+#define SOCKET_ERROR_BIND           -13
+#define SOCKET_ERROR_LISTEN         -14
+#define SOCKET_ERROR_ACCEPT         -15
+#define SOCKET_ERROR_HOST           -16
+#define SOCKET_ERROR_SEND_FAILED    -17
+#define SOCKET_ERROR_RECEIVE_FAILED -18
+#define SOCKET_ERROR_CNTL_GET       -19
+#define SOCKET_ERROR_CNTL_SET       -20
+#define SOCKET_ERROR_HOST_NOT_FOUND -21
+#define SOCKET_ERROR_ADDRESS_TYPE   -22
+#define SOCKET_ERROR_CANNOT_FIND_IP -23
+#define SOCKET_ERROR_ALLOCATE       -24
+#define SOCKET_ERROR_BLOCKING       -25
+#define SOCKET_ERROR_ADD_EPOLL      -26
+#define SOCKET_ERROR_DEL_EPOLL      -27
+#define SOCKET_ERROR_SET_EPOLL      -28
 
 int udt_sendfully(int socketfd, unsigned char *buffer, size_t len);
 int udt_receivefully(int socketfd, unsigned char *buffer, size_t len);

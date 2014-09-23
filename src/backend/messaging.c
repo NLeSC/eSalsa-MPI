@@ -37,6 +37,8 @@
 #include "generic_message.h"
 #include "message_buffer.h"
 
+#define MAX_MESSAGE_SIZE (DATA_MESSAGE_SIZE + MAX_MESSAGE_PAYLOAD)
+
 #define DEFAULT_GATEWAY_IN_BUFFER (8*1024*1024 + DATA_MESSAGE_SIZE)
 #define DEFAULT_GATEWAY_OUT_BUFFER (8*1024*1024 + DATA_MESSAGE_SIZE)
 
@@ -196,6 +198,9 @@ static message_buffer *gateway_out_buffer;
 
 static request_queue *send_request_queue;
 static request_queue *receive_request_queue;
+
+static size_t pending_bytes = 0;
+static size_t max_pending_bytes = 2 * MAX_MESSAGE_SIZE;
 
 /*****************************************************************************/
 /*                      Initialization / Finalization                        */
@@ -615,15 +620,14 @@ static int probe_mpi_data_message(data_message **message, int blocking)
 
 static int probe_gateway_message(message_header *mh, bool blocking)
 {
-	int error;
-	size_t tmp, avail;
+	size_t tmp, bytes_read;
 
 	// NOTE: we may receive any combination of message here.
 	do {
 		// First we poll the gateway socket and attempt to receive some data.
-		error = socket_receive_mb(gatewayfd, gateway_in_buffer, false);
+		bytes_read = socket_receive_mb(gatewayfd, gateway_in_buffer, false);
 
-		if (error != SOCKET_OK) {
+		if (bytes_read < 0) {
 			ERROR(1, "Failed to read gateway message!");
 			return EMPI_ERR_GATEWAY;
 		}
@@ -631,10 +635,8 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 		//INFO(1, "XXX Received message from socket %d start=%d end=%d size=%d", gatewayfd, gateway_in_buffer->start,
 				//gateway_in_buffer->end, gateway_in_buffer->size);
 
-		avail = message_buffer_max_read(gateway_in_buffer);
-
 		// Next, we check if there is enough data available for a message header.
-		if (avail >= MESSAGE_HEADER_SIZE) {
+		if (message_buffer_max_read(gateway_in_buffer) >= MESSAGE_HEADER_SIZE) {
 			// There should be at least a message header in the buffer!
 			tmp = message_buffer_peek(gateway_in_buffer, (unsigned char *)mh, MESSAGE_HEADER_SIZE);
 
@@ -649,7 +651,7 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 						GET_CLUSTER_RANK(mh->dst_pid), GET_PROCESS_RANK(mh->dst_pid),
 						mh->length);
 
-			if (avail >= mh->length) {
+			if (bytes_read >= mh->length) {
 				// There is a complete message in the buffer!
 				INFO(2, "MESSAGE COMPLETE");
 				return 0;
@@ -741,10 +743,182 @@ static int probe_gateway_message(data_message **message, bool blocking)
 }
  */
 
+/*
+static int flush_output_buffer(bool blocking)
+{
+	int error;
+
+	// Write some data to the network (may block, depending on the "blocking" parameter).
+	error = socket_send_mb(gatewayfd, gateway_out_buffer, blocking);
+
+	if (error != SOCKET_OK) {
+		ERROR(1, "Failed to flush send buffer!");
+		return -1;
+	}
+
+	return 0;
+}
+*/
+
+static void process_ack()
+{
+	ack_message *ack;
+
+	ack = (ack_message *) message_buffer_direct_read_access(gateway_in_buffer, ACK_MESSAGE_SIZE);
+
+	fprintf(stderr, "Received ack %ld pending %ld\n", ack->bytes, pending_bytes);
+
+	pending_bytes -= ack->bytes;
+
+}
+
+static int process_pending_request()
+{
+	int position;
+	data_message *m;
+	request *req;
+	unsigned char *buffer;
+
+	m = (data_message *) message_buffer_direct_read_access(gateway_in_buffer, 0);
+
+	DEBUG(4, "Message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
+			m->header.opcode, m->header.src_pid, m->header.dst_pid, m->header.length,
+			m->comm, m->source, m->dest, m->tag, m->count);
+
+	req = request_queue_dequeue_matching(receive_request_queue, m->comm, m->source, m->tag);
+
+	if (req == NULL) {
+		return 1;
+	}
+
+	// This is the right message, so unpack it into the application buffer.
+	DEBUG(5, "Match. Directly unpacking message to application buffer!");
+
+	// Skip the header.
+	message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
+
+	buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
+
+	position = 0;
+
+	req->error = PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, req->buf, req->count, req->type->type, req->c->comm);
+	req->message_source = m->source;
+	req->message_tag = m->tag;
+	req->message_count = m->count;
+	req->flags |= REQUEST_FLAG_COMPLETED;
+	return 0;
+}
+
+static generic_message *read_generic_message(size_t length)
+{
+	generic_message *m = malloc(length);
+
+	if (m == NULL) {
+		ERROR(1, "Failed to allocate space for server message!");
+		return NULL;
+	}
+
+	message_buffer_read(gateway_in_buffer, (unsigned char *)m, length);
+
+	return m;
+}
+
+static int get_message(uint32_t opcode, message_header *mh, bool blocking)
+{
+	int result;
+
+	while (true) {
+
+		result = probe_gateway_message(mh, blocking);
+
+		if (result == -1) {
+			ERROR(1, "Failed to probe for WA message");
+			return -1;
+		}
+
+		if (result == 1) {
+			if (blocking) {
+				// No message was found on the network, so return.
+				return 1;
+			} else {
+				ERROR(1, "Failed to probe for WA message");
+				return -1;
+			}
+		}
+
+		// We have found a message of the type we are looking for.
+		if (mh->opcode == opcode) {
+			return 0;
+		}
+
+		if (mh->opcode == OPCODE_ACK) {
+			// We've run into a ACK message
+			process_ack();
+
+		} else if (mh->opcode == OPCODE_DATA) {
+			// There is a data message in the gateway_in_buffer. Check if there is any request waiting for this message, if not,
+			// store it in the queue.
+			if (process_pending_request() != 0) {
+				store_message((data_message *)read_generic_message(mh->length));
+			}
+
+		} else {
+			// We've run into an unexpected server message. Should never happen ?
+			FATAL("Unexpected server message!");
+		}
+	}
+
+	// Unreachable
+	return -1;
+}
+
+static int flush_output_buffer(bool blocking)
+{
+	int result;
+	size_t written;
+	message_header mh;
+
+	while (pending_bytes >= max_pending_bytes) {
+		// We cannot send any more data, since we have reached out limit. Instead we start receiving data and hope to receive an
+		// ACK as quickly as possible.
+		result = get_message(OPCODE_DATA, &mh, blocking);
+
+		if (result == -1) {
+			ERROR(1, "Failed to probe for WA message");
+			return -1;
+		}
+
+		if (result == 1) {
+			if (!blocking) {
+				// No message was found on the network, so return.
+				return 1;
+			} else {
+				ERROR(1, "Failed to probe for WA message");
+				return -1;
+			}
+		}
+
+		process_ack();
+	}
+
+	// Write some data to the network (may block, depending on the "blocking" parameter).
+	written = socket_send_mb(gatewayfd, gateway_out_buffer, blocking);
+
+	if (written < 0) {
+		ERROR(1, "Failed to flush send buffer!");
+		return -1;
+	}
+
+	pending_bytes += written;
+
+	return 0;
+}
+
+
 static int ensure_space(size_t space, bool blocking)
 {
 	int error;
-	size_t avail, used, size;
+	size_t avail;
 
 	if (space > gateway_out_buffer->size) {
 		// If (space > size) the message will never fit!
@@ -753,6 +927,27 @@ static int ensure_space(size_t space, bool blocking)
 
 	avail = message_buffer_max_write(gateway_out_buffer);
 
+	if (avail >= space) {
+		return 0;
+	}
+
+	error = flush_output_buffer(blocking);
+
+	if (error < 0) {
+		return -1;
+	}
+
+	if (!blocking) {
+		avail = message_buffer_max_write(gateway_out_buffer);
+
+		if (avail < space) {
+			return 1;
+		}
+	}
+
+	return 0;
+
+/*
 	while (avail < space) {
 
 		// There is not enough space in the buffer for the message. Try to push out some data.
@@ -788,22 +983,10 @@ static int ensure_space(size_t space, bool blocking)
 
 	// Enough space in the buffer!
 	return 0;
+*/
 }
 
-static int flush_output_buffer(bool blocking)
-{
-	int error;
 
-	// Write some data to the network (may block, depending on the "blocking" parameter).
-	error = socket_send_mb(gatewayfd, gateway_out_buffer, blocking);
-
-	if (error != SOCKET_OK) {
-		ERROR(1, "Failed to flush send buffer!");
-		return -1;
-	}
-
-	return 0;
-}
 
 
 /* Attempt to write a message to the output buffer.
@@ -998,19 +1181,6 @@ int messaging_send(void* buf, int count, datatype *t, int dest, int tag, communi
 	return do_send(OPCODE_DATA, buf, count, t, dest, tag, c, req, needs_ack);
 }
 
-static generic_message *read_generic_message(size_t length)
-{
-	generic_message *m = malloc(length);
-
-	if (m == NULL) {
-		ERROR(1, "Failed to allocate space for server message!");
-		return NULL;
-	}
-
-	message_buffer_read(gateway_in_buffer, (unsigned char *)m, length);
-
-	return m;
-}
 
 
 /*
@@ -1094,6 +1264,9 @@ static int do_recv1(void *buf, int count, datatype *t, int *source, int *tag, in
 }
  */
 
+
+
+
 static int do_recv(int opcode, void *buf, int count, datatype *t, int source, int tag, EMPI_Status *status, communicator* c)
 {
 	// do a blocking receive.
@@ -1111,7 +1284,6 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 	message_header mh;
 	data_message *m;
 	unsigned char *buffer;
-	request *req;
 
 	// First we check the receive queue.
 	m = find_pending_message(c, source, tag);
@@ -1130,47 +1302,18 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 	// No message yet, so start polling the network!
 	while (true) {
 
-		error = probe_gateway_message(&mh, true);
+		error = get_message(OPCODE_DATA, &mh, true);
 
 		if (error != 0) {
 			ERROR(1, "Failed to probe for WA message (error=%d)", error);
 			return error;
 		}
 
-		if (mh.opcode != OPCODE_DATA) {
-			// We've run into a server message. Should not happen!
-			FATAL("Received unexpected server message!");
-		}
-
-		// There is a data message in the gateway_in_buffer. Check if there is a matching message in the receive queue.
-		m = (data_message *) message_buffer_direct_read_access(gateway_in_buffer, 0);
-
-		INFO(4, "Message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
-				m->header.opcode, m->header.src_pid, m->header.dst_pid, m->header.length,
-				m->comm, m->source, m->dest, m->tag, m->count);
-
-		req = request_queue_dequeue_matching(receive_request_queue, m->comm, m->source, m->tag);
-
-		if (req != NULL) {
-			// Found a matching pending receive
-			INFO(5, "Matched pending receive. Directly unpacking message to application buffer!");
-
-			// Skip the header.
-			message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
-
-			buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
-
-			position = 0;
-
-			req->error = PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, req->buf, req->count, req->type->type, req->c->comm);
-			req->message_source = m->source;
-			req->message_tag = m->tag;
-			req->message_count = m->count;
-			req->flags |= REQUEST_FLAG_COMPLETED;
-
-		} else {
-
+		// There is now a message on the stream with OPCODE_DATA
+		if (process_pending_request() == 1) {
 			// No pending receive request found, so see if we match the message!
+			m = message_buffer_direct_read_access(gateway_in_buffer, 0);
+
 			if (match_message(m, c->handle, source, tag)) {
 				// This is the right message, so unpack it into the application buffer.
 				DEBUG(5, "Match. Directly unpacking message to application buffer!");
@@ -1192,12 +1335,10 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 				}
 
 				return EMPI_SUCCESS;
-
 			} else {
 				// Nobody wants this message, so receive and queue it for later!
 				DEBUG(5, "No match. Copying and storing message");
-				m = (data_message *) read_generic_message(mh.length);
-				store_message(m);
+				store_message((data_message *)read_generic_message(mh.length));
 				m = NULL;
 			}
 		}
@@ -1290,7 +1431,7 @@ static int messaging_poll_receive(request *r)
 	}
 
 	// See if there is a message on the network
-	result = probe_gateway_message(&mh, false);
+	result = get_message(OPCODE_DATA, &mh, false);
 
 	if (result == -1) {
 		ERROR(1, "Failed to probe for WA message");
@@ -1300,11 +1441,6 @@ static int messaging_poll_receive(request *r)
 	if (result == 1) {
 		// No message was found on the network, so return.
 		return 1;
-	}
-
-	if (mh.opcode != OPCODE_DATA) {
-		// We've run into a server message. Should never happen ?
-		FATAL("Unexpected server message!");
 	}
 
 	// There is a data message in the gateway_in_buffer. Check if this is the message we are looking for.
@@ -1367,14 +1503,11 @@ int messaging_post_receive(request *r)
 
 static int process_pending_receives(bool copy)
 {
-	int result, position;
+	int result;
 	message_header mh;
-	data_message *m;
-	request *req;
-	unsigned char *buffer;
 
 	// See if there is a message on the network
-	result = probe_gateway_message(&mh, false);
+	result = get_message(OPCODE_DATA, &mh, false);
 
 	if (result == -1) {
 		ERROR(1, "Failed to probe for WA message");
@@ -1386,46 +1519,18 @@ static int process_pending_receives(bool copy)
 		return 1;
 	}
 
-	if (mh.opcode != OPCODE_DATA) {
-		// We've run into a server message. Should never happen ?
-		FATAL("Unexpected server message!");
+	if (process_pending_request() == 0) {
+		// Matching receive was found!
+		return 0;
 	}
 
-	// There is a data message in the gateway_in_buffer. Check if this is the message we are looking for.
-	m = (data_message *) message_buffer_direct_read_access(gateway_in_buffer, 0);
-
-	DEBUG(4, "Message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
-			m->header.opcode, m->header.src_pid, m->header.dst_pid, m->header.length,
-			m->comm, m->source, m->dest, m->tag, m->count);
-
-	req = request_queue_dequeue_matching(receive_request_queue, m->comm, m->source, m->tag);
-
-	if (req == NULL) {
-		// No matching receive pending. Copy and queue the message if desired!
-		if (copy) {
-			DEBUG(5, "No match. Copying and storing message");
-			m = (data_message *) read_generic_message(mh.length);
-			store_message(m);
-		}
-		return 1;
+	// No matching receive pending. Copy and queue the message if desired!
+	if (copy) {
+		DEBUG(5, "No match. Copying and storing message");
+		store_message((data_message *)read_generic_message(mh.length));
 	}
 
-	// This is the right message, so unpack it into the application buffer.
-	DEBUG(5, "Match. Directly unpacking message to application buffer!");
-
-	// Skip the header.
-	message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
-
-	buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
-
-	position = 0;
-
-	req->error = PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, req->buf, req->count, req->type->type, req->c->comm);
-	req->message_source = m->source;
-	req->message_tag = m->tag;
-	req->message_count = m->count;
-	req->flags |= REQUEST_FLAG_COMPLETED;
-	return 0;
+	return 1;
 }
 
 int messaging_poll_sends(bool blocking)
@@ -1546,19 +1651,17 @@ int messaging_finalize_receive(request *r, EMPI_Status *status)
 
 static int wait_for_server_reply(int opcode, message_header *mh)
 {
-	int error, position;
-	data_message *m;
-	request *req;
-	unsigned char *buffer;
+	int error = get_message(opcode, mh, true);
 
-	while (true) {
+	if (error != 0) {
+		ERROR(1, "Failed to probe for WA message (error=%d)", error);
+		return error;
+	}
 
-		error = probe_gateway_message(mh, true);
+	return EMPI_SUCCESS;
+}
 
-		if (error != 0) {
-			ERROR(1, "Failed to probe for WA message (error=%d)", error);
-			return error;
-		}
+/*
 
 		if (mh->opcode == OPCODE_DATA) {
 			// We've run into a data message. See is there is pending receive request for it...
@@ -1607,12 +1710,15 @@ static int wait_for_server_reply(int opcode, message_header *mh)
 	// Unreachable!
 	return EMPI_ERR_INTERN;
 }
+*/
 
 static int *receive_int_array(int length)
 {
 	message_buffer *m;
-	int error;
-	int *tmp = malloc(length * sizeof(int));
+	size_t bytes_read;
+	int *tmp;
+
+	tmp = malloc(length * sizeof(int));
 
 	if (tmp == NULL) {
 		ERROR(1, "Failed to allocate int[%ld]!", length * sizeof(int));
@@ -1626,9 +1732,9 @@ static int *receive_int_array(int length)
 		return NULL;
 	}
 
-	error = socket_receive_mb(gatewayfd, m, true);
+	bytes_read = socket_receive_mb(gatewayfd, m, true);
 
-	if (error != SOCKET_OK) {
+	if (bytes_read < 0) {
 		message_buffer_destroy(m);
 		free(tmp);
 		ERROR(1, "Failed to receive int[%ld]!", length * sizeof(int));
@@ -1667,14 +1773,7 @@ int messaging_comm_split_send(communicator* c, int color, int key)
 	req->key   = key;
 
 	// Since this split is a collective operation, we must completely write the send buffer here!
-	error = socket_send_mb(gatewayfd, gateway_out_buffer, true);
-
-	if (error != SOCKET_OK) {
-		ERROR(1, "Failed to flush send buffer!");
-		return EMPI_ERR_INTERN;
-	}
-
-	return EMPI_SUCCESS;
+	return flush_output_buffer(true);
 }
 
 int messaging_comm_split_receive(comm_reply *reply)
@@ -1820,14 +1919,7 @@ int messaging_comm_create_send(communicator* c, group *g)
 	DEBUG(1, "Group request header %d %d %d %d %d", req->header.opcode, req->header.length, req->comm, req->src, req->size);
 
 	// Since this is a collective operation, we must completely write the send buffer here!
-	error = socket_send_mb(gatewayfd, gateway_out_buffer, true);
-
-	if (error != SOCKET_OK) {
-		ERROR(1, "Failed to flush send buffer!");
-		return EMPI_ERR_INTERN;
-	}
-
-	return EMPI_SUCCESS;
+	return flush_output_buffer(true);
 }
 
 
@@ -1965,14 +2057,7 @@ int messaging_comm_dup_send(communicator* c)
 	req->src            = c->global_rank;
 
 	// Since this is a collective operation, we must completely write the send buffer here!
-	error = socket_send_mb(gatewayfd, gateway_out_buffer, true);
-
-	if (error != SOCKET_OK) {
-		ERROR(1, "Failed to flush send buffer!");
-		return EMPI_ERR_INTERN;
-	}
-
-	return EMPI_SUCCESS;
+	return flush_output_buffer(true);
 }
 
 int messaging_comm_dup_receive(dup_reply *reply)
@@ -2031,14 +2116,7 @@ int messaging_comm_free_send(communicator* c)
 	req->src            = c->global_rank;
 
 	// Since this is a collective operation, we must completely write the send buffer here!
-	error = socket_send_mb(gatewayfd, gateway_out_buffer, true);
-
-	if (error != SOCKET_OK) {
-		ERROR(1, "Failed to flush send buffer!");
-		return EMPI_ERR_INTERN;
-	}
-
-	return EMPI_SUCCESS;
+	return flush_output_buffer(true);
 }
 
 int messaging_finalize()
@@ -2079,7 +2157,7 @@ int messaging_finalize()
 	req->src            = c->global_rank;
 
 	// Since this is a collective operation, we must completely write the send buffer here!
-	error = socket_send_mb(gatewayfd, gateway_out_buffer, true);
+	error = flush_output_buffer(true);
 
 	if (error != SOCKET_OK) {
 		ERROR(1, "Failed to flush send buffer!");

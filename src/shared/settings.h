@@ -60,6 +60,9 @@
 // Maximum number of info object that can be created (at once, for each individual process).
 #define MAX_INFOS 64
 
+// The largest message payload we support.
+#define MAX_MESSAGE_PAYLOAD (8*1024*1024)
+
 // Size of detailed timing buffers (in messages) in gateway nodes.
 #define DETAILED_TIMING_COUNT 8096
 

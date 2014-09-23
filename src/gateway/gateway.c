@@ -25,7 +25,7 @@
 #include "socket_util.h"
 #include "udt_util.h"
 
-#define MAX_MESSAGE_SIZE (8*1024*1024 + (MESSAGE_HEADER_SIZE + 5*sizeof(int)))
+#define MAX_MESSAGE_SIZE (MAX_MESSAGE_PAYLOAD + (MESSAGE_HEADER_SIZE + 5*sizeof(int)))
 
 #define MAX_LENGTH_CLUSTER_NAME 128
 #define MAX_STREAMS 16
@@ -111,7 +111,7 @@ typedef struct {
 	message_buffer *in_msg;
 
 	// The number of bytes received on this socket_info that have not been forwarded yet (poor mans flow control).
-	size_t pending_bytes;
+	size_t pending_ack_bytes;
 
 	// A mutex to make the pending bytes thread safe.
 	pthread_mutex_t bytes_mutex;
@@ -212,8 +212,6 @@ static uint64_t mpi_received_count = 0;
 
 static socket_info **local_compute_nodes;
 
-static size_t max_reserved_bytes = 2*MAX_MESSAGE_SIZE;
-
 static uint64_t current_time_micros()
 {
 	uint64_t result;
@@ -271,74 +269,6 @@ void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
 	pthread_mutex_unlock(&send_data_mutex);
 }
 
-static size_t get_reserved_bytes(socket_info *info)
-{
-	size_t result;
-
-	if (info->type != TYPE_COMPUTE_NODE_TCP) {
-		return 0;
-	}
-
-	pthread_mutex_lock(&info->bytes_mutex);
-
-	result = info->pending_bytes;
-
-	pthread_mutex_unlock(&info->bytes_mutex);
-
-	return result;
-}
-
-static void add_reserved_bytes(socket_info *info, size_t bytes)
-{
-	if (info->type != TYPE_COMPUTE_NODE_TCP) {
-		return;
-	}
-
-	pthread_mutex_lock(&info->bytes_mutex);
-
-	info->pending_bytes += bytes;
-
-	//fprintf(stderr, "ADD socket_info %d pending_bytes %ld %ld", info->socketfd, info->pending_bytes, bytes);
-
-	pthread_mutex_unlock(&info->bytes_mutex);
-
-}
-
-static void release_reserved_bytes(message_header *mh)
-{
-	int rank;
-	socket_info *info;
-	size_t toAck = 0;
-
-	if (mh->src_pid == server_pid) {
-		return;
-	}
-
-	if (GET_CLUSTER_RANK(mh->src_pid) != cluster_rank) {
-		return;
-	}
-
-	rank = GET_PROCESS_RANK(mh->src_pid);
-
-	if (rank < 0 || rank >= local_application_size) {
-		WARN(1, "Failed to release bytes!");
-		return;
-	}
-
-	info = local_compute_nodes[rank];
-
-	if (info->type != TYPE_COMPUTE_NODE_TCP) {
-		return;
-	}
-
-	pthread_mutex_lock(&info->bytes_mutex);
-
-	info->pending_bytes -= mh->length;
-
-	//fprintf(stderr, "RELEASE socket_info %d pending_bytes %ld\n", info->socketfd, info->pending_bytes);
-
-	pthread_mutex_unlock(&info->bytes_mutex);
-}
 
 static bool enqueue_message_at_socket_info(socket_info *info, message_buffer *m)
 {
@@ -374,6 +304,64 @@ static bool enqueue_message_at_socket_info(socket_info *info, message_buffer *m)
 
 	return (error == SOCKET_OK) && result;
 }
+
+static void add_ack_bytes(message_header *mh)
+{
+	int rank;
+	socket_info *info;
+	size_t toAck = 0;
+	message_buffer *m;
+	ack_message *ack;
+
+	if (mh->src_pid == server_pid) {
+		return;
+	}
+
+	if (GET_CLUSTER_RANK(mh->src_pid) != cluster_rank) {
+		return;
+	}
+
+	rank = GET_PROCESS_RANK(mh->src_pid);
+
+	if (rank < 0 || rank >= local_application_size) {
+		WARN(1, "Failed to release bytes!");
+		return;
+	}
+
+	info = local_compute_nodes[rank];
+
+	if (info->type != TYPE_COMPUTE_NODE_TCP) {
+		return;
+	}
+
+	pthread_mutex_lock(&info->bytes_mutex);
+
+	info->pending_ack_bytes += mh->length;
+
+	if (info->pending_ack_bytes > MAX_MESSAGE_SIZE / 2) {
+		toAck = info->pending_ack_bytes;
+		info->pending_ack_bytes	= 0;
+		fprintf(stderr, "Send ack %ld\n", toAck);
+	}
+
+	pthread_mutex_unlock(&info->bytes_mutex);
+
+	if (toAck > 0) {
+		// We must send an ACK message to mh->src_pid
+		m = message_buffer_create(ACK_MESSAGE_SIZE);
+		ack = (ack_message *)message_buffer_direct_write_access(m, ACK_MESSAGE_SIZE);
+
+		ack->header.opcode = OPCODE_ACK;
+		ack->header.dst_pid = mh->src_pid;
+		ack->header.src_pid = my_pid;
+		ack->header.length = ACK_MESSAGE_SIZE;
+		ack->bytes = toAck;
+
+		// FIXME: should enqueu at head, not tail!
+		enqueue_message_at_socket_info(info, m);
+	}
+}
+
 
 static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64_t timeout_usec)
 {
@@ -455,7 +443,7 @@ static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64
 
 	// HACK!!
 	if (m != NULL) {
-		release_reserved_bytes((message_header *)m->data);
+		add_ack_bytes((message_header *)m->data);
 	}
 
 	return m;
@@ -558,7 +546,7 @@ static bool enqueue_message_from_wa_link(message_buffer *m)
 static int write_message(socket_info *info)
 {
 	// The socket is ready for writing, so write something!
-	int error;
+	size_t written;
 
 	// If there was no message in progress, we try to dequeue one.
 	if (info->out_msg == NULL) {
@@ -569,9 +557,9 @@ static int write_message(socket_info *info)
 		}
 	}
 
-	error = socket_send_mb(info->socketfd, info->out_msg, false);
+	written = socket_send_mb(info->socketfd, info->out_msg, false);
 
-	if (error != SOCKET_OK) {
+	if (written < 0) {
 		ERROR(1, "Failed to write message to compute node %d!", info->index);
 		return ERROR_CONNECTION;
 	}
@@ -594,20 +582,20 @@ static int write_message(socket_info *info)
 static int read_message(socket_info *info, bool blocking, message_buffer **out, bool *disconnect)
 {
 	// The socket is ready for reading, so read something!
-	int error;
+	size_t bytes_read;
 	message_header mh;
 
 	INFO(1, "XXX Receive of message from socket %d start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
 			info->in_msg->size);
 
-	error = socket_receive_mb(info->socketfd, info->in_msg, blocking);
+	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, blocking);
 
 	INFO(1, "XXX Receive of message from socket %d done! start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
 			info->in_msg->size);
 
-	if (error != SOCKET_OK) {
+	if (bytes_read < 0) {
 
-		if (error == SOCKET_DISCONNECT && info->state == STATE_TERMINATING) {
+		if (bytes_read == SOCKET_DISCONNECT && info->state == STATE_TERMINATING) {
 			// The connection was closed, as expected!
 			*disconnect = true;
 			return 0;
@@ -669,11 +657,9 @@ static int read_message(socket_info *info, bool blocking, message_buffer **out, 
 // Sender thread for sockets.
 void* tcp_sender_thread(void *arg)
 {
-	int error;
 	bool done;
-	size_t avail;
+	size_t written;
 	socket_info *info;
-	message_header *mh;
 	message_buffer *m;
 
 	uint64_t last_write, now, data, count;
@@ -690,17 +676,15 @@ void* tcp_sender_thread(void *arg)
 
 		if (m != NULL) {
 
-			avail = message_buffer_max_read(m);
+			written = socket_send_mb(info->socketfd, m, true);
 
-			error = socket_send_mb(info->socketfd, m, true);
-
-			if (error != SOCKET_OK) {
+			if (written < 0) {
 				ERROR(1, "Failed to send message!");
 				return NULL;
 			}
 
 			count++;
-			data += avail;
+			data += written;
 
 //			// HACK -- flow control on gateway - client link
 //			mh = (message_header *) m->data;
@@ -944,7 +928,7 @@ static socket_info *create_socket_info(int socketfd, int type, int state)
 	info->state = state;
 	info->index = -1;
 
-	info->pending_bytes = 0;
+	info->pending_ack_bytes = 0;
 
 	info->in_msg = NULL;
 	info->out_msg = NULL;
@@ -1039,12 +1023,17 @@ static int receive_gateway_ready_opcode(int index)
 {
 	int status;
 	int opcode;
-	int socketfd = gateway_connections[index].sockets[0]->socketfd;
+	int socketfd;
+
+	status = 0;
+	socketfd = gateway_connections[index].sockets[0]->socketfd;
 
 	if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_TCP) {
 		status = socket_receivefully(socketfd, (unsigned char *) &opcode, 4);
 	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
 		status = udt_receivefully(socketfd, (unsigned char *) &opcode, 4);
+	} else {
+		FATAL("Unknown gateway protocol!");
 	}
 
 	if (status != SOCKET_OK) {
@@ -1057,7 +1046,7 @@ static int receive_gateway_ready_opcode(int index)
 
 static int send_gateway_ready_opcode(int index)
 {
-	int status;
+	int status = 0;
 	int opcode = OPCODE_GATEWAY_READY;
 	int socketfd = gateway_connections[index].sockets[0]->socketfd;
 
@@ -1065,6 +1054,8 @@ static int send_gateway_ready_opcode(int index)
 		status = socket_sendfully(socketfd, (unsigned char *) &opcode, 4);
 	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
 		status = udt_sendfully(socketfd, (unsigned char *) &opcode, 4);
+	} else {
+		FATAL("Unknown gateway protocol!");
 	}
 
 	if (status != SOCKET_OK) {
@@ -1787,6 +1778,7 @@ static int read_handshake_compute_node(socket_info *info)
 	int error;
 	uint32_t *msg;
 	uint32_t size;
+	size_t bytes_read;
 
 	if (info->state != STATE_READING_HANDSHAKE) {
 		ERROR(1, "Socket %d in invalid state %d", info->socketfd, info->state);
@@ -1794,9 +1786,9 @@ static int read_handshake_compute_node(socket_info *info)
 	}
 
 //	error = perform_non_blocking_read(info);
-	error = socket_receive_mb(info->socketfd, info->in_msg, false);
+	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, false);
 
-	if (error != SOCKET_OK) {
+	if (bytes_read < 0) {
 		ERROR(1, "Failed to read handshake message of compute node!");
 		return ERROR_HANDSHAKE_FAILED;
 	}
@@ -1887,6 +1879,7 @@ static int read_handshake_compute_node(socket_info *info)
 static int write_handshake_compute_node(socket_info *info)
 {
 	int error;
+	size_t written;
 
 	if (info->state != STATE_WRITING_HANDSHAKE) {
 		ERROR(1, "Socket %d in invalid state %d", info->socketfd, info->state);
@@ -1895,9 +1888,9 @@ static int write_handshake_compute_node(socket_info *info)
 
 //	error = perform_non_blocking_write(info);
 
-	error = socket_send_mb(info->socketfd, info->out_msg, false);
+	written = socket_send_mb(info->socketfd, info->out_msg, false);
 
-	if (error != SOCKET_OK) {
+	if (written < 0) {
 		ERROR(1, "Failed to write handshake message to compute node!");
 		return ERROR_HANDSHAKE_FAILED;
 	}
@@ -2035,13 +2028,13 @@ static int accept_local_connections()
 		if (count > 0) {
 			for (i=0;i<count;i++) {
 
+				info = events[i].data.ptr;
+
 				if ((events[i].events & (EPOLLERR | EPOLLHUP)) != 0) {
 					// Error or hang up occurred in file descriptor!
 					ERROR(1, "Unexpected error on socket %d", info->socketfd);
 					return ERROR_POLL;
 				}
-
-				info = events[i].data.ptr;
 
 				if (info->state == STATE_ACCEPTING) {
 					error = accept_new_connection(info);
@@ -2354,43 +2347,35 @@ static int process_messages()
 				if (event & EPOLLIN) {
 					m = NULL;
 
-					if (get_reserved_bytes(info) < max_reserved_bytes) {
-						// We only read data from this compute node if it hasn't got too much data waiting to be send.
-						error = read_message(info, false, &m, &disconnect);
+					// We only read data from this compute node if it hasn't got too much data waiting to be send.
+					error = read_message(info, false, &m, &disconnect);
 
-						if (error != 0) {
-							ERROR(1, "Failed to handle event on connection to compute node %d (error=%d)", i, error);
+					if (error != 0) {
+						ERROR(1, "Failed to handle event on connection to compute node %d (error=%d)", i, error);
+						return ERROR_CONNECTION;
+					}
+
+					if (m != NULL) {
+						// Read produced a message.
+						if (info->type == TYPE_SERVER) {
+							enqueue_message_from_server(m);
+						} else {
+							enqueue_message_from_compute_node(m);
+						}
+					}
+
+					if (disconnect) {
+						if (info->state == STATE_TERMINATING) {
+							// Disconnect was expected!
+							INFO(1, "Disconnecting compute node %d", info->index);
+							socket_remove_from_epoll(epollfd, info->socketfd);
+							close(info->socketfd);
+							info->state = STATE_TERMINATED;
+							active_connections--;
+						} else {
+							ERROR(1, "Unexpected termination of link to compute node %d", info->index);
 							return ERROR_CONNECTION;
 						}
-
-						if (m != NULL) {
-							// Read produced a message.
-							if (info->type == TYPE_SERVER) {
-								add_reserved_bytes(info, message_buffer_max_read(m));
-								enqueue_message_from_server(m);
-							} else {
-								add_reserved_bytes(info, message_buffer_max_read(m));
-								enqueue_message_from_compute_node(m);
-							}
-						}
-
-						if (disconnect) {
-							if (info->state == STATE_TERMINATING) {
-								// Disconnect was expected!
-								INFO(1, "Disconnecting compute node %d", info->index);
-								socket_remove_from_epoll(epollfd, info->socketfd);
-								close(info->socketfd);
-								info->state = STATE_TERMINATED;
-								active_connections--;
-							} else {
-								ERROR(1, "Unexpected termination of link to compute node %d", info->index);
-								return ERROR_CONNECTION;
-							}
-						}
-
-					} else {
-
-						// fprintf(stderr, "socket %d has too much pending data. Will NOT receive more!", info->socketfd);
 					}
 				}
 			}
