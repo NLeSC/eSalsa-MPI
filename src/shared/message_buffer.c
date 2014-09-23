@@ -59,7 +59,7 @@ int message_buffer_expand(message_buffer *buffer, size_t new_size)
 }
 
 
-message_buffer *message_buffer_wrap(unsigned char *buffer, size_t size)
+message_buffer *message_buffer_wrap(unsigned char *buffer, size_t size, bool nofree)
 {
 	message_buffer *b = malloc(sizeof(message_buffer));
 
@@ -72,7 +72,12 @@ message_buffer *message_buffer_wrap(unsigned char *buffer, size_t size)
 	b->size = size;
 	b->start = 0;
 	b->end = 0;
-	b->type = MESSAGE_BUFFER_WRAPPED;
+
+	if (nofree) {
+		b->type = MESSAGE_BUFFER_WRAPPED;
+	} else {
+		b->type = MESSAGE_BUFFER_NORMAL;
+	}
 	return b;
 }
 

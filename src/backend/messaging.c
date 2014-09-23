@@ -37,8 +37,8 @@
 #include "generic_message.h"
 #include "message_buffer.h"
 
-#define DEFAULT_GATEWAY_IN_BUFFER (8*1024*1024)
-#define DEFAULT_GATEWAY_OUT_BUFFER (8*1024*1024)
+#define DEFAULT_GATEWAY_IN_BUFFER (8*1024*1024 + DATA_MESSAGE_SIZE)
+#define DEFAULT_GATEWAY_OUT_BUFFER (8*1024*1024 + DATA_MESSAGE_SIZE)
 
 // TODO: Cleanup these messages. They always have the comm and src fields!
 
@@ -790,7 +790,35 @@ static int ensure_space(size_t space, bool blocking)
 	return 0;
 }
 
-static int do_send1(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c, bool blocking)
+static int flush_output_buffer(bool blocking)
+{
+	int error;
+
+	// Write some data to the network (may block, depending on the "blocking" parameter).
+	error = socket_send_mb(gatewayfd, gateway_out_buffer, blocking);
+
+	if (error != SOCKET_OK) {
+		ERROR(1, "Failed to flush send buffer!");
+		return -1;
+	}
+
+	return 0;
+}
+
+
+/* Attempt to write a message to the output buffer.
+ *
+ * If blocking is true, the message is guaranteed to be written to the buffer when this function returns. As a result, this
+ * function may push some data to the network that is already in the buffer, and may even block when doing so.
+ *
+ * If blocking is false, the message is NOT guaranteed to be written to the buffer when this function returns. In this case, this
+ * function is guaranteed not to block. When this function returns, the message is either written completely, or not at all.
+ *
+ * Returns 0 if the message is written.
+ *         1 if the message cannot be written without blocking
+ *        -1 if an error occurred.
+ */
+static int write_to_output_buffer(int opcode, void* buf, int count, datatype *t, int dest, int tag, communicator* c, bool blocking)
 {
 	int bytes, error, tmp;
 	data_message *m;
@@ -844,6 +872,7 @@ static int do_send1(int opcode, void* buf, int count, datatype *t, int dest, int
 	buffer = message_buffer_direct_write_access(gateway_out_buffer, bytes);
 
 	// Copy the data to the message
+	tmp = 0;
 	error = PMPI_Pack(buf, count, t->type, buffer, bytes, &tmp, c->comm);
 
 	if (error != MPI_SUCCESS) {
@@ -851,7 +880,7 @@ static int do_send1(int opcode, void* buf, int count, datatype *t, int dest, int
 		return -1;
 	}
 
-	DEBUG(1, "Written message to gateway buffer!",);
+	DEBUG(1, "Written message to gateway buffer!");
 
 	return 0;
 }
@@ -865,7 +894,7 @@ static int process_pending_sends(bool blocking)
 
 	while (req != NULL) {
 
-		error = do_send1(OPCODE_DATA, req->buf, req->count, req->type, req->source_or_dest, req->tag, req->c, blocking);
+		error = write_to_output_buffer(OPCODE_DATA, req->buf, req->count, req->type, req->source_or_dest, req->tag, req->c, blocking);
 
 		if (error != 0) {
 			return error;
@@ -902,7 +931,16 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
 			return MPI_ERR_INTERN;
 		}
 
-		error = do_send1(opcode, buf, count, t, dest, tag, c, true);
+		// Next we write our message to the buffer.
+		error = write_to_output_buffer(opcode, buf, count, t, dest, tag, c, true);
+
+		if (error != 0) {
+			ERROR(1, "Failed to write message");
+			return MPI_ERR_INTERN;
+		}
+
+		// Finally, we flush the output buffer to ensure the message is send.
+		error = flush_output_buffer(true);
 
 		if (error != 0) {
 			ERROR(1, "Failed to send message");
@@ -925,7 +963,7 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
 			return EMPI_SUCCESS;
 		}
 
-		error = do_send1(opcode, buf, count, t, dest, tag, c, false);
+		error = write_to_output_buffer(opcode, buf, count, t, dest, tag, c, false);
 
 		if (error != -1) {
 			ERROR(1, "Failed to send message");
@@ -938,7 +976,17 @@ static int do_send(int opcode, void* buf, int count, datatype *t, int dest, int 
 			return EMPI_SUCCESS;
 		}
 
-		// We copied the message to the send buffer, so update the reques.
+		// FIXME: Not correct ? The data may be stuck in the buffer forever, since we may not come back into MPI ...
+
+		// Finally, try to flush the output buffer. This may not be able to write any data, but that's OK.
+		error = flush_output_buffer(false);
+
+		if (error != 0) {
+			ERROR(1, "Failed to send message");
+			return MPI_ERR_INTERN;
+		}
+
+		// We copied the message to the send buffer, so update the request.
 		req->flags |= REQUEST_FLAG_COMPLETED;
 		return EMPI_SUCCESS;
 	}
@@ -1571,7 +1619,7 @@ static int *receive_int_array(int length)
 		return NULL;
 	}
 
-	m = message_buffer_wrap((unsigned char *)tmp, length * sizeof(int));
+	m = message_buffer_wrap((unsigned char *)tmp, length * sizeof(int), true);
 
 	if (m == NULL) {
 		ERROR(1, "Failed to wrap int[%ld]!", length * sizeof(int));

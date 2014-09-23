@@ -566,7 +566,7 @@ int EMPI_Irecv(void *buf, int count, EMPI_Datatype type,
 
 //WARN(0, "JASON remote irecv");
 
-      // If the source is guarenteed to be remote, we only test the WA link.
+      // If the source is guaranteed to be remote, we only test the WA link.
       // error = messaging_probe_receive(r, 0);
       error = messaging_post_receive(r);
 
@@ -930,7 +930,7 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
 		   // No local message was found (yet), so try the WA link.
 
 		   // What we should do here is peek at the WA messages. If there is a matching message available, we need
-		   // to cancel the local request, and wait to see if the cancellation was succesfull, or if a message was
+		   // to cancel the local request, and wait to see if the cancellation was successful, or if a message was
 		   // received before the cancel was called. In the latter case, the local message will take precedence over the
 		   // WA one, since we can leave the WA message in the queue, but not the local one!
 		   error = messaging_peek_receive_queue(r);

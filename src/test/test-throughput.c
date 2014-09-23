@@ -97,6 +97,12 @@ int run_test(int rank, int size, int sender, int peer, int msgsize)
           }
        }
 
+    if (sender) {
+       fprintf(stderr, "Done sending -- Barrier\n");
+    } else {
+       fprintf(stderr, "Done receiving -- Barrier\n");
+    }
+
        error = MPI_Barrier(MPI_COMM_WORLD);
 
        if (error != MPI_SUCCESS) {
