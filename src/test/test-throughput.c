@@ -16,7 +16,7 @@
 #define MAX_MSG_SIZE (8*1024L*1024L)
 
 // Number of times to repeat a test
-#define REPEAT (1)
+#define REPEAT (5)
 
 static uint64_t current_time_micros()
 {
