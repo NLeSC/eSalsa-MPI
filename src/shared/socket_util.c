@@ -147,7 +147,7 @@ int socket_receivefully(int socketfd, unsigned char *buffer, size_t len)
    return SOCKET_OK;
 }
 
-size_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking)
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking)
 {
 	ssize_t tmp;
 	int flags;
@@ -157,7 +157,7 @@ size_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool bloc
 	}
 
 	if (blocking) {
-		flags = MSG_WAITALL;
+		flags = 0; //MSG_WAITALL;
 	} else {
 		flags = MSG_DONTWAIT;
 	}
@@ -181,11 +181,18 @@ size_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool bloc
 	return tmp;
 }
 
-size_t socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking)
+ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t suggested_read, bool blocking)
 {
-	size_t bytes_read;
+	ssize_t bytes_read;
+	size_t space;
 
-	bytes_read = socket_receive(socketfd, buffer->data + buffer->end, buffer->size-buffer->end, blocking);
+	space = buffer->size-buffer->end;
+
+	if (suggested_read > 0 && suggested_read < space) {
+		space = suggested_read;
+	}
+
+	bytes_read = socket_receive(socketfd, buffer->data + buffer->end, space, blocking);
 
 	if (bytes_read <= 0) {
 		return bytes_read;
@@ -208,7 +215,7 @@ size_t socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking)
 //	return SOCKET_OK;
 //}
 
-size_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking)
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking)
 {
 	ssize_t tmp;
 	int flags;
@@ -233,9 +240,9 @@ size_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blockin
 	return tmp;
 }
 
-size_t socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
+ssize_t socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
 {
-	size_t bytes_sent;
+	ssize_t bytes_sent;
 
 	bytes_sent = socket_send(socketfd, buffer->data+buffer->start, buffer->end-buffer->start, blocking);
 

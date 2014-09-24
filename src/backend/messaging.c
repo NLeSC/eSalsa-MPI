@@ -39,8 +39,8 @@
 
 #define MAX_MESSAGE_SIZE (DATA_MESSAGE_SIZE + MAX_MESSAGE_PAYLOAD)
 
-#define DEFAULT_GATEWAY_IN_BUFFER (8*1024*1024 + DATA_MESSAGE_SIZE)
-#define DEFAULT_GATEWAY_OUT_BUFFER (8*1024*1024 + DATA_MESSAGE_SIZE)
+#define DEFAULT_GATEWAY_IN_BUFFER ((MAX_MESSAGE_PAYLOAD + DATA_MESSAGE_SIZE) * 2)
+#define DEFAULT_GATEWAY_OUT_BUFFER (MAX_MESSAGE_PAYLOAD + DATA_MESSAGE_SIZE)
 
 // TODO: Cleanup these messages. They always have the comm and src fields!
 
@@ -618,6 +618,7 @@ static int probe_mpi_data_message(data_message **message, int blocking)
 }
  */
 
+/*
 static int probe_gateway_message(message_header *mh, bool blocking)
 {
 	size_t tmp, bytes_read;
@@ -679,6 +680,87 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 
 	return 1;
 }
+*/
+
+static int probe_gateway_message(message_header *mh, bool blocking)
+{
+	size_t tmp, suggested_read;
+	ssize_t bytes_read;
+
+	// NOTE: we may receive any combination of message here.
+	while (true) {
+
+		suggested_read = 64*1024;
+
+		// Check if there is enough data available for a message header.
+		if (message_buffer_max_read(gateway_in_buffer) >= MESSAGE_HEADER_SIZE) {
+			// There should be at least a message header in the buffer!
+			tmp = message_buffer_peek(gateway_in_buffer, (unsigned char *)mh, MESSAGE_HEADER_SIZE);
+
+			if (tmp != MESSAGE_HEADER_SIZE) {
+				// Should not happen!
+				ERROR(1, "Failed to peek at gateway_in_buffer!");
+				return EMPI_ERR_INTERN;
+			}
+
+			INFO(1, "GOT DATA MESSAGE WA opcode=%d src=%d:%d dst=%d:%d length=%d", mh->opcode,
+						GET_CLUSTER_RANK(mh->src_pid), GET_PROCESS_RANK(mh->src_pid),
+						GET_CLUSTER_RANK(mh->dst_pid), GET_PROCESS_RANK(mh->dst_pid),
+						mh->length);
+
+			tmp = message_buffer_max_read(gateway_in_buffer);
+
+			if (tmp >= mh->length) {
+				// There is a complete message in the buffer!
+				INFO(2, "MESSAGE COMPLETE");
+				return 0;
+			}
+
+			INFO(2, "MESSAGE INCOMPLETE");
+
+			if (mh->length - tmp > suggested_read) {
+				suggested_read = mh->length - tmp;
+			}
+
+			// No complete message yet. Check if the message will fit in the buffer.
+			if (message_buffer_max_write(gateway_in_buffer) < mh->length) {
+
+				if (mh->length > message_buffer_size(gateway_in_buffer)) {
+					// The message is larger than the buffer!
+					ERROR(1, "Failed to receive wide area message as it is larger than receive buffer!");
+					return -1;
+				}
+
+				//INFO(5, "WILL COMPACT BUFFER TO RECEIVE MESSAGE message length=%d buffer space=%ld buffer data=%ld", mh->length, message_buffer_max_write(gateway_in_buffer), message_buffer_max_read(gateway_in_buffer));
+
+				// fprintf(stderr, "WILL COMPACT BUFFER TO RECEIVE MESSAGE message length=%d buffer space=%ld buffer data=%ld\n", mh->length, message_buffer_max_write(gateway_in_buffer), message_buffer_max_read(gateway_in_buffer));
+
+				// We need to compact the buffer or the message will not fit!
+				message_buffer_compact(gateway_in_buffer);
+			}
+		}
+
+		// Not enough data for a complete message, so we poll the socket and attempt to receive some data.
+		bytes_read = socket_receive_mb(gatewayfd, gateway_in_buffer, 0, blocking);
+
+		if (bytes_read < 0) {
+			ERROR(1, "Failed to read gateway message!");
+			return EMPI_ERR_GATEWAY;
+		}
+
+		//fprintf(stderr, "READ %ld bytes\n", bytes_read);
+
+		if (!blocking && bytes_read == 0) {
+			// We give up if  we fail to read any data and we are in non-blocking mode.
+			return 1;
+		}
+	}
+
+	// Unreachable
+	return 1;
+}
+
+
 
 /*
 static int probe_gateway_message(data_message **message, bool blocking)
@@ -766,7 +848,7 @@ static void process_ack()
 
 	ack = (ack_message *) message_buffer_direct_read_access(gateway_in_buffer, ACK_MESSAGE_SIZE);
 
-	fprintf(stderr, "Received ack %ld pending %ld\n", ack->bytes, pending_bytes);
+	DEBUG(1, "Received ack %ld with %ld bytes pending", ack->bytes, pending_bytes);
 
 	pending_bytes -= ack->bytes;
 
@@ -794,14 +876,12 @@ static int process_pending_request()
 	// This is the right message, so unpack it into the application buffer.
 	DEBUG(5, "Match. Directly unpacking message to application buffer!");
 
-	// Skip the header.
-	message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
-
-	buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
+	// Get read access to the message
+	buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length);
 
 	position = 0;
 
-	req->error = PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, req->buf, req->count, req->type->type, req->c->comm);
+	req->error = PMPI_Unpack(buffer+DATA_MESSAGE_SIZE, m->header.length-DATA_MESSAGE_SIZE, &position, req->buf, req->count, req->type->type, req->c->comm);
 	req->message_source = m->source;
 	req->message_tag = m->tag;
 	req->message_count = m->count;
@@ -875,13 +955,13 @@ static int get_message(uint32_t opcode, message_header *mh, bool blocking)
 static int flush_output_buffer(bool blocking)
 {
 	int result;
-	size_t written;
+	ssize_t written;
 	message_header mh;
 
 	while (pending_bytes >= max_pending_bytes) {
 		// We cannot send any more data, since we have reached out limit. Instead we start receiving data and hope to receive an
 		// ACK as quickly as possible.
-		result = get_message(OPCODE_DATA, &mh, blocking);
+		result = get_message(OPCODE_ACK, &mh, blocking);
 
 		if (result == -1) {
 			ERROR(1, "Failed to probe for WA message");
@@ -1318,14 +1398,12 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 				// This is the right message, so unpack it into the application buffer.
 				DEBUG(5, "Match. Directly unpacking message to application buffer!");
 
-				// Skip the header.
-				message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
-
-				buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
+				// Get access to the message
+				buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length);
 
 				position = 0;
 
-				error = PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, buf, count, t->type, c->comm);
+				error = PMPI_Unpack(buffer+DATA_MESSAGE_SIZE, m->header.length-DATA_MESSAGE_SIZE, &position, buf, count, t->type, c->comm);
 
 				if (error == MPI_SUCCESS) {
 					set_status(status, m->source, m->tag, error, t, count, FALSE);
@@ -1458,14 +1536,12 @@ static int messaging_poll_receive(request *r)
 	// This is the right message, so unpack it into the application buffer.
 	DEBUG(5, "Match. Directly unpacking message to application buffer!");
 
-	// Skip the header.
-	message_buffer_skip(gateway_in_buffer, DATA_MESSAGE_SIZE);
-
-	buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length-DATA_MESSAGE_SIZE);
+	// Get access to the message
+	buffer = message_buffer_direct_read_access(gateway_in_buffer, m->header.length);
 
 	position = 0;
 
-	r->error = TRANSLATE_ERROR(PMPI_Unpack(buffer, m->header.length-DATA_MESSAGE_SIZE, &position, r->buf, r->count, r->type->type, r->c->comm));
+	r->error = TRANSLATE_ERROR(PMPI_Unpack(buffer+DATA_MESSAGE_SIZE, m->header.length-DATA_MESSAGE_SIZE, &position, r->buf, r->count, r->type->type, r->c->comm));
 	r->message_source = m->source;
 	r->message_tag = m->tag;
 	r->message_count = m->count;
@@ -1715,7 +1791,7 @@ static int wait_for_server_reply(int opcode, message_header *mh)
 static int *receive_int_array(int length)
 {
 	message_buffer *m;
-	size_t bytes_read;
+	ssize_t bytes_read;
 	int *tmp;
 
 	tmp = malloc(length * sizeof(int));
@@ -1732,7 +1808,7 @@ static int *receive_int_array(int length)
 		return NULL;
 	}
 
-	bytes_read = socket_receive_mb(gatewayfd, m, true);
+	bytes_read = socket_receive_mb(gatewayfd, m, 0, true);
 
 	if (bytes_read < 0) {
 		message_buffer_destroy(m);

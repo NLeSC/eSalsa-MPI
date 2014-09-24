@@ -61,11 +61,11 @@ int socket_set_blocking(int socketfd);
 int socket_sendfully(int socketfd, unsigned char *buffer, size_t len);
 int socket_receivefully(int socketfd, unsigned char *buffer, size_t len);
 
-size_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking);
-size_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking);
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking);
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking);
 
-size_t socket_send_mb(int socketfd, message_buffer *buffer, bool blocking);
-size_t socket_receive_mb(int socketfd, message_buffer *buffer, bool blocking);
+ssize_t socket_send_mb(int socketfd, message_buffer *buffer, bool blocking);
+ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t suggested_read_size, bool blocking);
 
 // Set buffer sizes for socket.
 //

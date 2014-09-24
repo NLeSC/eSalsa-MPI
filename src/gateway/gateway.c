@@ -338,10 +338,11 @@ static void add_ack_bytes(message_header *mh)
 
 	info->pending_ack_bytes += mh->length;
 
-	if (info->pending_ack_bytes > MAX_MESSAGE_SIZE / 2) {
+	if (info->pending_ack_bytes >= MAX_MESSAGE_SIZE/2) {
 		toAck = info->pending_ack_bytes;
 		info->pending_ack_bytes	= 0;
-		fprintf(stderr, "Send ack %ld\n", toAck);
+
+		DEBUG(1, "Sending ack %ld to compute node %d\n", toAck, rank);
 	}
 
 	pthread_mutex_unlock(&info->bytes_mutex);
@@ -440,11 +441,6 @@ static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64
 	pthread_mutex_unlock(&info->output_mutex);
 
 //	fprintf(stderr, "##### Dequeue released lock! (socket_info %d)", info->socketfd);
-
-	// HACK!!
-	if (m != NULL) {
-		add_ack_bytes((message_header *)m->data);
-	}
 
 	return m;
 }
@@ -546,7 +542,7 @@ static bool enqueue_message_from_wa_link(message_buffer *m)
 static int write_message(socket_info *info)
 {
 	// The socket is ready for writing, so write something!
-	size_t written;
+	ssize_t written;
 
 	// If there was no message in progress, we try to dequeue one.
 	if (info->out_msg == NULL) {
@@ -567,6 +563,11 @@ static int write_message(socket_info *info)
 	if (message_buffer_max_read(info->out_msg) == 0) {
 		// Full message has been written, so destroy it and dequeue the next message.
 		// If no message is available, the socket will be set to read only mode until more message arrive.
+
+		if (info->type == TYPE_SERVER) {
+			add_ack_bytes((message_header *)info->out_msg->data);
+		}
+
 		message_buffer_destroy(info->out_msg);
 
 		// TODO FIXME: Which is better ?
@@ -582,13 +583,13 @@ static int write_message(socket_info *info)
 static int read_message(socket_info *info, bool blocking, message_buffer **out, bool *disconnect)
 {
 	// The socket is ready for reading, so read something!
-	size_t bytes_read;
+	ssize_t bytes_read;
 	message_header mh;
 
 	INFO(1, "XXX Receive of message from socket %d start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
 			info->in_msg->size);
 
-	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, blocking);
+	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, blocking);
 
 	INFO(1, "XXX Receive of message from socket %d done! start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
 			info->in_msg->size);
@@ -658,7 +659,7 @@ static int read_message(socket_info *info, bool blocking, message_buffer **out, 
 void* tcp_sender_thread(void *arg)
 {
 	bool done;
-	size_t written;
+	ssize_t written;
 	socket_info *info;
 	message_buffer *m;
 
@@ -689,6 +690,8 @@ void* tcp_sender_thread(void *arg)
 //			// HACK -- flow control on gateway - client link
 //			mh = (message_header *) m->data;
 //			release_bytes(GET_PROCESS_RANK(mh->src_pid), avail);
+
+			add_ack_bytes((message_header *)m->data);
 
 			message_buffer_destroy(m);
 
@@ -1778,7 +1781,7 @@ static int read_handshake_compute_node(socket_info *info)
 	int error;
 	uint32_t *msg;
 	uint32_t size;
-	size_t bytes_read;
+	ssize_t bytes_read;
 
 	if (info->state != STATE_READING_HANDSHAKE) {
 		ERROR(1, "Socket %d in invalid state %d", info->socketfd, info->state);
@@ -1786,7 +1789,7 @@ static int read_handshake_compute_node(socket_info *info)
 	}
 
 //	error = perform_non_blocking_read(info);
-	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, false);
+	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, false);
 
 	if (bytes_read < 0) {
 		ERROR(1, "Failed to read handshake message of compute node!");
@@ -1879,7 +1882,7 @@ static int read_handshake_compute_node(socket_info *info)
 static int write_handshake_compute_node(socket_info *info)
 {
 	int error;
-	size_t written;
+	ssize_t written;
 
 	if (info->state != STATE_WRITING_HANDSHAKE) {
 		ERROR(1, "Socket %d in invalid state %d", info->socketfd, info->state);

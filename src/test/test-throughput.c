@@ -88,6 +88,11 @@ int run_test(int rank, int size, int sender, int peer, int msgsize)
              error = MPI_Send(buf, msgsize, MPI_BYTE, peer, j, MPI_COMM_WORLD);
           } else {
              error = MPI_Recv(buf, msgsize, MPI_BYTE, peer, j, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+//if (j % 1000 == 0) {
+//	fprintf(stderr, "received %d\n", j);
+//}
+
           }
 
           if (error != MPI_SUCCESS) {
