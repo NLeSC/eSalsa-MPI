@@ -194,6 +194,7 @@ static socket_info *server_info;
 
 // Timing offset.
 uint64_t gateway_start_time;
+uint64_t application_start_time;
 
 static uint64_t wa_send_data = 0;
 static uint64_t wa_send_count = 0;
@@ -658,24 +659,27 @@ static int read_message(socket_info *info, bool blocking, message_buffer **out, 
 // Sender thread for sockets.
 void* tcp_sender_thread(void *arg)
 {
-	bool done;
+	bool more;
 	ssize_t written;
 	socket_info *info;
 	message_buffer *m;
+	//message_header *mh;
 
 	uint64_t last_write, now, data, count;
 
 	info = (socket_info *) arg;
-	done = false;
+	more = true;
 
 	now = last_write = current_time_micros();
 	data = 0;
 	count = 0;
 
-	while (!done) {
+	while (more) {
 		m = dequeue_message_from_socket_info(info, 1000000);
 
 		if (m != NULL) {
+
+			//mh = message_buffer_direct_write_access(m, 0);
 
 			written = socket_send_mb(info->socketfd, m, true);
 
@@ -693,6 +697,10 @@ void* tcp_sender_thread(void *arg)
 
 			add_ack_bytes((message_header *)m->data);
 
+			if (((message_header *)m->data)->opcode == OPCODE_FINALIZE) {
+				more = false;
+			}
+
 			message_buffer_destroy(m);
 
 			now = current_time_micros();
@@ -707,6 +715,8 @@ void* tcp_sender_thread(void *arg)
 		}
 	}
 
+	// FXIME: close socket connections!
+
 	return NULL;
 }
 
@@ -714,24 +724,23 @@ void* udt_sender_thread(void *arg)
 {
 	size_t avail;
 	socket_info *info;
-	bool done;
-	message_header *mh[1024];
-	message_header *tmp;
-	int error, msg, i;
-	uint64_t last_write, now, data, count;
-	UDT4_Statistics stats;
+	bool more;
+	// message_header *tmp;
+	int error; // , msg, i;
+//	uint64_t last_write, now, data, count;
+//	UDT4_Statistics stats;
 
 	message_buffer *m;
 	unsigned char *p;
 
 	info = (socket_info *) arg;
-	done = false;
+	more = true;
 
-	now = last_write = current_time_micros();
-	data = 0;
-	count = 0;
+	//now = last_write = current_time_micros();
+	//data = 0;
+	//count = 0;
 
-	while (!done) {
+	while (more) {
 		m = dequeue_message_from_socket_info(info, 1000000);
 
 		if (m != NULL) {
@@ -747,6 +756,12 @@ void* udt_sender_thread(void *arg)
 			if (error != SOCKET_OK) {
 				ERROR(1, "Failed to send message!");
 				return NULL;
+			}
+
+			add_ack_bytes((message_header *)m->data);
+
+			if (((message_header *)m->data)->opcode == OPCODE_FINALIZE) {
+				more = false;
 			}
 
 			message_buffer_destroy(m);
@@ -765,7 +780,7 @@ void* udt_sender_thread(void *arg)
 void* tcp_receiver_thread(void *arg)
 {
 	socket_info *info;
-	bool done;
+	bool more;
 	message_header mh;
 	void *buffer;
 	int error;
@@ -773,14 +788,13 @@ void* tcp_receiver_thread(void *arg)
 	message_buffer *m;
 
 	info = (socket_info *) arg;
-	done = false;
+	more = false;
 
 	now = last_write = current_time_micros();
 	data = 0;
 	count = 0;
 
-	// FIXME: how to stop ?
-	while (!done) {
+	while (more) {
 
 		error = socket_receivefully(info->socketfd, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
 
@@ -792,6 +806,11 @@ void* tcp_receiver_thread(void *arg)
 		if (mh.length < 0 || mh.length > MAX_MESSAGE_SIZE) {
 			ERROR(1, "Receive invalid message header length=%d!\n", mh.length);
 			return NULL;
+		}
+
+		if (mh.opcode == OPCODE_FINALIZE) {
+			more = false;
+			break;
 		}
 
 		buffer = malloc(mh.length);
@@ -828,6 +847,8 @@ void* tcp_receiver_thread(void *arg)
 		}
 	}
 
+	// FIXME: close link
+
 	return NULL;
 }
 
@@ -835,7 +856,7 @@ void* tcp_receiver_thread(void *arg)
 void* udt_receiver_thread(void *arg)
 {
 	socket_info *info;
-	bool done;
+	bool more;
 	message_header mh;
 	void *buffer;
 	int error;
@@ -845,14 +866,13 @@ void* udt_receiver_thread(void *arg)
 	message_buffer *m;
 
 	info = (socket_info *) arg;
-	done = false;
+	more = true;
 
 	now = last_write = current_time_micros();
 	data = 0;
 	count = 0;
 
-	// FIXME: how to stop ?
-	while (!done) {
+	while (more) {
 
 		error = udt_receivefully(info->socketfd, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
 
@@ -864,6 +884,11 @@ void* udt_receiver_thread(void *arg)
 		if (mh.length < 0 || mh.length > MAX_MESSAGE_SIZE) {
 			ERROR(1, "Receive invalid message header length=%d!\n", mh.length);
 			return NULL;
+		}
+
+		if (mh.opcode == OPCODE_FINALIZE) {
+			more = false;
+			break;
 		}
 
 		buffer = malloc(mh.length);
@@ -910,6 +935,7 @@ void* udt_receiver_thread(void *arg)
 		}
 	}
 
+	// FIXME: close link
 	return NULL;
 }
 
@@ -1401,10 +1427,10 @@ static int read_config_file()
 	FILE *config;
 	char buffer[1024];
 
-	file = getenv("EMPI_CONFIG");
+	file = getenv("EMPI_GATEWAY_CONFIG");
 
 	if (file == NULL) {
-		WARN(0, "EMPI_CONFIG not set!");
+		WARN(0, "EMPI_GATEWAY_CONFIG not set!");
 		return ERROR_CONFIG;
 	}
 
@@ -2306,6 +2332,10 @@ static int process_messages()
 	message_buffer *m;
 	bool disconnect;
 	uint32_t event;
+	uint64_t now, last_print;
+
+	application_start_time = current_time_micros();
+	last_print = application_start_time;
 
 	// Allocate space for the events, one per compute node.
 	events = malloc(local_application_size * sizeof(struct epoll_event));
@@ -2319,7 +2349,7 @@ static int process_messages()
 
 	while (active_connections > 1) {
 
-		count = epoll_wait(epollfd, events, local_application_size, 1000);
+		count = epoll_wait(epollfd, events, local_application_size, 500);
 
 		if (count < 0) {
 			ERROR(1, "Failed to wait for socket event!");
@@ -2381,6 +2411,14 @@ static int process_messages()
 						}
 					}
 				}
+			}
+		} else {
+			// No messages, so check if we need to print anything...
+			now = current_time_micros();
+
+			if (now >= last_print + 10000000) {
+				print_gateway_statistics(now-application_start_time);
+				last_print = now;
 			}
 		}
 	}

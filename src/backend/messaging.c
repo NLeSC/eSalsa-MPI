@@ -213,10 +213,10 @@ static int read_config_file()
 	FILE *config;
 	char buffer[1024];
 
-	file = getenv("EMPI_LOCAL_CONFIG");
+	file = getenv("EMPI_APPLICATION_CONFIG");
 
 	if (file == NULL) {
-		WARN(0, "EMPI_LOCAL_CONFIG not set!");
+		WARN(0, "EMPI_APPLICATION_CONFIG not set!");
 		return EMPI_ERR_NO_SUCH_FILE;
 	}
 
@@ -1392,7 +1392,7 @@ static int do_recv(int opcode, void *buf, int count, datatype *t, int source, in
 		// There is now a message on the stream with OPCODE_DATA
 		if (process_pending_request() == 1) {
 			// No pending receive request found, so see if we match the message!
-			m = message_buffer_direct_read_access(gateway_in_buffer, 0);
+			m = (data_message *)message_buffer_direct_read_access(gateway_in_buffer, 0);
 
 			if (match_message(m, c->handle, source, tag)) {
 				// This is the right message, so unpack it into the application buffer.
