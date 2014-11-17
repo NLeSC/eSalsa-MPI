@@ -6,7 +6,7 @@
 
 // Total data to send per pair (must be power of two)
 //#define TOTAL_DATA   (1024L*1024L*1024L)
-#define TOTAL_DATA   (512*1024L*1024L)
+#define TOTAL_DATA   (4*1024L*1024L*1024L)
 
 // Min message size used (must be power of two)
 #define MIN_MSG_SIZE (256)
@@ -16,7 +16,7 @@
 #define MAX_MSG_SIZE (8*1024L*1024L)
 
 // Number of times to repeat a test
-#define REPEAT (5)
+#define REPEAT (1)
 
 static uint64_t current_time_micros()
 {

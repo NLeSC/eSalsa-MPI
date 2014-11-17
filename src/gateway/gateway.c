@@ -30,8 +30,8 @@
 #define MAX_LENGTH_CLUSTER_NAME 128
 #define MAX_STREAMS 16
 
-#define RECEIVE_BUFFER_SIZE (32*1024*1024)
-#define SEND_BUFFER_SIZE (32*1024*1024)
+//#define RECEIVE_BUFFER_SIZE (32*1024*1024)
+//#define SEND_BUFFER_SIZE (32*1024*1024)
 
 #define TYPE_SERVER           (0)
 #define TYPE_ACCEPT           (1)
@@ -196,6 +196,14 @@ static socket_info *server_info;
 uint64_t gateway_start_time;
 uint64_t application_start_time;
 
+static uint64_t prev_deltat = 0;
+
+static uint64_t prev_send_data = 0;
+static uint64_t prev_send_count = 0;
+
+static uint64_t prev_received_data = 0;
+static uint64_t prev_received_count = 0;
+
 static uint64_t wa_send_data = 0;
 static uint64_t wa_send_count = 0;
 
@@ -205,11 +213,11 @@ static uint64_t wa_received_count = 0;
 static pthread_mutex_t send_data_mutex;
 static pthread_mutex_t received_data_mutex;
 
-static uint64_t mpi_send_data = 0;
-static uint64_t mpi_send_count = 0;
+//static uint64_t mpi_send_data = 0;
+//static uint64_t mpi_send_count = 0;
 
-static uint64_t mpi_received_data = 0;
-static uint64_t mpi_received_count = 0;
+//static uint64_t mpi_received_data = 0;
+//static uint64_t mpi_received_count = 0;
 
 static socket_info **local_compute_nodes;
 
@@ -554,7 +562,9 @@ static int write_message(socket_info *info)
 		}
 	}
 
-	written = socket_send_mb(info->socketfd, info->out_msg, false);
+	INFO(1, "Writing message to compute node %d!", info->index);
+
+	written = socket_send_mb(info->socketfd, info->out_msg, 0, false);
 
 	if (written < 0) {
 		ERROR(1, "Failed to write message to compute node %d!", info->index);
@@ -590,7 +600,7 @@ static int read_message(socket_info *info, bool blocking, message_buffer **out, 
 	INFO(1, "XXX Receive of message from socket %d start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
 			info->in_msg->size);
 
-	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, blocking);
+	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, 0, blocking);
 
 	INFO(1, "XXX Receive of message from socket %d done! start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
 			info->in_msg->size);
@@ -681,7 +691,7 @@ void* tcp_sender_thread(void *arg)
 
 			//mh = message_buffer_direct_write_access(m, 0);
 
-			written = socket_send_mb(info->socketfd, m, true);
+			written = socket_send_mb(info->socketfd, m, 0, true);
 
 			if (written < 0) {
 				ERROR(1, "Failed to send message!");
@@ -788,7 +798,7 @@ void* tcp_receiver_thread(void *arg)
 	message_buffer *m;
 
 	info = (socket_info *) arg;
-	more = false;
+	more = true;
 
 	now = last_write = current_time_micros();
 	data = 0;
@@ -991,12 +1001,17 @@ static int init_socket_info_threads(socket_info *info)
 	int error;
 
 	if (info->type == TYPE_GATEWAY_TCP) {
+
+		INFO(1, "Starting gateway TCP receiver thread!");
+
 		error = pthread_create(&(info->receive_thread), NULL, &tcp_receiver_thread, info);
 
 		if (error != 0) {
 			ERROR(1, "Failed to create TCP receive thread for socket %d!", info->socketfd);
 			return ERROR_ALLOCATE;
 		}
+
+		INFO(1, "Starting gateway TCP sender thread!");
 
 		error = pthread_create(&(info->send_thread), NULL, &tcp_sender_thread, info);
 
@@ -1006,12 +1021,17 @@ static int init_socket_info_threads(socket_info *info)
 		}
 
  	} else if (info->type == TYPE_GATEWAY_UDT) {
+
+		INFO(1, "Starting gateway UDT receiver thread!");
+
 		error = pthread_create(&(info->receive_thread), NULL, &udt_receiver_thread, info);
 
 		if (error != 0) {
 			ERROR(1, "Failed to create UDT receive thread for socket %d!", info->socketfd);
 			return ERROR_ALLOCATE;
 		}
+
+		INFO(1, "Starting gateway UDT sender thread!");
 
 		error = pthread_create(&(info->send_thread), NULL, &udt_sender_thread, info);
 
@@ -1118,7 +1138,7 @@ static int connect_to_gateways(int crank, int local_port)
 
 				if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_TCP) {
 					// Create a path to the target gateway.
-					status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
+					status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, 0, 0,
 							&socket);
 				} else if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_UDT) {
 					status = udt_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
@@ -1157,7 +1177,7 @@ static int connect_to_gateways(int crank, int local_port)
 
 			if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_TCP) {
 				// Create a path to the target gateway.
-				status = socket_accept_one(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
+				status = socket_accept_one(local_port + s, gateway_addresses[remoteIndex].ipv4, 0, 0, &socket);
 			} else if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_UDT) {
 				status = udt_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
 			}
@@ -1397,21 +1417,51 @@ static void print_gateway_statistics(uint64_t deltat)
 }
 */
 
+
+
 static void print_gateway_statistics(uint64_t deltat)
 {
-	uint64_t sec, millis, receive_data, receive_count, send_data, send_count;
+	uint64_t sec, millis, dt;
+        uint64_t receive_data, receive_count, send_data, send_count;
+        uint64_t delta_receive_data, delta_receive_count, delta_send_data, delta_send_count;
+        double gbit_in, gbit_out;
+        uint64_t prate_in, prate_out;
 
 	sec = deltat / 1000000UL;
 	millis = (deltat % 1000000UL) / 1000UL;
+
+	dt = deltat - prev_deltat;
 
 	// Retrieve stats for sending and receiving
 	retrieve_receiver_thread_stats(&receive_data, &receive_count);
 	retrieve_sender_thread_stats(&send_data, &send_count);
 
-	printf("STATS FOR GATEWAY %d AFTER %ld.%03ld - WA_IN %ld %ld MPI_OUT %ld %ld - MPI_IN %ld %ld WA_OUT %ld %ld\n",
+        delta_receive_data = receive_data - prev_received_data;
+        delta_receive_count = receive_count - prev_received_count;
+
+        delta_send_data = send_data - prev_send_data;
+        delta_send_count = send_count - prev_send_count;
+
+        gbit_in =  (delta_receive_data * 8) / (1000.0*dt);
+        gbit_out = (delta_send_data * 8) / (1000.0*dt);
+
+        prate_in = delta_receive_count / (dt / 1000000.0);
+        prate_out = delta_send_count / (dt / 1000000.0);
+
+	printf("STATS FOR GATEWAY %d AFTER %ld.%03ld - WA_IN_TOT %ld bytes %ld packets WA_OUT_TOT %ld bytes %ld packets -- WA_IN %f gbit/s %ld pckt/s WA_OUT %f gbit/s %ld pckt/s\n",
 			cluster_rank, sec, millis,
-			receive_data, receive_count, mpi_send_data, mpi_send_count,
-			mpi_received_data, mpi_received_count, send_data, send_count);
+			receive_data, receive_count,
+			send_data, send_count,
+                        gbit_in, prate_in,
+                        gbit_out, prate_out);
+
+        prev_received_data = receive_data;
+        prev_received_count = receive_count;
+
+        prev_send_data = send_data;
+        prev_send_count = send_count;
+
+	prev_deltat = deltat;
 
 	fflush(stdout);
 }
@@ -1815,7 +1865,7 @@ static int read_handshake_compute_node(socket_info *info)
 	}
 
 //	error = perform_non_blocking_read(info);
-	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, false);
+	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, 0, false);
 
 	if (bytes_read < 0) {
 		ERROR(1, "Failed to read handshake message of compute node!");
@@ -1917,7 +1967,7 @@ static int write_handshake_compute_node(socket_info *info)
 
 //	error = perform_non_blocking_write(info);
 
-	written = socket_send_mb(info->socketfd, info->out_msg, false);
+	written = socket_send_mb(info->socketfd, info->out_msg, 0, false);
 
 	if (written < 0) {
 		ERROR(1, "Failed to write handshake message to compute node!");
@@ -2013,7 +2063,7 @@ static int accept_local_connections()
 	memset(local_compute_nodes, 0, local_application_size * sizeof(socket_info *));
 
 	// open local server socket at local_port
-	error = socket_listen(local_port, -1, -1, 100, &listenfd);
+	error = socket_listen(local_port, 0, 0, 100, &listenfd);
 
 	if (error != SOCKET_OK) {
 		WARN(1, "Failed to open socket to listen for local connections!");
@@ -2176,7 +2226,7 @@ static int gateway_init(int argc, char **argv)
 	INFO(2, "I am gateway in cluster %s. Server at %s %d", cluster_name, server_name, server_port);
 
 	// Connect to the server.
-	status = socket_connect(server_ipv4, server_port, -1, -1, &serverfd);
+	status = socket_connect(server_ipv4, server_port, 0, 0, &serverfd);
 
 	if (status != SOCKET_OK) {
 		WARN(1, "Failed to connect to server!");
@@ -2412,14 +2462,14 @@ static int process_messages()
 					}
 				}
 			}
-		} else {
-			// No messages, so check if we need to print anything...
-			now = current_time_micros();
+		}
 
-			if (now >= last_print + 10000000) {
-				print_gateway_statistics(now-application_start_time);
-				last_print = now;
-			}
+		// Check if we need to print anything...
+		now = current_time_micros();
+
+		if (now >= last_print + 1000000) {
+			print_gateway_statistics(now-application_start_time);
+			last_print = now;
 		}
 	}
 

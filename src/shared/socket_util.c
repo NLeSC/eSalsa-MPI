@@ -109,6 +109,7 @@ int socket_set_blocking(int socketfd)
 /*                      Send / Receive operations                            */
 /*****************************************************************************/
 
+
 int socket_sendfully(int socketfd, unsigned char *buffer, size_t len)
 {
    size_t w = 0;
@@ -147,52 +148,123 @@ int socket_receivefully(int socketfd, unsigned char *buffer, size_t len)
    return SOCKET_OK;
 }
 
-ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t len, bool blocking)
+/*
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t len, size_t packet_size, bool blocking)
 {
 	ssize_t tmp;
 	int flags;
+	size_t todo, bytes, torecv;
 
 	if (len <= 0) {
 		return 0;
 	}
 
 	if (blocking) {
-		flags = 0; //MSG_WAITALL;
+		flags = 0;
 	} else {
 		flags = MSG_DONTWAIT;
 	}
 
-	tmp = recv(socketfd, buffer, len, flags);
+	if (packet_size <= 0) {
+		packet_size = 8*1024;
+	}
 
-	if (tmp < 0) {
-		if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-			return 0;
+	todo = len;
+	bytes = 0;
+
+	while (todo > 0) {
+
+		if (todo <= packet_size) {
+			torecv = todo;
+		} else {
+			torecv = packet_size;
 		}
 
-		ERROR(1, "socket_receive failed! (%s) blocking=%d errno=%d", strerror(errno), blocking, errno);
-        return SOCKET_ERROR_RECEIVE_FAILED;
+		tmp = recv(socketfd, buffer+bytes, torecv, flags);
+
+		if (tmp < 0) {
+			if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+				return bytes;
+			} else {
+				ERROR(1, "socket receive failed! (%s) errno=%d", strerror(errno), errno);
+				return SOCKET_ERROR_RECEIVE_FAILED;
+			}
+		}
+
+		if (tmp == 0) {
+			// Other side has shut down the connection!
+			return SOCKET_DISCONNECT;
+		}
+
+		bytes += tmp;
+		todo -= tmp;
 	}
 
-	if (tmp == 0) {
-		// Other side has shut down the connection!
-		return SOCKET_DISCONNECT;
+	return len;
+}
+*/
+
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, size_t packet_size, bool blocking)
+{
+	register ssize_t r;
+	register size_t nleft = count;
+	register int flags;
+
+	if (blocking) {
+		flags = 0;
+	} else {
+		flags = MSG_DONTWAIT;
 	}
 
-	return tmp;
+	if (packet_size <= 0) {
+		packet_size = DEFAULT_PACKET_SIZE;
+        }
+
+	while (nleft > 0) {
+
+		// We receive at most 'packet_size' bytes at a time. This is done because some some network devices (ie., IP-over-IB)
+		// tend to misbehave with larger messages.
+		if (nleft <= packet_size) {
+			r = recv(socketfd, buffer, nleft, flags);
+		} else {
+			r = recv(socketfd, buffer, packet_size, flags);
+		}
+
+		if (r < 0) {
+			 // An error occurred. If we are in non-blocking mode this may be OK.
+			if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+				return count - nleft;
+			} else {
+				ERROR(1, "socket receive failed! (%s) errno=%d", strerror(errno), errno);
+				return SOCKET_ERROR_RECEIVE_FAILED;
+			}
+		} else if (r == 0) {
+			// Other side has shut down the connection!
+			if (!blocking && count != nleft) {
+				// We have already received some bytes
+				return count - nleft;
+			} else {
+				return SOCKET_DISCONNECT;
+			}
+		}
+
+		nleft -= r;
+		buffer += r;
+	}
+
+	return count;
 }
 
-ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t suggested_read, bool blocking)
+
+ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t to_read, size_t packet_size, bool blocking)
 {
 	ssize_t bytes_read;
-	size_t space;
 
-	space = buffer->size-buffer->end;
-
-	if (suggested_read > 0 && suggested_read < space) {
-		space = suggested_read;
+	if (to_read <= 0) {
+		to_read = buffer->size - buffer->end;
 	}
 
-	bytes_read = socket_receive(socketfd, buffer->data + buffer->end, space, blocking);
+	bytes_read = socket_receive(socketfd, buffer->data + buffer->end, to_read, packet_size, blocking);
 
 	if (bytes_read <= 0) {
 		return bytes_read;
@@ -215,10 +287,57 @@ ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t suggested
 //	return SOCKET_OK;
 //}
 
-ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocking)
+
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, size_t packet_size, bool blocking)
+{
+	 register ssize_t r;
+	 register size_t nleft = count;
+	 register int flags;
+
+	 if (blocking) {
+		flags = 0;
+	 } else {
+		flags = MSG_DONTWAIT;
+	 }
+
+	 if (packet_size <= 0) {
+	 	packet_size = DEFAULT_PACKET_SIZE;
+         }
+
+	 while (nleft > 0) {
+
+		 // We send at most 'packet_size' bytes at a time. This is done because some some network devices (ie., IP-over-IB) tend
+		 // to misbehave with larger sends.
+		 if (nleft <= packet_size) {
+			 r = send(socketfd, buffer, nleft, flags);
+		 } else {
+			 r = send(socketfd, buffer, packet_size, flags);
+		 }
+
+		 if (r <= 0) {
+			 // An error occurred. If we are in non-blocking mode this may be OK.
+			 if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+				 return count - nleft;
+			 }
+
+			 ERROR(1, "socket_send failed! (%s)", strerror(errno));
+			 return SOCKET_ERROR_SEND_FAILED;
+
+		 }
+
+		 nleft -= r;
+		 buffer += r;
+	 }
+
+	 return count;
+}
+
+/*
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, size_t packet_size, bool blocking)
 {
 	ssize_t tmp;
 	int flags;
+	size_t todo, bytes, tosend;
 
 	if (len <= 0) {
 		return 0;
@@ -230,21 +349,45 @@ ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, bool blocki
 		flags = MSG_DONTWAIT;
 	}
 
-	tmp = send(socketfd, buffer, len, flags);
-
-	if (tmp < 0) {
-        ERROR(1, "socket_send failed! (%s)", strerror(errno));
-        return SOCKET_ERROR_SEND_FAILED;
+	if (packet_size <= 0) {
+		packet_size = 8*1024;
 	}
 
-	return tmp;
-}
+	todo = len;
+	bytes = 0;
 
-ssize_t socket_send_mb(int socketfd, message_buffer *buffer, bool blocking)
+	while (todo > 0) {
+
+		if (todo <= packet_size) {
+			tosend = todo;
+		} else {
+			tosend = packet_size;
+		}
+
+		tmp = send(socketfd, buffer + bytes, tosend, flags);
+
+		if (tmp < 0) {
+			if (!blocking && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+				return bytes;
+			} else {
+				ERROR(1, "socket_send failed! (%s)", strerror(errno));
+				return SOCKET_ERROR_SEND_FAILED;
+			}
+		}
+
+		bytes += tmp;
+		todo -= tmp;
+	}
+
+	return len;
+}
+*/
+
+ssize_t socket_send_mb(int socketfd, message_buffer *buffer, size_t packet_size, bool blocking)
 {
 	ssize_t bytes_sent;
 
-	bytes_sent = socket_send(socketfd, buffer->data+buffer->start, buffer->end-buffer->start, blocking);
+	bytes_sent = socket_send(socketfd, buffer->data+buffer->start, buffer->end-buffer->start, packet_size, blocking);
 
 	if (bytes_sent < 0) {
 		return bytes_sent;

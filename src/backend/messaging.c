@@ -332,7 +332,7 @@ int messaging_init(int rank, int size, int *argc, char ***argv)
 	// offsets, etc.
 	if (rank == 0) {
 
-		error = socket_connect(gateway_ipv4, gateway_port, -1, -1, &gatewayfd);
+		error = socket_connect(gateway_ipv4, gateway_port, 0, 0, &gatewayfd);
 
 		if (error != SOCKET_OK) {
 			ERROR(1, "Failed to connect to gateway! (error=%d)", error);
@@ -436,7 +436,7 @@ int messaging_init(int rank, int size, int *argc, char ***argv)
 
 	if (rank != 0) {
 
-		error = socket_connect(gateway_ipv4, gateway_port, -1, -1, &gatewayfd);
+		error = socket_connect(gateway_ipv4, gateway_port, 0, 0, &gatewayfd);
 
 		if (error != SOCKET_OK) {
 			ERROR(1, "Failed to connect to gateway! (error=%d)", error);
@@ -684,13 +684,11 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 
 static int probe_gateway_message(message_header *mh, bool blocking)
 {
-	size_t tmp, suggested_read;
+	size_t tmp, to_read;
 	ssize_t bytes_read;
 
 	// NOTE: we may receive any combination of message here.
 	while (true) {
-
-		suggested_read = 64*1024;
 
 		// Check if there is enough data available for a message header.
 		if (message_buffer_max_read(gateway_in_buffer) >= MESSAGE_HEADER_SIZE) {
@@ -718,9 +716,7 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 
 			INFO(2, "MESSAGE INCOMPLETE");
 
-			if (mh->length - tmp > suggested_read) {
-				suggested_read = mh->length - tmp;
-			}
+			to_read = mh->length - tmp;
 
 			// No complete message yet. Check if the message will fit in the buffer.
 			if (message_buffer_max_write(gateway_in_buffer) < mh->length) {
@@ -738,10 +734,12 @@ static int probe_gateway_message(message_header *mh, bool blocking)
 				// We need to compact the buffer or the message will not fit!
 				message_buffer_compact(gateway_in_buffer);
 			}
+		} else {
+			to_read = MESSAGE_HEADER_SIZE - message_buffer_max_read(gateway_in_buffer);
 		}
 
 		// Not enough data for a complete message, so we poll the socket and attempt to receive some data.
-		bytes_read = socket_receive_mb(gatewayfd, gateway_in_buffer, 0, blocking);
+		bytes_read = socket_receive_mb(gatewayfd, gateway_in_buffer, to_read, 64*1024, blocking);
 
 		if (bytes_read < 0) {
 			ERROR(1, "Failed to read gateway message!");
@@ -982,7 +980,7 @@ static int flush_output_buffer(bool blocking)
 	}
 
 	// Write some data to the network (may block, depending on the "blocking" parameter).
-	written = socket_send_mb(gatewayfd, gateway_out_buffer, blocking);
+	written = socket_send_mb(gatewayfd, gateway_out_buffer, 64*1024, blocking);
 
 	if (written < 0) {
 		ERROR(1, "Failed to flush send buffer!");
@@ -1808,7 +1806,7 @@ static int *receive_int_array(int length)
 		return NULL;
 	}
 
-	bytes_read = socket_receive_mb(gatewayfd, m, 0, true);
+	bytes_read = socket_receive_mb(gatewayfd, m, length * sizeof(int), 64*1024, true);
 
 	if (bytes_read < 0) {
 		message_buffer_destroy(m);
