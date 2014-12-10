@@ -204,7 +204,8 @@ ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t len, size_t p
 }
 */
 
-ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, size_t packet_size, bool blocking)
+/*
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, bool blocking)
 {
 	register ssize_t r;
 	register size_t nleft = count;
@@ -216,19 +217,9 @@ ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, size_t
 		flags = MSG_DONTWAIT;
 	}
 
-	if (packet_size <= 0) {
-		packet_size = DEFAULT_PACKET_SIZE;
-        }
-
 	while (nleft > 0) {
 
-		// We receive at most 'packet_size' bytes at a time. This is done because some some network devices (ie., IP-over-IB)
-		// tend to misbehave with larger messages.
-		if (nleft <= packet_size) {
-			r = recv(socketfd, buffer, nleft, flags);
-		} else {
-			r = recv(socketfd, buffer, packet_size, flags);
-		}
+		r = recv(socketfd, buffer, nleft, flags);
 
 		if (r < 0) {
 			 // An error occurred. If we are in non-blocking mode this may be OK.
@@ -254,8 +245,49 @@ ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, size_t
 
 	return count;
 }
+*/
+
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count)
+{
+	register ssize_t r;
+	register size_t nleft = count;
+	register int flags;
+
+	flags = MSG_DONTWAIT;
+
+	while (nleft > 0) {
+
+		r = recv(socketfd, buffer, nleft, flags);
+
+		if (r < 0) {
+			 // An error occurred. If we are in non-blocking mode this may be OK.
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				return count - nleft;
+			}
+
+			ERROR(1, "socket receive failed! (%s) errno=%d", strerror(errno), errno);
+			return SOCKET_ERROR_RECEIVE_FAILED;
+
+		} else if (r == 0) {
+			// Other side has shut down the connection!
+			if (count != nleft) {
+				// We have already received some bytes
+				return count - nleft;
+			} else {
+				return SOCKET_DISCONNECT;
+			}
+		}
+
+		nleft -= r;
+		buffer += r;
+	}
+
+	return count;
+}
 
 
+
+/*
 ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t to_read, size_t packet_size, bool blocking)
 {
 	ssize_t bytes_read;
@@ -287,8 +319,10 @@ ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t to_read, 
 //	return SOCKET_OK;
 //}
 
+*/
 
-ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, size_t packet_size, bool blocking)
+/*
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, bool blocking)
 {
 	 register ssize_t r;
 	 register size_t nleft = count;
@@ -300,19 +334,9 @@ ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, size_t pa
 		flags = MSG_DONTWAIT;
 	 }
 
-	 if (packet_size <= 0) {
-	 	packet_size = DEFAULT_PACKET_SIZE;
-         }
-
 	 while (nleft > 0) {
 
-		 // We send at most 'packet_size' bytes at a time. This is done because some some network devices (ie., IP-over-IB) tend
-		 // to misbehave with larger sends.
-		 if (nleft <= packet_size) {
-			 r = send(socketfd, buffer, nleft, flags);
-		 } else {
-			 r = send(socketfd, buffer, packet_size, flags);
-		 }
+		 r = send(socketfd, buffer, nleft, flags);
 
 		 if (r <= 0) {
 			 // An error occurred. If we are in non-blocking mode this may be OK.
@@ -331,6 +355,37 @@ ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, size_t pa
 
 	 return count;
 }
+*/
+
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count)
+{
+	 register ssize_t r;
+	 register size_t nleft = count;
+	 register int flags;
+
+	 flags = MSG_DONTWAIT;
+
+	 while (nleft > 0) {
+
+		 r = send(socketfd, buffer, nleft, flags);
+
+		 if (r <= 0) {
+			 // An error occurred. If we are in non-blocking mode this may be OK.
+			 if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				 return count - nleft;
+			 }
+
+			 ERROR(1, "socket_send failed! (%s)", strerror(errno));
+			 return SOCKET_ERROR_SEND_FAILED;
+		 }
+
+		 nleft -= r;
+		 buffer += r;
+	 }
+
+	 return count;
+}
+
 
 /*
 ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, size_t packet_size, bool blocking)
@@ -382,7 +437,7 @@ ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, size_t pack
 	return len;
 }
 */
-
+/*
 ssize_t socket_send_mb(int socketfd, message_buffer *buffer, size_t packet_size, bool blocking)
 {
 	ssize_t bytes_sent;
@@ -401,6 +456,7 @@ ssize_t socket_send_mb(int socketfd, message_buffer *buffer, size_t packet_size,
 
 	return bytes_sent;
 }
+*/
 
 int socket_get_options(int socket, int *send_buffer, int *receive_buffer, bool *nodelay)
 {

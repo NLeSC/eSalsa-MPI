@@ -25,6 +25,19 @@
 #include "socket_util.h"
 #include "udt_util.h"
 
+// We should now allocate a fixed amount of message fragments. We can either do this per processes (ie. 64 per process) or per
+// data volume (ie. 16 GB in total), or use the minimum useful count of the two.
+//
+// Examples:
+//
+// Taking into account that the biggest message used in CESM is about 768 KB, and the avarage size is as low as 16~76 KB
+// (depending on the node), a 1 MB buffer per connection should be enough for everyone ;-)
+//
+// With 16 KB fragments and 1 MB buffer per virtual connection (VC) we would get 64 packets per VC. Assuming each node has
+// 8 VCs (used for the halo exchange) we would need 512 packets per node (8 MB). With 2K nodes there could be at most 1M packets
+// in transit, using a total of 16GB.
+
+
 #define MAX_MESSAGE_SIZE (MAX_MESSAGE_PAYLOAD + (MESSAGE_HEADER_SIZE + 5*sizeof(int)))
 
 #define MAX_LENGTH_CLUSTER_NAME 128

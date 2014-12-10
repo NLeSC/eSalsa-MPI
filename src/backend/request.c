@@ -70,6 +70,10 @@ request *create_request(int flags, void *buf, int count, datatype *type, int des
       return NULL;
    }
 
+   r->sequence_nr = 0;
+   r->fragment_buf = NULL;
+   r->fragment_count = 0;
+
    return r;
 }
 

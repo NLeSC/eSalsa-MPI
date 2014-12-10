@@ -45,7 +45,18 @@ struct s_request {
      MPI_Request req;
 
      // This is the matching message (used in receive operations).
-     data_message *message;
+     // data_message *message;
+
+     // The sequence number of this send. Used to reassemble the message at the destination.
+     uint32_t sequence_nr;
+
+     // This a temporary buffer for all message fragments.
+     void *fragment_buf;
+
+     // Number of fragments received so far.
+     int fragment_count;
+
+
 };
 
 int init_request();

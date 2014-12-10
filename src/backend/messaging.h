@@ -24,16 +24,27 @@
 
 // This is data message, that carries application data in its payload.
 typedef struct s_data_msg {
-   message_header header;
-   int comm;              // communicator used
-   int source;            // source rank
-   int dest;              // destination rank
-   int tag;               // message tag
-   int count;             // data size in elements
-   unsigned char payload[];  // message data
+   // Generic message header
+   // message_header header;
+
+   // Info needed for fragmentation / assembly of messages
+   //uint32_t sequence_nr;      // data message sequence nr
+   //uint32_t fragment_count;   // data message fragment count
+   //uint32_t fragment_nr;      // data message fragment nr
+
+   // Info needed by MPI to deliver the message.
+   size_t length;             // length of message (including this header).
+   int comm;                  // communicator used (and for which source and dest are valid).
+   int source;                // source rank
+   int dest;                  // destination rank
+   int count;                 // data size in elements
+   int tag;                   // message tag
+
+   // Message payload.
+   unsigned char payload[];   // message data
 } data_message;
 
-#define DATA_MESSAGE_SIZE (MESSAGE_HEADER_SIZE + 5*sizeof(int))
+#define DATA_MESSAGE_SIZE (sizeof(size_t) + sizeof(int)*5)
 
 // This struct is used to return the servers reply to a comm-split request.
 typedef struct {
@@ -125,7 +136,7 @@ int messaging_print_profile();
 int match_message(data_message *m, int comm, int source, int tag);
 
 int messaging_poll_receive_queue(request *r);
-int messaging_post_receive(request *r);
+void messaging_post_receive(request *r);
 int messaging_poll_sends(bool blocking);
 int messaging_poll_receives();
 int messaging_poll();

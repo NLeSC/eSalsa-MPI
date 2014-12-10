@@ -66,4 +66,7 @@
 // Size of detailed timing buffers (in messages) in gateway nodes.
 #define DETAILED_TIMING_COUNT 8096
 
+// Maximum size of a low level message. All wide area communication will the fragmented to messages of this size.
+#define MESSAGE_SIZE (16*1024)
+
 #endif

@@ -568,7 +568,15 @@ int EMPI_Irecv(void *buf, int count, EMPI_Datatype type,
 
       // If the source is guaranteed to be remote, we only test the WA link.
       // error = messaging_probe_receive(r, 0);
-      error = messaging_post_receive(r);
+      messaging_post_receive(r);
+
+      // Now poll the network in the hope of completing the request.
+      error = messaging_poll();
+
+      if (error == -1) {
+    	  ERROR(1, "Failed to probe for WA message");
+    	  return EMPI_ERR_INTERN;
+      }
 
    } else { // local == 0 && source == MPI_ANY_SOURCE
 
@@ -595,7 +603,7 @@ int EMPI_Irecv(void *buf, int count, EMPI_Datatype type,
 	   }
    }
 
-   // We stuff our own data into the users request pointer here...
+   // Return the request handle to the application.
    *req = request_to_handle(r);
    return EMPI_SUCCESS;
 }
@@ -786,8 +794,29 @@ int EMPI_Issend ( void *buf, int count, EMPI_Datatype type, int dest, int tag, E
 /*                             Waits / Polling                               */
 /*****************************************************************************/
 
+/*
+ * Test the status of a request req.
+ *
+ * This request can represent a send or receive request, and can be local, remote, or mixed (the latter only for receive).
+ *
+ * If the request is completed, flag will be set to 1.
+ *
+ * If blocking is true, probe_request will block until the request is completed or an error occurs. If blocking is false,
+ * probe_request will check the status of the request and return immediately, even if the request is not completed.
+ *
+ * If clear is true, and the request has been completed, the request will be freed, and req set to NULL. If clear is false, the
+ * request will NOT be freed, even if it has completed.
+ *
+ * This function is used to implement:
+ *
+ * MPI_Test -> with blocking = false and clear == true
+ * MPI_Wait -> with blocking = true  and clear == true
+ * MPI_Request_get_status -> with blocking = false and clear == false
+ */
+
 static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool blocking, bool clear)
 {
+
    int count;
    int error = EMPI_SUCCESS;
    MPI_Status mstatus;
@@ -805,36 +834,13 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
    DEBUG(1, "request=(index=%d, flags=%d, srcdest=%d, count=%d, tag=%d type=%d) blocking=%d",
 		   r->handle, r->flags, r->source_or_dest, r->count, r->tag, r->type->handle, blocking);
 
-   // Request was already finished!
-   if (request_completed(r)) {
-	   *flag = 1;
-
-	   if (request_send(r)) {
-		   set_status(s, r->source_or_dest, r->tag, EMPI_SUCCESS, r->type, r->count, FALSE);
-		   r->error = EMPI_SUCCESS;
-	   } else {
-		   if (r->error == EMPI_SUCCESS) {
-			   set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, FALSE);
-		   } else {
-			   set_status_error(s, r->message_source, r->message_tag, r->error, r->type);
-		   }
-	   }
-
-	   if (clear) {
-		   free_request(r);
-		   *req = EMPI_REQUEST_NULL;
-	   }
-
-	   return r->error;
-   }
-
    // We don't support persistent request yet!
    if (request_persistent(r)) {
 	   FATAL(0, "Persistent requests not supported yet! (MPI_Test)");
 	   return EMPI_ERR_REQUEST;
    }
 
-   // Pure local request, so we ask MPI.
+   // Pure local request, so we ask MPI and return afterwards.
    if (request_local(r)) {
 
       DEBUG(2, "request=LOCAL blocking=%d %p", blocking, r->req);
@@ -857,6 +863,7 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
             error = PMPI_Get_count(&mstatus, r->type->type, &count);
 //            INFO(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
             error = translate_status(r->c, r->type, s, &mstatus);
+            // FIXME: error is ignored ?
          }
 
          if (clear) {
@@ -868,69 +875,82 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
       return r->error;
    }
 
-   // Wide area send request
-   if (request_send(r)) {
-
-      DEBUG(2, "request=WA_SEND blocking=%d", blocking);
-
-      // Give the send queue a little push.
-      if (messaging_poll_sends(blocking) < 0) {
-    	  ERROR(1, "Failed to send messages!");
-    	  return EMPI_ERR_INTERN;
-      }
-
-      return EMPI_SUCCESS;
-   }
-
-   // It was a non-persistent remote receive request.
-   if (r->source_or_dest != EMPI_ANY_SOURCE) {
-
-      DEBUG(2, "request=WA_RECEIVE blocking=%d", blocking);
-
-      if (request_completed(r)) {
-         *flag = 1;
-
-         if (r->error == EMPI_SUCCESS) {
-        	 set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, FALSE);
-         } else {
-        	 set_status_error(s, r->message_source, r->message_tag, r->error, r->type);
-         }
-
-         if (clear) {
-        	 free_request(r);
-        	 *req = EMPI_REQUEST_NULL;
-         }
-
-         return r->error;
-      } else {
-    	  // Give the receive queue a little push.
-    	  messaging_poll_receives();
-          return EMPI_SUCCESS;
-      }
-   }
-
-   // Last option: it was a non-persistent mixed receive request, so we must probe the local network and the WA link.
-   DEBUG(2, "request=WA_RECEIVE_ANY blocking=%d", blocking);
-
+   // Remote or mixed request.
    do {
-	   // Check local receive first
-	   DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
+	   if (request_completed(r)) {
+		   // Request is finished
+		   *flag = 1;
 
-	   r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
+		   if (request_send(r)) {
+			   set_status(s, r->source_or_dest, r->tag, EMPI_SUCCESS, r->type, r->count, FALSE);
+			   r->error = EMPI_SUCCESS;
+		   } else {
+			   if (r->error == EMPI_SUCCESS) {
+				   set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, FALSE);
+			   } else {
+				   set_status_error(s, r->message_source, r->message_tag, r->error, r->type);
+			   }
+		   }
 
-	   if (r->error == EMPI_SUCCESS && *flag == 1) {
-		   // We've receive a message! We must now translate local source rank to global rank.
-		   DEBUG(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
-		   error = PMPI_Get_count(&mstatus, r->type->type, &count);
-		   DEBUG(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
-		   error = translate_status(r->c, r->type, s, &mstatus);
+		   if (clear) {
+			   free_request(r);
+			   *req = EMPI_REQUEST_NULL;
+		   }
+
+		   return r->error;
+
+	   } else if (request_send(r)) {
+		   // It's an unfinished wide area send request
+
+		   DEBUG(2, "request=WA_SEND blocking=%d", blocking);
+
+		   // Give the network a little push.
+		   if (messaging_poll() < 0) {
+			   ERROR(1, "Failed to poll network!");
+			   return EMPI_ERR_INTERN;
+		   }
+
+	   } else if (r->source_or_dest != EMPI_ANY_SOURCE) {
+		   // It's an unfinished non-persistent wide area receive request from a specific source
+
+		   DEBUG(2, "request=WA_RECEIVE blocking=%d", blocking);
+
+		   // Give the network a little push.
+		   if (messaging_poll() < 0) {
+			   ERROR(1, "Failed to poll network!");
+			   return EMPI_ERR_INTERN;
+		   }
 
 	   } else {
+		   //It was an unfinished non-persistent mixed receive request, so we must probe the local network and the WA link.
+		   DEBUG(2, "request=WA_RECEIVE_ANY blocking=%d", blocking);
+
+		   // Check local receive first
+		   DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
+
+		   r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
+
+		   if (r->error == EMPI_SUCCESS && *flag == 1) {
+			   // We've receive a message! We must now translate local source rank to global rank.
+			   DEBUG(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
+			   error = PMPI_Get_count(&mstatus, r->type->type, &count);
+			   DEBUG(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
+			   error = translate_status(r->c, r->type, s, &mstatus);
+
+			   // FIXME: error is ignored ?
+
+			   if (clear) {
+				   free_request(r);
+				   *req = EMPI_REQUEST_NULL;
+			   }
+
+			   return r->error;
+		   }
 
 		   // No local message was found (yet), so try the WA link.
 
 		   // What we should do here is peek at the WA messages. If there is a matching message available, we need
-		   // to cancel the local request, and wait to see if the cancellation was successful, or if a message was
+		   // to cancel the local request, and wait to see if the cancellation was successful, or if a local message was
 		   // received before the cancel was called. In the latter case, the local message will take precedence over the
 		   // WA one, since we can leave the WA message in the queue, but not the local one!
 		   error = messaging_peek_receive_queue(r);
@@ -965,44 +985,268 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
 
 			   if (!flag) {
 				   // A local receive already claimed the receive before we could cancel it!
+				   DEBUG(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
+				   error = PMPI_Get_count(&mstatus, r->type->type, &count);
+				   DEBUG(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
 				   error = translate_status(r->c, r->type, s, &mstatus);
 
-				   if (error != EMPI_SUCCESS) {
-					   return error;
-				   }
-			   } else {
-				   error = messaging_poll_receive_queue(r);
+				   // FIXME: error is ignored ?
 
-				   if (error != 0) {
-					   ERROR(3, "Failed to receive WA message that should be in the queue!");
-					   return EMPI_ERR_INTERN;
+				   if (clear) {
+					   free_request(r);
+					   *req = EMPI_REQUEST_NULL;
 				   }
 
-				   set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, 0);
+				   *flag = 1;
+				   return r->error;
+			   }
 
+			   error = messaging_poll_receive_queue(r);
+
+			   if (error != 0) {
+				   ERROR(3, "Failed to receive WA message that should be in the queue!");
+				   return EMPI_ERR_INTERN;
+			   }
+
+			   set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, FALSE);
+
+			   if (clear) {
+				   free_request(r);
+				   *req = EMPI_REQUEST_NULL;
 			   }
 
 			   *flag = 1;
+			   return r->error;
 		   }
 	   }
 
-   } while (blocking && (*flag == 0) && (r->error == EMPI_SUCCESS));
+   } while (blocking);
 
-   if (*flag == 1) {
-
-      DEBUG(1, "received data %d", ((int *)r->buf)[0]);
-      error = r->error;
-
-      if (clear) {
-    	  free_request(r);
-    	  *req = EMPI_REQUEST_NULL;
-      }
-   }
-
-   DEBUG(1, "done error=%d", error);
-
-   return error;
+   // Reached if non-blocking and not-complete.
+   return EMPI_SUCCESS;
 }
+
+//static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool blocking, bool clear)
+//{
+//   int count;
+//   int error = EMPI_SUCCESS;
+//   MPI_Status mstatus;
+//   request *r;
+//
+//   if (req == NULL || *req == EMPI_REQUEST_NULL) {
+//      DEBUG(1, "request=NULL, blocking=%d", blocking);
+//      clear_status(s);
+//      *flag = 1;
+//      return EMPI_SUCCESS;
+//   }
+//
+//   H2R(*req, r)
+//
+//   DEBUG(1, "request=(index=%d, flags=%d, srcdest=%d, count=%d, tag=%d type=%d) blocking=%d",
+//		   r->handle, r->flags, r->source_or_dest, r->count, r->tag, r->type->handle, blocking);
+//
+//   // We don't support persistent request yet!
+//   if (request_persistent(r)) {
+//	   FATAL(0, "Persistent requests not supported yet! (MPI_Test)");
+//	   return EMPI_ERR_REQUEST;
+//   }
+//
+//
+//
+//
+//   // Request was already finished!
+//   if (request_completed(r)) {
+//	   *flag = 1;
+//
+//	   if (request_send(r)) {
+//		   set_status(s, r->source_or_dest, r->tag, EMPI_SUCCESS, r->type, r->count, FALSE);
+//		   r->error = EMPI_SUCCESS;
+//	   } else {
+//		   if (r->error == EMPI_SUCCESS) {
+//			   set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, FALSE);
+//		   } else {
+//			   set_status_error(s, r->message_source, r->message_tag, r->error, r->type);
+//		   }
+//	   }
+//
+//	   if (clear) {
+//		   free_request(r);
+//		   *req = EMPI_REQUEST_NULL;
+//	   }
+//
+//	   return r->error;
+//   }
+//
+//   // Pure local request, so we ask MPI.
+//   if (request_local(r)) {
+//
+//      DEBUG(2, "request=LOCAL blocking=%d %p", blocking, r->req);
+//
+//      if (blocking) {
+//         r->error = TRANSLATE_ERROR(PMPI_Wait(&(r->req), &mstatus));
+//         *flag = 1;
+//      } else {
+//         r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
+//      }
+//
+//      if (r->error == EMPI_SUCCESS && *flag == 1) {
+//         // Intel-MPI seems to leave "mstatus" unset when PMPI_Test succeeds, and since the MPI standard is
+//         // unclear about this we assume the mstatus is invalid in case of a succesfull isend completion.
+//         if (request_send(r)) {
+//            set_status(s, r->source_or_dest, r->tag, EMPI_SUCCESS, r->type, r->count, FALSE);
+//         } else {
+//            // We must translate local source rank to global rank.
+//            DEBUG(2, "translating status %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR);
+//            error = PMPI_Get_count(&mstatus, r->type->type, &count);
+////            INFO(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
+//            error = translate_status(r->c, r->type, s, &mstatus);
+//         }
+//
+//         if (clear) {
+//        	 free_request(r);
+//        	 *req = EMPI_REQUEST_NULL;
+//         }
+//      }
+//
+//      return r->error;
+//   }
+//
+//   // Wide area send request
+//   if (request_send(r)) {
+//
+//      DEBUG(2, "request=WA_SEND blocking=%d", blocking);
+//
+//      // Give the send queue a little push.
+//      if (messaging_poll_sends(blocking) < 0) {
+//    	  ERROR(1, "Failed to send messages!");
+//    	  return EMPI_ERR_INTERN;
+//      }
+//
+//      return EMPI_SUCCESS;
+//   }
+//
+//   // It was a non-persistent remote receive request.
+//   if (r->source_or_dest != EMPI_ANY_SOURCE) {
+//
+//      DEBUG(2, "request=WA_RECEIVE blocking=%d", blocking);
+//
+//      if (request_completed(r)) {
+//         *flag = 1;
+//
+//         if (r->error == EMPI_SUCCESS) {
+//        	 set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, FALSE);
+//         } else {
+//        	 set_status_error(s, r->message_source, r->message_tag, r->error, r->type);
+//         }
+//
+//         if (clear) {
+//        	 free_request(r);
+//        	 *req = EMPI_REQUEST_NULL;
+//         }
+//
+//         return r->error;
+//      } else {
+//    	  // Give the receive queue a little push.
+//    	  messaging_poll_receives();
+//          return EMPI_SUCCESS;
+//      }
+//   }
+//
+//   // Last option: it was a non-persistent mixed receive request, so we must probe the local network and the WA link.
+//   DEBUG(2, "request=WA_RECEIVE_ANY blocking=%d", blocking);
+//
+//   do {
+//	   // Check local receive first
+//	   DEBUG(3, "request=WA_RECEIVE_ANY performing LOCAL probe for ANY, %d", r->tag);
+//
+//	   r->error = TRANSLATE_ERROR(PMPI_Test(&(r->req), flag, &mstatus));
+//
+//	   if (r->error == EMPI_SUCCESS && *flag == 1) {
+//		   // We've receive a message! We must now translate local source rank to global rank.
+//		   DEBUG(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
+//		   error = PMPI_Get_count(&mstatus, r->type->type, &count);
+//		   DEBUG(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
+//		   error = translate_status(r->c, r->type, s, &mstatus);
+//
+//	   } else {
+//
+//		   // No local message was found (yet), so try the WA link.
+//
+//		   // What we should do here is peek at the WA messages. If there is a matching message available, we need
+//		   // to cancel the local request, and wait to see if the cancellation was successful, or if a message was
+//		   // received before the cancel was called. In the latter case, the local message will take precedence over the
+//		   // WA one, since we can leave the WA message in the queue, but not the local one!
+//		   error = messaging_peek_receive_queue(r);
+//
+//		   if (error == -1) {
+//			   ERROR(1, "Failed to peek receive queue!");
+//			   return EMPI_ERR_INTERN;
+//		   }
+//
+//		   if (error == 0) {
+//			   // There is a message available, so cancel the local request.
+//			   error = PMPI_Cancel(&(r->req));
+//
+//			   if (error != MPI_SUCCESS) {
+//				   ERROR(3, "Failed to cancel LOCAL_RECEIVE_ANY after WA receive (error=%d)", error);
+//				   return EMPI_ERR_INTERN;
+//			   }
+//
+//			   error = PMPI_Wait(&(r->req), &mstatus);
+//
+//			   if (error != MPI_SUCCESS) {
+//				   ERROR(3, "Failed to wait for canceled LOCAL_RECEIVE_ANY after WA receive (error=%d)", error);
+//				   return EMPI_ERR_INTERN;
+//			   }
+//
+//			   error = PMPI_Test_cancelled(&mstatus, flag);
+//
+//			   if (error != MPI_SUCCESS) {
+//				   ERROR(3, "Failed to test canceled status of LOCAL_RECEIVE_ANY after WA receive (error=%d)", error);
+//				   return EMPI_ERR_INTERN;
+//			   }
+//
+//			   if (!flag) {
+//				   // A local receive already claimed the receive before we could cancel it!
+//				   error = translate_status(r->c, r->type, s, &mstatus);
+//
+//				   if (error != EMPI_SUCCESS) {
+//					   return error;
+//				   }
+//			   } else {
+//				   error = messaging_poll_receive_queue(r);
+//
+//				   if (error != 0) {
+//					   ERROR(3, "Failed to receive WA message that should be in the queue!");
+//					   return EMPI_ERR_INTERN;
+//				   }
+//
+//				   set_status(s, r->message_source, r->message_tag, r->error, r->type, r->message_count, 0);
+//
+//			   }
+//
+//			   *flag = 1;
+//		   }
+//	   }
+//
+//   } while (blocking && (*flag == 0) && (r->error == EMPI_SUCCESS));
+//
+//   if (*flag == 1) {
+//
+//      DEBUG(1, "received data %d", ((int *)r->buf)[0]);
+//      error = r->error;
+//
+//      if (clear) {
+//    	  free_request(r);
+//    	  *req = EMPI_REQUEST_NULL;
+//      }
+//   }
+//
+//   DEBUG(1, "done error=%d", error);
+//
+//   return error;
+//}
+
 
 #define __EMPI_Test
 int EMPI_Test(EMPI_Request *req, int *flag, EMPI_Status *s)
@@ -1541,7 +1785,7 @@ static int WA_Gatherv(void *sendbuf, int sendcount, datatype* sendtype,
    // seems, since only the root knows exactly how much data each process sends...
 
    if (c->global_rank == root) {
-
+      // If we are the root, we receive the data from the remote processes.
       error = TRANSLATE_ERROR(PMPI_Type_extent(recvtype->type, &extent));
 
       if (error != EMPI_SUCCESS) {
@@ -1563,6 +1807,7 @@ static int WA_Gatherv(void *sendbuf, int sendcount, datatype* sendtype,
       }
 
    } else {
+	  // If we are not root, we simply send out data to the root. This may be a local or remote send!
       error = do_send(sendbuf, sendcount, sendtype, root, GATHERV_TAG, c);
 
       if (error != EMPI_SUCCESS) {

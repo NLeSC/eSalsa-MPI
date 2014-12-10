@@ -10,8 +10,6 @@
 #define OPCODE_GATEWAY_INFO               45
 #define OPCODE_GATEWAY_READY              46
 
-// This is used to acknowledge the receipt of data
-#define OPCODE_ACK                        32
 
 // These are used by all processes to communicate with the server.
 #define OPCODE_SPLIT                      51
@@ -26,9 +24,13 @@
 
 #define OPCODE_CLOSE_LINK                127
 
-// These are only used to communicate with other gateways.
-#define OPCODE_DATA                       50
-#define OPCODE_COLLECTIVE_BCAST           60
+
+
+
+
+
+
+// #define OPCODE_COLLECTIVE_BCAST           60
 
 // Tags use for MPI communication between the gateway and application nodes.
 //

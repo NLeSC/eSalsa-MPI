@@ -21,7 +21,7 @@ typedef struct {
 	request_queue_node *tail;
 
 	// The number of elements in the queue.
-	int length;
+	//int length;
 
 	// A cache of queue nodes.
 	request_queue_node *node_cache;
@@ -46,10 +46,10 @@ request *request_queue_dequeue(request_queue *queue);
 request *request_queue_dequeue_matching(request_queue *queue, int comm, int source, int tag);
 
 // Return the element from the head of the queue, without removeing it from the queue.
-request *request_queue_peek(request_queue *queue);
+// request *request_queue_peek(request_queue *queue);
 
 // Length of the queue ?
-int request_queue_length(request_queue *queue);
+//int request_queue_length(request_queue *queue);
 
 
 #endif // _LINKED_QUEUE_H_

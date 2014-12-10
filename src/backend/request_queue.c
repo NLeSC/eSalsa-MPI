@@ -44,7 +44,7 @@ request_queue *request_queue_create(int max_node_cache_size)
 
 	tmp->head = NULL;
 	tmp->tail = NULL;
-	tmp->length = 0;
+//	tmp->length = 0;
 
 	tmp->node_cache = NULL;
 	tmp->node_cache_size = 0;
@@ -67,7 +67,7 @@ bool request_queue_destroy(request_queue *queue)
 		return false;
 	}
 
-	if (queue->length != 0) {
+	if (queue->head != NULL) {
 		// We can only destroy an empty queue!
 		return false;
 	}
@@ -93,15 +93,12 @@ bool request_queue_enqueue(request_queue *queue, request *elt)
 
 	n->data = elt;
 
-	if (queue->length == 0) {
+	if (queue->head == NULL) {
 		queue->head = queue->tail = n;
 	} else {
 		queue->tail->next = n;
 		queue->tail = n;
 	}
-
-	// Update the queue stats.
-	queue->length++;
 
 	return true;
 }
@@ -124,8 +121,6 @@ request *request_queue_dequeue(request_queue *queue)
 		queue->head = queue->head->next;
 	}
 
-	queue->length--;
-
 	// Store the list node for later use
 	request_queue_put_node(queue, current);
 
@@ -144,18 +139,19 @@ request *request_queue_dequeue_matching(request_queue *queue, int comm, int sour
 
 	current = queue->head;
 	prev = NULL;
-	elt = current->data;
 
 	while (current != NULL) {
 
-		if ((comm == elt->c->handle) &&
-   			(source == EMPI_ANY_SOURCE || source == elt->source_or_dest) &&
-		   	(tag == EMPI_ANY_TAG || tag == elt->tag)) {
+		elt = current->data;
+
+		if ((source == EMPI_ANY_SOURCE || source == elt->source_or_dest) &&
+		   	(tag == EMPI_ANY_TAG || tag == elt->tag) &&
+			(comm == elt->c->handle)) {
 
 			// We've found a matching request!
 			if (current == queue->head) {
-				// delete head. check if list empty
-				if (queue->length == 1) {
+				// delete head. check if list is empty afterwards
+				if (queue->head == queue->tail) {
 					queue->head = queue->tail = NULL;
 				} else {
 					queue->head = queue->head->next;
@@ -169,7 +165,6 @@ request *request_queue_dequeue_matching(request_queue *queue, int comm, int sour
 				prev->next = current->next;
 			}
 
-			queue->length--;
 			request_queue_put_node(queue, current);
 			return elt;
 		}
@@ -181,7 +176,7 @@ request *request_queue_dequeue_matching(request_queue *queue, int comm, int sour
 	return NULL;
 }
 
-
+/*
 request *request_queue_peek(request_queue *queue)
 {
 	if (queue->head == NULL) {
@@ -195,4 +190,4 @@ int request_queue_length(request_queue *queue)
 {
 	return queue->length;
 }
-
+*/
