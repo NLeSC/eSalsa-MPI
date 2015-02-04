@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <netdb.h>
 #include <string.h>
@@ -21,9 +20,11 @@
 #include "logging.h"
 #include "opcodes.h"
 #include "generic_message.h"
-#include "linked_queue.h"
+//#include "linked_queue.h"
 #include "socket_util.h"
 #include "udt_util.h"
+#include "fragments_buffer.h"
+
 
 // We should now allocate a fixed amount of message fragments. We can either do this per processes (ie. 64 per process) or per
 // data volume (ie. 16 GB in total), or use the minimum useful count of the two.
@@ -38,10 +39,12 @@
 // in transit, using a total of 16GB.
 
 
-#define MAX_MESSAGE_SIZE (MAX_MESSAGE_PAYLOAD + (MESSAGE_HEADER_SIZE + 5*sizeof(int)))
+//#define MAX_MESSAGE_SIZE (MAX_MESSAGE_PAYLOAD + (MESSAGE_HEADER_SIZE + 5*sizeof(int)))
+
+#define EPOLL_TIMEOUT 500
 
 #define MAX_LENGTH_CLUSTER_NAME 128
-#define MAX_STREAMS 16
+//#define MAX_STREAMS 16
 
 //#define RECEIVE_BUFFER_SIZE (32*1024*1024)
 //#define SEND_BUFFER_SIZE (32*1024*1024)
@@ -52,16 +55,20 @@
 #define TYPE_GATEWAY_UDT      (3)
 #define TYPE_COMPUTE_NODE_TCP (4)
 
-#define WIDE_AREA_PROTOCOL (TYPE_GATEWAY_TCP)
+//#define WIDE_AREA_PROTOCOL (TYPE_GATEWAY_TCP)
+
+#define WIDE_AREA_PROTOCOL_TCP   0
+#define WIDE_AREA_PROTOCOL_UDT   1
 
 #define STATE_ACCEPTING          0
 #define STATE_READING_HANDSHAKE  1
 #define STATE_WRITING_HANDSHAKE  2
 #define STATE_IDLE               3
-#define STATE_READ_HEADER        4
-#define STATE_READ_PAYLOAD       5
-#define STATE_TERMINATING        6
-#define STATE_TERMINATED         7
+#define STATE_READY              4
+#define STATE_READ_HEADER        5
+#define STATE_READ_PAYLOAD       6
+#define STATE_TERMINATING        7
+#define STATE_TERMINATED         8
 
 // Error codes used internally.
 #define CONNECT_OK              0
@@ -92,6 +99,7 @@ timing read_timings[DETAILED_TIMING_COUNT];
 int read_timing_count;
 #endif // DETAILED_TIMING
 
+
 // A gateway request message which is used to inform the server
 // of the contact information of a gateway.
 typedef struct {
@@ -106,10 +114,13 @@ typedef struct {
 // A type to store all information related to a single socket connection.
 // This includes the send and receive threads, plus output queue.
 typedef struct {
+
 	int socketfd;
 	int type;
 	int state;
 	int index;
+
+	bool done;
 
 	// Receiver thread (only used in gateway-to-gateway connections).
 	pthread_t receive_thread;
@@ -117,29 +128,80 @@ typedef struct {
 	// Sender thread (only used in gateway-to-gateway connections).
 	pthread_t send_thread;
 
+
+	/******* Current outgoing message *******/
+
 	// Current message that is being written.
-	message_buffer *out_msg;
+	unsigned char *out_msg;
+
+	// Index of message that is being written.
+	int out_msg_index;
+
+	// Write position in message that is being written.
+	size_t out_msg_pos;
+
+	// Length of the message that is being written.
+	size_t out_msg_length;
+
+	// Total number of messages written.
+	uint64_t out_msg_count;
+
+	// Total number of bytes written.
+	uint64_t out_msg_bytes_total;
+
+
+	/******* Current incoming message *******/
 
 	// Current message that is read.
-	message_buffer *in_msg;
+	unsigned char *in_msg;
+
+	// Index of message that is being read.
+	int in_msg_index;
+
+	// Read position in message that is being read.
+	size_t in_msg_pos;
+
+	// Length of the message that is being read.
+	size_t in_msg_length;
+
+	// Total number of messages read.
+	uint64_t in_msg_count;
+
+	// Total number of bytes read.
+	uint64_t in_msg_bytes_total;
 
 	// The number of bytes received on this socket_info that have not been forwarded yet (poor mans flow control).
-	size_t pending_ack_bytes;
+	// size_t pending_ack_bytes;
 
 	// A mutex to make the pending bytes thread safe.
-	pthread_mutex_t bytes_mutex;
+	// pthread_mutex_t bytes_mutex;
+
+	// A FIFO queue for the messages that need to written to the socket.
+	int *output_queue;
+
+	// Maximum number of elements in output queue.
+	int max_output_queue_size;
+
+	// Number of elements in output queue.
+	int output_queue_size;
+
+	// Head of output queue.
+	int output_queue_head;
+
+	// Tails of output queue.
+	int output_queue_tail;
 
 	// Queue for the messages that need to written to the socket.
-	linked_queue *output_queue;
+	// linked_queue *output_queue;
 
-	// A mutex to make the queue thread safe.
+	// A mutex to make the output queue thread safe.
 	pthread_mutex_t output_mutex;
 
-	// A condition variable that allows dequeue to block.
+	// A condition variable that allows a dequeue on the output queue to block.
 	pthread_cond_t output_cond;
 
 	// Queue for the messages that have been received from the socket (only in gateway-to-gateway TCP connections).
-	linked_queue *input_queue;
+	// linked_queue *input_queue;
 
 } socket_info;
 
@@ -147,6 +209,7 @@ typedef struct {
 typedef struct {
 	unsigned long  ipv4;
 	unsigned short port;
+	unsigned short protocol;
 	unsigned short streams;
 } gateway_address;
 
@@ -226,13 +289,39 @@ static uint64_t wa_received_count = 0;
 static pthread_mutex_t send_data_mutex;
 static pthread_mutex_t received_data_mutex;
 
-//static uint64_t mpi_send_data = 0;
-//static uint64_t mpi_send_count = 0;
-
-//static uint64_t mpi_received_data = 0;
-//static uint64_t mpi_received_count = 0;
-
+// These represent the socket connections to the local compute nodes.
 static socket_info **local_compute_nodes;
+
+// Size of the message fragments (provided by the server).
+static int fragment_size;
+
+// The number of fragments in each fragment buffer (provided by the server).
+static int fragment_count;
+
+// We need -two- fragment buffers here, each containing "fragment_count" messages. One fragment buffer is used to receive messages
+// from the local compute nodes that belong to this gateway, and also serves at the 'send buffer' when forwarding these messages
+// to other gateways. The other fragment buffer is used to receive messages from remote gateways, and also serves as a
+// 'send buffer' when forwarding these messages to the local compute nodes.
+//
+// The reason we need two is that using only one may result in deadlocks. For example: take two gateways each containing only one
+// fragment buffer. It may happen that all messages in the fragment buffer of one of these gateways are filled by local messages.
+// This gateway can then no longer receive any messages from another gateway, since there is no room left to receive these
+// messages. If this happens on both gateways at the same time, neither can receive, so neither can send, so we have a deadlock.
+// By using separate fragment buffers for incoming local and remote communication this can never occur.
+//
+// Note that there is no flow control (on this layer) on the gateway to gateway links. As a result, more messages can be send to
+// a gateway than it can buffer (even when using a separate fragment buffer for receiving). When this happens, the gateway will
+// simply stop receiving messages until there is buffer space available (and the flow control of the underlying TCP or UDT
+// link will kick in). This will -NOT- cause a deadlock, since there is end-to-end flow control on the compute-node to
+// compute-node streams. Therefore, all messages send by a compute node are guaranteed to have buffer space available on the
+// receiver. As a result, a gateway is guaranteed to (eventually) be able to forward all data it receives to one of its
+// compute-nodes and thus have more buffer space available.
+
+// Fragment buffer containing the fragments used for receiving from local processes and sending to remote gateways.
+static fragment_buffer *nodes_to_gateway_fragment_buffer;
+
+// Fragment buffer containing the fragments used for receiving from a remote gateways and sending to local processes.
+static fragment_buffer *gateway_to_nodes_fragment_buffer;
 
 static uint64_t current_time_micros()
 {
@@ -291,31 +380,109 @@ void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
 	pthread_mutex_unlock(&send_data_mutex);
 }
 
-
-static bool enqueue_message_at_socket_info(socket_info *info, message_buffer *m)
+static void clear_socket_info_in_msg(socket_info *info)
 {
-	bool result;
-	int error = SOCKET_OK;
+	info->in_msg = NULL;
+	info->in_msg_pos = 0;
+	info->in_msg_length = 0;
+	info->in_msg_index = -1;
+	info->state = STATE_READY;
+}
+
+static void clear_socket_info_out_msg(socket_info *info)
+{
+	info->out_msg = NULL;
+	info->out_msg_pos = 0;
+	info->out_msg_length = 0;
+	info->out_msg_index = -1;
+}
+
+static void set_done_at_socket_info(socket_info *info)
+{
+	// Lock the queue first.
+	pthread_mutex_lock(&(info->output_mutex));
+
+	info->done = true;
+
+	// Tell any listners that something has happened.
+	pthread_cond_broadcast(&(info->output_cond));
+
+	// Unlock the queue.
+	pthread_mutex_unlock(&(info->output_mutex));
+}
+
+static int enqueue_message_at_socket_info(socket_info *info, int index)
+{
+	int *tmp;
+	int i;
+	int error = 0;
 
 //	fprintf(stderr, "##### Enqueue for socket_info %d", info->socketfd);
 
 	// Lock the queue first.
 	pthread_mutex_lock(&info->output_mutex);
 
+	if (info->done) {
+		FATAL("Cannot enqueue message after done is set!");
+	}
+
 //	fprintf(stderr, "###### Storing message in queue of length %d (socket_info %d)", linked_queue_length(info->output_queue), info->socketfd);
 
-	result = linked_queue_enqueue(info->output_queue, m, message_buffer_max_read(m));
+	if (info->max_output_queue_size == info->output_queue_size) {
+		// The output queue is full, so we need to resize it!
+		tmp = info->output_queue;
 
-	if (linked_queue_length(info->output_queue) == 1) {
+		INFO(1, "RESIZE OUTPUT QUEUE %d FROM %d TO %d", info->socketfd, info->max_output_queue_size, 2*info->max_output_queue_size);
+
+		info->output_queue = malloc(2 * info->max_output_queue_size * sizeof(int));
+
+		if (info->output_queue == NULL) {
+			FATAL("Failed to create output queue for socket info!");
+		}
+
+		if (info->output_queue_head == 0) {
+			INFO(1, "RESIZE USES LINEAR COPY");
+			// The elements are stored -in order- (e.g.: (H) 0, 1, 2, ... N-1 (T)) so we can use memcpy to copy to the new buffer space.
+			memcpy(info->output_queue, tmp, info->max_output_queue_size * sizeof(int));
+		} else {
+			INFO(1, "RESIZE REORDER COPY %d %d", info->output_queue_head, info->output_queue_tail);
+
+			// The elements are stored -out of order- (e.g.: ..., N-2, N-1 (T), (H) 0, 1, 2, ... ) so we can -not- use memcpy!
+			for (i=0;i<info->max_output_queue_size;i++) {
+				info->output_queue[i] = tmp[(info->output_queue_head + i) % info->max_output_queue_size];
+			}
+
+		}
+
+		free(tmp);
+
+		info->output_queue_head = 0;
+		info->output_queue_tail = info->max_output_queue_size;
+		info->max_output_queue_size *= 2;
+
+		INFO(1, "AFTER RESIZE %d head %d tail %d size %d", info->socketfd, info->output_queue_head, info->output_queue_tail, info->output_queue_size);
+
+	}
+
+	INFO(1, "ENQ %d index %d at position %d size %d", info->socketfd, index, info->output_queue_tail, info->output_queue_size);
+
+	info->output_queue[info->output_queue_tail] = index;
+	info->output_queue_tail = (info->output_queue_tail + 1) % info->max_output_queue_size;
+	info->output_queue_size += 1;
+
+	// FIXME: ensure this only needs to be done at 1 ?
+	if (info->output_queue_size == 1) {
 
 		// We've just inserted a message into an empty queue, so set the socket to the correct mode (if needed),
-		// and wake up any waiting threads.
+		// and wake up any waiting threads. We need do do this inside the lock to prevent the message from disappearing before
+		// we have updated the message state.
 		if (info->type == TYPE_SERVER || info->type == TYPE_COMPUTE_NODE_TCP) {
 			error = socket_set_rw(epollfd, info->socketfd, info);
 		}
 
 //		fprintf(stderr, "##### Sending bcast to wake up threads! (socket_info %d)", info->socketfd);
 
+		// FIXME: is this alway needed ?
 		pthread_cond_broadcast(&info->output_cond);
 	}
 
@@ -324,9 +491,10 @@ static bool enqueue_message_at_socket_info(socket_info *info, message_buffer *m)
 
 //	fprintf(stderr, "##### Enqueue done for socket_info %d", info->socketfd);
 
-	return (error == SOCKET_OK) && result;
+	return error;
 }
 
+/*
 static void add_ack_bytes(message_header *mh)
 {
 	int rank;
@@ -384,27 +552,44 @@ static void add_ack_bytes(message_header *mh)
 		enqueue_message_at_socket_info(info, m);
 	}
 }
+*/
 
-
-static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64_t timeout_usec)
+static int dequeue_message_from_socket_info(socket_info *info, int64_t timeout_usec)
 {
-	message_buffer *m;
 	struct timespec alarm;
 	struct timeval now;
-	int error = SOCKET_OK;
+	int error;
 
 //	fprintf(stderr, "##### Dequeue message from socket_info %d", info->socketfd);
+
+	if (info->out_msg != NULL) {
+		FATAL("INTERNAL ERROR: extra dequeue on socket info %d ?", info->socketfd);
+	}
+
+	info->out_msg_index = -1;
 
 	// Lock the queue first.
 	pthread_mutex_lock(&(info->output_mutex));
 
+	INFO(2, "Dequeue message from socket info socketfd=%d output_queue_size=%d ", info->socketfd, info->output_queue_size);
+
 //	fprintf(stderr, "##### Dequeue grabbed lock! (socket_info %d)", info->socketfd);
 
-	m = linked_queue_dequeue(info->output_queue);
+	while (info->output_queue_size == 0) {
 
-//	fprintf(stderr, "##### Dequeue got message %p (socket_info %d)", m, info->socketfd);
+		if (info->done) {
+			// We are done. No more messages will be queued. Set the socket to read only before returning!.
+			if (info->type == TYPE_COMPUTE_NODE_TCP || info->type == TYPE_SERVER) {
+				error = socket_set_ro(epollfd, info->socketfd, info);
 
-	while (m == NULL) {
+				if (error != 0) {
+					WARN(1, "Failed to set socket %d to read only", info->socketfd);
+				}
+			}
+
+			pthread_mutex_unlock(&info->output_mutex);
+			return 2;
+		}
 
 		if (timeout_usec == 0) {
 			// We don't wait for an element to appear, but return immediately!
@@ -421,7 +606,7 @@ static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64
 		} else {
 			// positive timeout, so perform a timed wait.
 
-	//		fprintf(stderr, "##### Dequeue will sleep for %ld usec (socket_info %d)", timeout_usec, info->socketfd);
+			//		fprintf(stderr, "##### Dequeue will sleep for %ld usec (socket_info %d)", timeout_usec, info->socketfd);
 
 			gettimeofday(&now, NULL);
 			alarm.tv_sec = now.tv_sec + (timeout_usec / 1000000);
@@ -434,11 +619,11 @@ static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64
 
 			error = pthread_cond_timedwait(&info->output_cond, &info->output_mutex, &alarm);
 
-		//	fprintf(stderr, "##### Dequeue woke up!(socket_info %d)", info->socketfd);
+			//	fprintf(stderr, "##### Dequeue woke up!(socket_info %d)", info->socketfd);
 
 			if (error == ETIMEDOUT) {
 				// If the timeout expired we return.
-	//			fprintf(stderr, "##### Dequeue got timeout!(socket_info %d)", info->socketfd);
+			//	fprintf(stderr, "##### Dequeue got timeout!(socket_info %d)", info->socketfd);
 				break;
 			}
 
@@ -446,101 +631,225 @@ static message_buffer *dequeue_message_from_socket_info(socket_info *info, int64
 				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
 			}
 		}
-
-		m = linked_queue_dequeue(info->output_queue);
 	}
 
-	if (m == NULL && (info->type == TYPE_SERVER || info->type == TYPE_COMPUTE_NODE_TCP)) {
-		// TODO: only set when needed, as this results in a system call!
-		error = socket_set_ro(epollfd, info->socketfd, info);
+	if (info->output_queue_size > 0) {
+		// A message is available in the queue.
 
-		if (error != 0) {
-			WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
+		info->out_msg_index = info->output_queue[info->output_queue_head];
+
+		INFO(1, "DEQ %d from postion %d index %d size %d", info->socketfd, info->output_queue_head, info->out_msg_index, info->output_queue_size);
+
+		info->output_queue_size--;
+
+		if (info->output_queue_size == 0) {
+			// Queue is empty now!
+			info->output_queue_head = 0;
+			info->output_queue_tail = 0;
+		} else {
+			info->output_queue_head = (info->output_queue_head + 1) % info->max_output_queue_size;
+		}
+
+		INFO(3, "Dequeued message %d queue size now %d", info->out_msg_index, info->output_queue_size);
+
+	} else {
+
+		// No messages available, so set the socket to read-only! We need to do this inside the lock of the queue to prevent
+		// queue when we don't expect it.
+
+		if (info->type == TYPE_COMPUTE_NODE_TCP || info->type == TYPE_SERVER) {
+			error = socket_set_ro(epollfd, info->socketfd, info);
+
+			if (error != 0) {
+				WARN(1, "Failed to set socket %d to read only", info->socketfd);
+			}
 		}
 	}
 
 	// Unlock the queue.
 	pthread_mutex_unlock(&info->output_mutex);
 
-//	fprintf(stderr, "##### Dequeue released lock! (socket_info %d)", info->socketfd);
+	if (info->out_msg_index != -1) {
 
-	return m;
+		// We've managed to get a message, so update some fields.
+		if (info->type == TYPE_COMPUTE_NODE_TCP) {
+
+			INFO(3, "Dequeued message for compute node - deq message data from g2n buffer");
+
+			info->out_msg = fragment_buffer_get_fragment(gateway_to_nodes_fragment_buffer, info->out_msg_index);
+			info->out_msg_pos = 0;
+			info->out_msg_length = ((generic_message *) info->out_msg)->length;
+
+		} else { // if (info->type == TYPE_SERVER || info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT)
+
+			INFO(3, "Dequeued message for server or gateway - deq message data from n2g buffer");
+
+			info->out_msg = fragment_buffer_get_fragment(nodes_to_gateway_fragment_buffer, info->out_msg_index);
+			info->out_msg_pos = 0;
+			info->out_msg_length = ((generic_message *) info->out_msg)->length;
+
+		}
+
+		// Sanity check
+		if (info->out_msg_length < GENERIC_MESSAGE_HEADER_SIZE || info->out_msg_length > fragment_size) {
+			FATAL("Invalid message was dequeued! length=%d", info->out_msg_length);
+		}
+
+		return 0;
+	}
+
+
+	return 1;
 }
 
-static bool enqueue_message_from_server(message_buffer *m)
+static bool enqueue_message_from_server(socket_info *info)
 {
 	// Message from the server are destined for a local compute node or (rarely) for the gateway itself. Since the server link
 	// is handled by a single epoll thread (together with all compute node links), only one of these calls is active at a time.
 	int rank;
-	message_header mh;
 
-	message_buffer_peek(m, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
+	bool result;
+	generic_message *m = (generic_message *) info->in_msg;
 
-	if (mh.dst_pid == my_pid) {
-		INFO(1, "RECEIVED SERVER REPLY for this gateway opcode=%d dst=%d:%d length=%d", mh.opcode, GET_CLUSTER_RANK(mh.dst_pid), GET_PROCESS_RANK(mh.dst_pid), mh.length);
+	if (m->dst_pid == my_pid) {
+		INFO(1, "RECEIVED SERVER REPLY for this gateway length=%d index=%d", m->length, info->in_msg_index);
 
-		if (mh.opcode == OPCODE_FINALIZE_REPLY) {
-			server_info->state = STATE_TERMINATING;
-			message_buffer_destroy(m);
-		} else {
-			ERROR(1, "Received unexpected server reply at gateway! opcode=%d dst=%d:%d length=%d",
-					mh.opcode, GET_CLUSTER_RANK(mh.dst_pid), GET_PROCESS_RANK(mh.dst_pid), mh.length);
+		if ((m->length - GENERIC_MESSAGE_HEADER_SIZE) != 8 || (((uint32_t *)&m->payload)[0] != OPCODE_FINALIZE_REPLY)) {
+			ERROR(1, "RECEIVED UNEXPECTED SERVER REPLY for magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d length=%d index=%d",
+					GET_MAGIC0(m->flags),
+					GET_MAGIC1(m->flags),
+					GET_FLAGS(m->flags),
+					GET_OPCODE(m->flags),
+					GET_CLUSTER_RANK(m->src_pid),
+					GET_PROCESS_RANK(m->src_pid),
+					GET_CLUSTER_RANK(m->dst_pid),
+					GET_PROCESS_RANK(m->dst_pid),
+					m->length, info->in_msg_index);
 		}
 
-		return true;
+		// We've received a finalize command from the server. This can only happen if all processes have called an MPI_Finalize,
+		// after which they have notified the server that they want to quit. Once all request are in, the server replies by
+		// sending a OPCODE_FINALIZE_REPLY to the gateways. So we are now 100% sure that all compute nodes are idle and waiting.
+		// In addition, all other gateway nodes will also receive a OPCODE_FINALIZE_REPLY at some moment in time.
+		//
+		// Conclusion: it is now safe to close all connections to the compute nodes, but not yet to the other gateways since they
+		//             may not have received OPCODE_FINALIZE_REPLY yet.
+
+		return false;
 	}
 
-	INFO(1, "ENQ SERVER REPLY opcode=%d dst=%d:%d length=%d", mh.opcode, GET_CLUSTER_RANK(mh.dst_pid), GET_PROCESS_RANK(mh.dst_pid), mh.length);
+	INFO(1, "RECEIVED SERVER REPLY for magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d length=%d index=%d",
+			GET_MAGIC0(m->flags),
+			GET_MAGIC1(m->flags),
+			GET_FLAGS(m->flags),
+			GET_OPCODE(m->flags),
+			GET_CLUSTER_RANK(m->src_pid),
+			GET_PROCESS_RANK(m->src_pid),
+			GET_CLUSTER_RANK(m->dst_pid),
+			GET_PROCESS_RANK(m->dst_pid),
+			m->length, info->in_msg_index);
 
-	rank = GET_PROCESS_RANK(mh.dst_pid);
+	rank = GET_PROCESS_RANK(m->dst_pid);
+
+/* FIXME: reimplement!
 
 	if (mh.opcode == OPCODE_FINALIZE_REPLY) {
 		// This link will be terminating soon!
 		local_compute_nodes[rank]->state = STATE_TERMINATING;
 	}
 
-	return enqueue_message_at_socket_info(local_compute_nodes[rank], m);
+*/
+	result = enqueue_message_at_socket_info(local_compute_nodes[rank], info->in_msg_index);
+
+	clear_socket_info_in_msg(info);
+
+	return result;
 }
 
-static bool enqueue_message_from_compute_node(message_buffer *m)
+static void enqueue_message_from_compute_node(socket_info *info)
 {
 	// Message from compute nodes are usually headed for the WA link, although they may also be destined for the server.
 	// Since all compute node links are handled by a single epoll thread (together with the server link), only one of these calls
 	// is active at a time.
 	int cluster, index;
-	message_header mh;
+	socket_info *dest;
 
-	message_buffer_peek(m, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
+	generic_message *m = (generic_message *) info->in_msg;
 
-	if (mh.dst_pid == server_pid) {
+	if (m->dst_pid == server_pid) {
 		// This message contains a request for the server!
-		INFO(1, "ENQ SERVER REQUEST opcode=%d src=%d:%d length=%d", mh.opcode, GET_CLUSTER_RANK(mh.src_pid), GET_PROCESS_RANK(mh.src_pid), mh.length);
-		return enqueue_message_at_socket_info(server_info, m);
+		INFO(1, "ENQ SERVER REQUEST src=%d:%d length=%d",GET_CLUSTER_RANK(m->src_pid), GET_PROCESS_RANK(m->src_pid), m->length);
+		dest = server_info;
+
+	} else {
+		// This message must be forwarded to another gateway.
+		INFO(1, "ENQ DATA MESSAGE TO WA src=%d:%d dst=%d:%d length=%d",
+				GET_CLUSTER_RANK(m->src_pid), GET_PROCESS_RANK(m->src_pid),
+				GET_CLUSTER_RANK(m->dst_pid), GET_PROCESS_RANK(m->dst_pid),
+				m->length);
+
+		INFO(1, "ENQ DATA MESSAGE TO WA at index %d magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d seq=%d ack=%d length=%d",
+						    info->in_msg_index,
+							GET_MAGIC0(m->flags),
+							GET_MAGIC1(m->flags),
+							GET_FLAGS(m->flags),
+							GET_OPCODE(m->flags),
+							GET_CLUSTER_RANK(m->src_pid),
+							GET_PROCESS_RANK(m->src_pid),
+							GET_CLUSTER_RANK(m->dst_pid),
+							GET_PROCESS_RANK(m->dst_pid),
+							m->transmit_seq,
+							m->ack_seq,
+							m->length);
+
+		cluster = GET_CLUSTER_RANK(m->dst_pid);
+
+		if (cluster < 0 || cluster >= cluster_count) {
+			FATAL("Cluster index out of bounds! (cluster=%d)", cluster);
+		}
+
+		// NOTE: to prevent message reordering, we always send fragments from the same sender via the same stream!
+		index = GET_PROCESS_RANK(m->src_pid) % gateway_connections[cluster].stream_count;
+		dest = gateway_connections[cluster].sockets[index];
 	}
 
-	// This message must be forwarded to another gateway.
-	INFO(1, "ENQ DATA MESSAGE TO WA opcode=%d src=%d:%d dst=%d:%d length=%d", mh.opcode,
-			GET_CLUSTER_RANK(mh.src_pid), GET_PROCESS_RANK(mh.src_pid),
-			GET_CLUSTER_RANK(mh.dst_pid), GET_PROCESS_RANK(mh.dst_pid),
-			mh.length);
+	enqueue_message_at_socket_info(dest, info->in_msg_index);
 
-	cluster = GET_CLUSTER_RANK(mh.dst_pid);
-
-	if (cluster < 0 || cluster >= cluster_count) {
-		ERROR(1, "Cluster index out of bounds! (cluster=%d)", cluster);
-		return false;
-	}
-
-	index = gateway_connections[cluster].next_output_stream;
-
-//	if (index < 0 || index > gateway_connections[cluster].stream_count) {
-//		ERROR(1, "Stream index out of bounds %d ~ %d-%d", index, 0, gateway_connections[cluster].stream_count);
-//	}
-
-	gateway_connections[cluster].next_output_stream = (index + 1) % gateway_connections[cluster].stream_count;
-	return enqueue_message_at_socket_info(gateway_connections[cluster].sockets[index], m);
+	clear_socket_info_in_msg(info);
 }
 
+static int enqueue_message_from_wa_link(socket_info *info)
+{
+	// Message from the WA link are headed to a compute node. (FIXME: they may also be heading for another WA link ?)
+	// Since multiple WA receive threads may be used, several of these calls may be active at a time.
+	int rank, error;
+
+	generic_message *m = (generic_message *) info->in_msg;
+
+	INFO(1, "ENQ DATA MESSAGE FROM WA at index %d magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d seq=%d ack=%d length=%d",
+						    info->in_msg_index,
+							GET_MAGIC0(m->flags),
+							GET_MAGIC1(m->flags),
+							GET_FLAGS(m->flags),
+							GET_OPCODE(m->flags),
+							GET_CLUSTER_RANK(m->src_pid),
+							GET_PROCESS_RANK(m->src_pid),
+							GET_CLUSTER_RANK(m->dst_pid),
+							GET_PROCESS_RANK(m->dst_pid),
+							m->transmit_seq,
+							m->ack_seq,
+							m->length);
+
+	rank = GET_PROCESS_RANK(m->dst_pid);
+
+	error = enqueue_message_at_socket_info(local_compute_nodes[rank], info->in_msg_index);
+
+	clear_socket_info_in_msg(info);
+
+	return error;
+}
+
+/*
 static bool enqueue_message_from_wa_link(message_buffer *m)
 {
 	// Messages from the WA link are always destined for a local compute node.
@@ -560,121 +869,216 @@ static bool enqueue_message_from_wa_link(message_buffer *m)
 
 	return enqueue_message_at_socket_info(local_compute_nodes[rank], m);
 }
+*/
 
-static int write_message(socket_info *info)
+static int write_message(socket_info *info, bool blocking)
 {
 	// The socket is ready for writing, so write something!
+	int status;
 	ssize_t written;
+	size_t bytes_left;
+	int64_t timeout;
+	generic_message *m;
 
 	// If there was no message in progress, we try to dequeue one.
 	if (info->out_msg == NULL) {
-		info->out_msg = dequeue_message_from_socket_info(info, 0);
 
-		if (info->out_msg == NULL) {
-			return 0;
+		if (info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT) {
+			// Dequeue with 1 sec. wait.
+			timeout = 1000*1000;
+		} else {
+			// Non-blocking dequeue.
+			timeout = 0;
 		}
+
+		status = dequeue_message_from_socket_info(info, timeout);
+
+		if (status != 0) {
+			// No message was dequeued, so return status which is either 1 ("wouldblock") or 2 ("done")
+			return status;
+		}
+
+		m = (generic_message *)info->out_msg;
+
+		INFO(1, "DEQ DATA MESSAGE at index %d magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d seq=%d ack=%d length=%d",
+								    info->out_msg_index,
+									GET_MAGIC0(m->flags),
+									GET_MAGIC1(m->flags),
+									GET_FLAGS(m->flags),
+									GET_OPCODE(m->flags),
+									GET_CLUSTER_RANK(m->src_pid),
+									GET_PROCESS_RANK(m->src_pid),
+									GET_CLUSTER_RANK(m->dst_pid),
+									GET_PROCESS_RANK(m->dst_pid),
+									m->transmit_seq,
+									m->ack_seq,
+									m->length);
+
 	}
 
-	INFO(1, "Writing message to compute node %d!", info->index);
+	bytes_left = info->out_msg_length - info->out_msg_pos;
 
-	written = socket_send_mb(info->socketfd, info->out_msg, 0, false);
+	if (info->type == TYPE_COMPUTE_NODE_TCP) {
+		INFO(1, "Writing message to compute node %d socket=%d timeout=%ld type=%d bytes=%ld bytes_left=%ld!",
+				info->index, info->socketfd, timeout, info->type, info->out_msg_length, bytes_left);
+
+	} else if (info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT) {
+		INFO(1, "Writing message to gateway %d socket=%d timeout=%ld type=%d bytes=%ld bytes_left=%ld!",
+						info->index, info->socketfd, timeout, info->type, info->out_msg_length, bytes_left);
+	}
+
+	written = socket_send(info->socketfd, info->out_msg + info->out_msg_pos, bytes_left, blocking);
 
 	if (written < 0) {
 		ERROR(1, "Failed to write message to compute node %d!", info->index);
-		return ERROR_CONNECTION;
+		return -1;
 	}
 
-	if (message_buffer_max_read(info->out_msg) == 0) {
-		// Full message has been written, so destroy it and dequeue the next message.
-		// If no message is available, the socket will be set to read only mode until more message arrive.
+	info->out_msg_pos += written;
+	bytes_left -= written;
 
-		if (info->type == TYPE_SERVER) {
-			add_ack_bytes((message_header *)info->out_msg->data);
+	INFO(1, "WROTE %d position now %ld", written, info->out_msg_pos);
+
+	if (bytes_left == 0) {
+		// Full message has been written, so free it and clear the out_msg. The next write will queue a new message.
+
+		info->out_msg_count++;
+		info->out_msg_bytes_total += info->out_msg_length;
+
+		INFO(1, "Message was completely written count=%ld totalbytes=%ld!", info->out_msg_count, info->out_msg_bytes_total);
+
+		if (info->type == TYPE_COMPUTE_NODE_TCP) {
+			fragment_buffer_push_free_fragment(gateway_to_nodes_fragment_buffer, info->out_msg_index);
+		} else { // if (info->type == TYPE_SERVER || info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT)
+			fragment_buffer_push_free_fragment(nodes_to_gateway_fragment_buffer, info->out_msg_index);
 		}
 
-		message_buffer_destroy(info->out_msg);
-
-		// TODO FIXME: Which is better ?
-		// info->out_msg = dequeue_message_from_socket_info(info, 0);
-		info->out_msg = NULL;
+		clear_socket_info_out_msg(info);
+	} else {
+		INFO(1, "Message was partly written!");
 	}
 
 	return 0;
 }
 
-
-
-static int read_message(socket_info *info, bool blocking, message_buffer **out, bool *disconnect)
+static int read_message(socket_info *info, bool blocking)
 {
-	// The socket is ready for reading, so read something!
-	ssize_t bytes_read;
-	message_header mh;
+	// A socket is ready for reading, so read something!
+	int status;
+	int64_t timeout;
+	ssize_t bytes_read, bytes_needed;
+	fragment_buffer *fb;
 
-	INFO(1, "XXX Receive of message from socket %d start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
-			info->in_msg->size);
+//	INFO(1, "XXX Receive of message from socket %d", info->socketfd);
 
-	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, 0, blocking);
+	bytes_needed = -1;
+	fb = NULL;
+	timeout = 0;
 
-	INFO(1, "XXX Receive of message from socket %d done! start=%d end=%d size=%d", info->socketfd, info->in_msg->start, info->in_msg->end,
-			info->in_msg->size);
+	switch (info->state) {
+	case STATE_READY:
 
-	if (bytes_read < 0) {
+		// No message fragment available yet, so try to get one. If we fail, we'll simply return 1 (for "wouldblock"). Make sure
+		// that we do get the fragment from the appropriate fragment buffer.
+		switch (info->type) {
+		case TYPE_COMPUTE_NODE_TCP:
+			timeout = 0;
+			fb = nodes_to_gateway_fragment_buffer;
+			break;
 
-		if (bytes_read == SOCKET_DISCONNECT && info->state == STATE_TERMINATING) {
-			// The connection was closed, as expected!
-			*disconnect = true;
-			return 0;
+		case TYPE_GATEWAY_TCP:
+		case TYPE_GATEWAY_UDT:
+			timeout = 1000*1000;
+			fb = gateway_to_nodes_fragment_buffer;
+			break;
+
+		case TYPE_SERVER:
+			timeout = 0;
+			fb = gateway_to_nodes_fragment_buffer;
+			break;
+
+		default:
+			FATAL("INTERNAL ERROR: unknown socket_info type %d in socket info %d", info->type, info->socketfd);
 		}
 
-		ERROR(1, "Failed to read message from compute node %d!", info->index);
-		return ERROR_CONNECTION;
-	}
+		status = fragment_buffer_pop_free_fragment_wait(fb, &(info->in_msg_index), timeout);
 
-	// NOTE: Assumption here is that the in_msg has exactly the size of a header or full message!!
-	if (message_buffer_max_write(info->in_msg) == 0) {
-		// Full message has been read, so see what we can do with it.
-
-		if (info->state == STATE_READ_HEADER) {
-			// Full header was read. Get the message size from this header, extend the buffer so the message will fit, read more.
-			message_buffer_peek(info->in_msg, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
-
-			if (mh.length == MESSAGE_HEADER_SIZE) {
-				// Header only message, so we are done. Enqueue it.
-
-				INFO(1, "XXX Enqueue SHORT message of size %d", info->in_msg->size);
-
-				*out = info->in_msg;
-
-				// enqueue_message(info->in_msg);
-				// TODO: reuse old buffer?
-				info->in_msg = message_buffer_create(MESSAGE_HEADER_SIZE);
-			} else {
-				// Message payload is still pending. Enlarge buffer and receive it.
-				// TODO: replace buffer and reuse the header sized one ?
-
-				INFO(1, "XXX Expanding message to size %d", mh.length);
-
-				if (message_buffer_expand(info->in_msg, mh.length) != 0) {
-					ERROR(1, "Failed to expand message buffer!");
-					return ERROR_ALLOCATE;
-				}
-				info->state = STATE_READ_PAYLOAD;
-			}
-		} else { // info->state == STATE_READ_PAYLOAD
-			// Full message was read, so queue it.
-
-			INFO(1, "XXX Enqueue message of size %d", info->in_msg->size);
-
-			*out = info->in_msg;
-			// enqueue_message(info->in_msg);
-			// TODO: reuse old buffer?
-
-			info->in_msg = message_buffer_create(MESSAGE_HEADER_SIZE);
+		if (status == 0) {
+			// We have a buffer.
+			info->in_msg = fragment_buffer_get_fragment(fb, info->in_msg_index);
+			info->in_msg_pos = 0;
+			info->in_msg_length = GENERIC_MESSAGE_HEADER_SIZE;
 			info->state = STATE_READ_HEADER;
+
+			// We need to read the message fragment header first.
+			bytes_needed = GENERIC_MESSAGE_HEADER_SIZE;
+
+		} else if (status == 1) {
+			// We are out of buffer space, so return 1 ("wouldblock")
+			return 1;
+
+		} else if (status == -1) {
+			FATAL("INTERNAL ERROR: Failed to reserve message fragment for socket info %d", info->socketfd);
+		}
+
+		break;
+
+	case STATE_READ_HEADER:
+	case STATE_READ_PAYLOAD:
+
+		// The length field contains a valid size, so compute how many bytes we need to read.
+		bytes_needed = info->in_msg_length - info->in_msg_pos;
+		break;
+
+	case STATE_TERMINATING:
+
+		// We are terminating, so we no more data but need to read a byte to terminate the socket.
+		bytes_needed = 1;
+		break;
+
+	default:
+		FATAL("INTERNAL ERROR: invalid state while reading for socket info %d", info->socketfd);
+	}
+
+	while (bytes_needed > 0) {
+
+		bytes_read = socket_receive(info->socketfd, info->in_msg + info->in_msg_pos, bytes_needed, blocking);
+
+//		INFO(1, "XXX Receive of message from socket %d done! pos=%ld needed=%ld read=%ld", info->socketfd, info->in_msg_pos,
+//				bytes_needed, bytes_read);
+
+		if (bytes_read > 0) {
+
+			info->in_msg_pos += bytes_read;
+			bytes_needed -= bytes_read;
+
+			if (bytes_needed == 0 && info->state == STATE_READ_HEADER) {
+				// Complete header has been read, switch to reading payload
+				info->state = STATE_READ_PAYLOAD;
+				info->in_msg_length = ((generic_message *) info->in_msg)->length;
+				bytes_needed = info->in_msg_length - GENERIC_MESSAGE_HEADER_SIZE;
+			}
+
+		} else if (bytes_read == 0) {
+			// No bytes where read, so return 1 ("wouldblock")
+			return 1;
+
+		} else { // if (bytes_read < 0)
+
+			// The connection was lost.
+			if (bytes_read == SOCKET_DISCONNECT) {
+				return 2;
+			}
+
+			ERROR(1, "Failed to read message from compute node %d!", info->index);
+			return -1;
 		}
 	}
 
-	*disconnect = false;
+	info->in_msg_bytes_total += info->in_msg_length;
+	info->in_msg_count++;
+
+	// We have read the complete message
 	return 0;
 }
 
@@ -683,9 +1087,9 @@ static int read_message(socket_info *info, bool blocking, message_buffer **out, 
 void* tcp_sender_thread(void *arg)
 {
 	bool more;
-	ssize_t written;
+	int status;
 	socket_info *info;
-	message_buffer *m;
+	// message_buffer *m;
 	//message_header *mh;
 
 	uint64_t last_write, now, data, count;
@@ -698,53 +1102,37 @@ void* tcp_sender_thread(void *arg)
 	count = 0;
 
 	while (more) {
-		m = dequeue_message_from_socket_info(info, 1000000);
 
-		if (m != NULL) {
+		status = write_message(info, true);
 
-			//mh = message_buffer_direct_write_access(m, 0);
+		if (status == -1) {
+			ERROR(1, "Failed to send message!");
+			more = false;
+		} else if (status == 2) {
+			INFO(1, "TCP sender thread done");
+			more = false;
+		}
 
-			written = socket_send_mb(info->socketfd, m, 0, true);
+		now = current_time_micros();
 
-			if (written < 0) {
-				ERROR(1, "Failed to send message!");
-				return NULL;
-			}
-
-			count++;
-			data += written;
-
-//			// HACK -- flow control on gateway - client link
-//			mh = (message_header *) m->data;
-//			release_bytes(GET_PROCESS_RANK(mh->src_pid), avail);
-
-			add_ack_bytes((message_header *)m->data);
-
-			if (((message_header *)m->data)->opcode == OPCODE_FINALIZE) {
-				more = false;
-			}
-
-			message_buffer_destroy(m);
-
-			now = current_time_micros();
-
-			// write stats at most once per second.
-			if (now > last_write + 1000000) {
-				store_sender_thread_stats(info->index, data, count, now);
-				last_write = now;
-				count = 0;
-				data = 0;
-			}
+		// write stats at most once per second.
+		if (now > last_write + 1000000) {
+			store_sender_thread_stats(info->index, info->out_msg_bytes_total-data, info->out_msg_count-count, now);
+			data = info->out_msg_bytes_total;
+			count = info->out_msg_count;
+			last_write = now;
 		}
 	}
 
-	// FXIME: close socket connections!
+	// Make sure all statistics are saved when we quit.
+	store_sender_thread_stats(info->index, info->out_msg_bytes_total-data, info->out_msg_count-count, now);
 
 	return NULL;
 }
 
 void* udt_sender_thread(void *arg)
 {
+	/*
 	size_t avail;
 	socket_info *info;
 	bool more;
@@ -795,7 +1183,7 @@ void* udt_sender_thread(void *arg)
 	}
 
 	//INFO(1, "UDT Sender done!");
-
+*/
 	return NULL;
 }
 
@@ -804,73 +1192,64 @@ void* tcp_receiver_thread(void *arg)
 {
 	socket_info *info;
 	bool more;
-	message_header mh;
-	void *buffer;
 	int error;
-	uint64_t last_write, now, data, count;
-	message_buffer *m;
+	uint64_t last_read, now, data, count;
 
 	info = (socket_info *) arg;
 	more = true;
 
-	now = last_write = current_time_micros();
+	now = last_read = current_time_micros();
 	data = 0;
 	count = 0;
 
 	while (more) {
 
-		error = socket_receivefully(info->socketfd, (unsigned char *)&mh, MESSAGE_HEADER_SIZE);
+		error = read_message(info, true); // FIXME: should use timeout!
 
-		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to receive header!");
-			return NULL;
-		}
+		switch (error) {
+		case 0: // Have a complete message, so queue it.
+			enqueue_message_from_wa_link(info);
+			break;
 
-		if (mh.length < 0 || mh.length > MAX_MESSAGE_SIZE) {
-			ERROR(1, "Receive invalid message header length=%d!\n", mh.length);
-			return NULL;
-		}
+		case 1:
+			// Would block -> no message!
+			break;
 
-		if (mh.opcode == OPCODE_FINALIZE) {
+		case 2: // Disconnect
+//			if (info->state == STATE_TERMINATING) {
+				// Disconnect was expected!
+//				INFO(1, "Disconnecting WA link %d", info->index);
+				// socket_remove_from_epoll(epollfd, info->socketfd);
+//				close(info->socketfd);
+//				info->state = STATE_TERMINATED;
+
+
+
+//			} else {
+			WARN(1, "Unexpected termination of link to gateway %d", info->index);
+//			}
+//			shutdown(info->socketfd, SHUT_RD);
 			more = false;
 			break;
+
+		default: // Also case -1, error
+			ERROR(1, "Failed to handle event on connection to gateway %d (error=%d)", info->index, error);
+			more = false;
 		}
 
-		buffer = malloc(mh.length);
-
-		if (buffer == NULL) {
-			ERROR(1, "Failed to allocate space for message of length=%d!\n", mh.length);
-			return NULL;
-		}
-
-		memcpy(buffer, &mh, MESSAGE_HEADER_SIZE);
-
-		error = socket_receivefully(info->socketfd, buffer + MESSAGE_HEADER_SIZE, mh.length-MESSAGE_HEADER_SIZE);
-
-		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to receive message payload!");
-			return NULL;
-		}
-
-		m = message_buffer_wrap(buffer, mh.length, false);
-		m->end = mh.length;
-
-		enqueue_message_from_wa_link(m);
-
-		data += mh.length;
-		count++;
+		// Write some statistics (at most once per second).
 		now = current_time_micros();
 
-		// write stats at most once per second.
-		if (now > last_write + 1000000) {
-			store_receiver_thread_stats(info->index, data, count, now);
-			last_write = now;
-			count = 0;
-			data = 0;
+		if (now > last_read + 1000000) {
+			store_receiver_thread_stats(info->index, info->in_msg_bytes_total-data, info->in_msg_count-count, now);
+			last_read = now;
+			data = info->in_msg_bytes_total;
+			count = info->in_msg_count;
 		}
 	}
 
-	// FIXME: close link
+	// Make sure all statistics are saved when we quit.
+	store_receiver_thread_stats(info->index, info->in_msg_bytes_total-data, info->in_msg_count-count, now);
 
 	return NULL;
 }
@@ -878,6 +1257,7 @@ void* tcp_receiver_thread(void *arg)
 // Receiver thread for sockets.
 void* udt_receiver_thread(void *arg)
 {
+	/*
 	socket_info *info;
 	bool more;
 	message_header mh;
@@ -957,7 +1337,7 @@ void* udt_receiver_thread(void *arg)
 
 		}
 	}
-
+*/
 	// FIXME: close link
 	return NULL;
 }
@@ -979,14 +1359,38 @@ static socket_info *create_socket_info(int socketfd, int type, int state)
 	info->type = type;
 	info->state = state;
 	info->index = -1;
+	info->done = false;
 
-	info->pending_ack_bytes = 0;
+	// info->pending_ack_bytes = 0;
 
 	info->in_msg = NULL;
-	info->out_msg = NULL;
+	info->in_msg_index = -1;
+	info->in_msg_pos = 0;
+	info->in_msg_length = 0;
+	info->in_msg_count = 0;
+	info->in_msg_bytes_total = 0;
 
-	info->input_queue = NULL;
-	info->output_queue = linked_queue_create(-1);
+	info->out_msg = NULL;
+	info->out_msg_index = -1;
+	info->out_msg_pos = 0;
+	info->out_msg_length = 0;
+	info->out_msg_count = 0;
+	info->out_msg_bytes_total = 0;
+
+	// Remove this ??
+	// info->input_queue = NULL;
+
+	// info->output_queue = linked_queue_create(-1);
+	info->output_queue = malloc(8 * sizeof(int));
+
+	if (info->output_queue == NULL) {
+		FATAL("Failed to create socket info!");
+	}
+
+	info->max_output_queue_size = 8;
+	info->output_queue_size = 0;
+	info->output_queue_head = 0;
+	info->output_queue_tail = 0;
 
 	error = pthread_cond_init(&(info->output_cond), NULL);
 
@@ -1000,11 +1404,11 @@ static socket_info *create_socket_info(int socketfd, int type, int state)
 		FATAL("Failed to create socket info!");
 	}
 
-	error = pthread_mutex_init(&(info->bytes_mutex), NULL);
+//	error = pthread_mutex_init(&(info->bytes_mutex), NULL);
 
-	if (error != 0) {
-		FATAL("Failed to create socket info!");
-	}
+//	if (error != 0) {
+		//FATAL("Failed to create socket info!");
+	//}
 
 	return info;
 }
@@ -1095,7 +1499,7 @@ static int receive_gateway_ready_opcode(int index)
 	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
 		status = udt_receivefully(socketfd, (unsigned char *) &opcode, 4);
 	} else {
-		FATAL("Unknown gateway protocol!");
+		FATAL("Unknown gateway protocol (%d)!", gateway_connections[index].sockets[0]->type);
 	}
 
 	if (status != SOCKET_OK) {
@@ -1117,7 +1521,7 @@ static int send_gateway_ready_opcode(int index)
 	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
 		status = udt_sendfully(socketfd, (unsigned char *) &opcode, 4);
 	} else {
-		FATAL("Unknown gateway protocol!");
+		FATAL("Unknown gateway protocol (%d)!", gateway_connections[index].sockets[0]->type);
 	}
 
 	if (status != SOCKET_OK) {
@@ -1149,23 +1553,29 @@ static int connect_to_gateways(int crank, int local_port)
 
 				INFO(2, "Connecting to gateway stream %d.%d.%d -> index = %d", i, gateway_rank, s, remoteIndex);
 
-				if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_TCP) {
+				if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_TCP) {
 					// Create a path to the target gateway.
 					status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, 0, 0,
 							&socket);
-				} else if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_UDT) {
+
+					if (status != CONNECT_OK) {
+						ERROR(1, "Failed to connect!");
+						return status;
+					}
+
+					gateway_connections[i].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_TCP, STATE_READY);
+
+				} else if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_UDT) {
 					status = udt_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
 							&socket);
-				}
 
-				if (status != CONNECT_OK) {
-					ERROR(1, "Failed to connect!");
-					return status;
-				}
+					if (status != CONNECT_OK) {
+						ERROR(1, "Failed to connect!");
+						return status;
+					}
 
-				gateway_connections[i].sockets[s] = create_socket_info(socket, WIDE_AREA_PROTOCOL, STATE_IDLE);
-//				init_socket_info(&(gateway_connections[i].sockets[s]), socket, type, MAX_BLOCKED_QUEUE_SIZE,
-//						MAX_BLOCKED_QUEUE_SIZE);
+					gateway_connections[i].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_UDT, STATE_READY);
+				}
 
 				INFO(1, "Created connection to remote gateway stream %d.%d.%d socket = %d!", i, gateway_rank, s, socket);
 			}
@@ -1188,22 +1598,27 @@ static int connect_to_gateways(int crank, int local_port)
 
 			INFO(2, "Accepting from gateway stream %d.%d.%d -> index = %d", crank, gateway_rank, s, remoteIndex);
 
-			if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_TCP) {
+			if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_TCP) {
 				// Create a path to the target gateway.
 				status = socket_accept_one(local_port + s, gateway_addresses[remoteIndex].ipv4, 0, 0, &socket);
-			} else if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_UDT) {
+
+				if (status != CONNECT_OK) {
+					ERROR(1, "Failed to accept!");
+					return status;
+				}
+
+				gateway_connections[crank].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_TCP, STATE_READY);
+
+			} else if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_UDT) {
 				status = udt_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
-			}
 
-			if (status != CONNECT_OK) {
-				ERROR(1, "Failed to accept!");
-				return status;
-			}
+				if (status != CONNECT_OK) {
+					ERROR(1, "Failed to accept!");
+					return status;
+				}
 
-			gateway_connections[crank].sockets[s] = create_socket_info(socket, WIDE_AREA_PROTOCOL, STATE_IDLE);
-//
-//			init_socket_info(&(gateway_connections[crank].sockets[s]), socket, type, MAX_BLOCKED_QUEUE_SIZE,
-//					MAX_BLOCKED_QUEUE_SIZE);
+				gateway_connections[crank].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_UDT, STATE_READY);
+			}
 
 			INFO(1, "Accepted connection from remote gateway %d.%d.%d socket = %d!", crank, gateway_rank, s, socket);
 		}
@@ -1262,40 +1677,6 @@ static int connect_gateways()
 
 	return 0;
 }
-
-static int disconnect_gateway(int index)
-{
-	int s;
-
-	if (index != cluster_rank) {
-		for (s=0;s<gateway_connections[index].stream_count;s++) {
-
-			if (WIDE_AREA_PROTOCOL == TYPE_GATEWAY_TCP) {
-				close(gateway_connections[index].sockets[s]->socketfd);
-			} else { // if (type == TYPE_GATEWAY_UDT)
-				udt4_close(gateway_connections[index].sockets[s]->socketfd);
-			}
-		}
-	}
-
-	return 0;
-}
-
-static int disconnect_gateways()
-{
-	int i, status;
-
-	for (i=0;i<cluster_count;i++) {
-		status = disconnect_gateway(i);
-
-		if (status != CONNECT_OK) {
-			WARN(1, "Failed to disconnect to gateway %d (error=%d)", i, status);
-		}
-	}
-
-	return 0;
-}
-
 
 
 #ifdef DETAILED_TIMING
@@ -1388,11 +1769,10 @@ void cleanup()
 		WARN(1, "Failed to receive OPCODE_CLOSE_LINK from server! (error=%d)", error);
 	}
 
-	close(serverfd);
 
 	// We are now sure that everyone agrees that we should stop. We can now disconnect all
 	// socket connections without producing unexpected EOFs on the other side!
-	disconnect_gateways();
+	// disconnect_gateways();
 
 	// Finally close the epoll socket and serverfd socket.
 	close(epollfd);
@@ -1465,8 +1845,8 @@ static void print_gateway_statistics(uint64_t deltat)
 			cluster_rank, sec, millis,
 			receive_data, receive_count,
 			send_data, send_count,
-                        gbit_in, prate_in,
-                        gbit_out, prate_out);
+			gbit_in, prate_in,
+			gbit_out, prate_out);
 
         prev_received_data = receive_data;
         prev_received_count = receive_count;
@@ -1651,11 +2031,10 @@ static int handshake()
 	// to the server and gets a cluster rank and clusters count as a reply (or an error).
 	int error;
 
-	// The maximum size of the handshake message is
-	//  (2*4 + MAX_LENGTH_CLUSTER_NAME) bytes
+	// The maximum size of the handshake message is (2*4 + MAX_LENGTH_CLUSTER_NAME) bytes
 	unsigned char message[2*4+MAX_LENGTH_CLUSTER_NAME];
 	unsigned int *message_i;
-	unsigned int reply[4];
+	unsigned int reply[6];
 	unsigned int opcode;
 
 	message_i = (unsigned int *) message;
@@ -1686,7 +2065,7 @@ static int handshake()
 		return ERROR_HANDSHAKE_FAILED;
 	}
 
-	error = socket_receivefully(serverfd, (unsigned char *)reply, 4*4);
+	error = socket_receivefully(serverfd, (unsigned char *)reply, 6*4);
 
 	if (error != SOCKET_OK) {
 		ERROR(1, "Handshake with server failed! (%d)", error);
@@ -1697,12 +2076,16 @@ static int handshake()
 	cluster_count          = reply[1];
 	local_application_size = reply[2];
 	gateway_count          = reply[3];
+	fragment_size          = reply[4];
+	fragment_count         = reply[5];
 
 	INFO(1, "Received following configuration from server:");
 	INFO(1, "  Cluster rank  : %d", cluster_rank);
 	INFO(1, "  Cluster count : %d", cluster_count);
 	INFO(1, "  Local   size  : %d", local_application_size);
 	INFO(1, "  Gateway count : %d", gateway_count);
+	INFO(1, "  Fragment size : %d", fragment_size);
+	INFO(1, "  Fragment count: %d", fragment_count);
 
 	if (cluster_count == 0 || cluster_count >= MAX_CLUSTERS) {
 		ERROR(1, "Cluster count out of bounds! (%d)", cluster_count);
@@ -1785,32 +2168,43 @@ static int receive_gateway(int index)
 	int error;
 	unsigned long ipv4;
 	unsigned short port;
+	unsigned short protocol;
 	unsigned short streams;
 
 	error = socket_receivefully(serverfd, (unsigned char*) &ipv4, 4);
 
 	if (error != SOCKET_OK) {
-		ERROR(1, "Receive of gateway info failed! (%d)", error);
+		ERROR(1, "Receive of gateway info failed! (ipv4, error=%d)", error);
 		return ERROR_HANDSHAKE_FAILED;
 	}
 
 	error = socket_receivefully(serverfd, (unsigned char*) &port, 2);
 
 	if (error != SOCKET_OK) {
-		ERROR(1, "Receive of gateway info failed! (%d)", error);
+		ERROR(1, "Receive of gateway info failed! (port, error=%d)", error);
+		return ERROR_HANDSHAKE_FAILED;
+	}
+
+	error = socket_receivefully(serverfd, (unsigned char*) &protocol, 2);
+
+	if (error != SOCKET_OK) {
+		ERROR(1, "Receive of gateway info failed! (protocol, error=%d)", error);
 		return ERROR_HANDSHAKE_FAILED;
 	}
 
 	error = socket_receivefully(serverfd, (unsigned char*) &streams, 2);
 
 	if (error != SOCKET_OK) {
-		ERROR(1, "Receive of gateway info failed! (%d)", error);
+		ERROR(1, "Receive of gateway info failed! (stream, error=%d)", error);
 		return ERROR_HANDSHAKE_FAILED;
 	}
 
 	gateway_addresses[index].ipv4 = ipv4;
 	gateway_addresses[index].port = port;
+	gateway_addresses[index].protocol = protocol;
 	gateway_addresses[index].streams = streams;
+
+	WARN(2, "Received gateway info %d address=%d port %d protocol %d streams %d", index, ipv4, port, protocol, streams);
 
 	return 0;
 }
@@ -1841,7 +2235,7 @@ static int all_clear_barrier()
 {
 	int error, opcode;
 
-	opcode  = OPCODE_GATEWAY_READY;
+	opcode = OPCODE_GATEWAY_READY;
 
 	error = socket_sendfully(serverfd, (unsigned char *) &opcode, sizeof(int));
 
@@ -1860,6 +2254,23 @@ static int all_clear_barrier()
 	return 0;
 }
 
+static int send_all_clear()
+{
+	int error, opcode;
+
+	opcode = OPCODE_GATEWAY_READY;
+
+	error = socket_sendfully(local_compute_nodes[0]->socketfd, (unsigned char *) &opcode, sizeof(int));
+
+	if (error != SOCKET_OK) {
+		ERROR(1, "Failed to send OPCODE_GATEWAY_READY to compute node 0!");
+		return ERROR_HANDSHAKE_FAILED;
+	}
+
+	return 0;
+}
+
+
 /*****************************************************************************/
 /*                Initial communication with compute nodes                   */
 /*****************************************************************************/
@@ -1870,24 +2281,29 @@ static int read_handshake_compute_node(socket_info *info)
 	int error;
 	uint32_t *msg;
 	uint32_t size;
-	ssize_t bytes_read;
+	ssize_t bytes_read, bytes_needed;
+	size_t offset;
 
 	if (info->state != STATE_READING_HANDSHAKE) {
 		ERROR(1, "Socket %d in invalid state %d", info->socketfd, info->state);
 		return ERROR_HANDSHAKE_FAILED;
 	}
 
-//	error = perform_non_blocking_read(info);
-	bytes_read = socket_receive_mb(info->socketfd, info->in_msg, 0, 0, false);
+	bytes_needed = info->in_msg_length - info->in_msg_pos;
+
+	bytes_read = socket_receive(info->socketfd, info->in_msg + info->in_msg_pos, bytes_needed, false);
 
 	if (bytes_read < 0) {
 		ERROR(1, "Failed to read handshake message of compute node!");
 		return ERROR_HANDSHAKE_FAILED;
 	}
 
-	if (message_buffer_max_write(info->in_msg) == 0) {
+	info->in_msg_pos += bytes_read;
+	bytes_needed -= bytes_read;
+
+	if (bytes_needed == 0) {
 		// Full message has been read. Process it and send reply back!
-		msg = (uint32_t *) message_buffer_direct_read_access(info->in_msg, 3 * sizeof(uint32_t));
+		msg = (uint32_t *) info->in_msg;
 
 		if (msg[0] != OPCODE_HANDSHAKE) {
 			// Invalid handshake!
@@ -1899,8 +2315,10 @@ static int read_handshake_compute_node(socket_info *info)
 		info->index = msg[1];
 		size = msg[2];
 
-		message_buffer_destroy(info->in_msg);
+		free(info->in_msg);
 		info->in_msg = NULL;
+		info->in_msg_length = 0;
+		info->in_msg_pos = 0;
 
 		INFO(2, "Received handshake from compute node %d of %d socketfd=%d type=%d state=%d", info->index, size, info->socketfd, info->type, info->state);
 
@@ -1926,33 +2344,32 @@ static int read_handshake_compute_node(socket_info *info)
 
 		if (info->index == 0) {
 			// We send the compute node with rank 0 all information about the clusters.
-			info->out_msg = message_buffer_create(3 * sizeof(uint32_t) + (2*cluster_count+1) * sizeof(int));
+			info->out_msg = malloc(4 * sizeof(uint32_t) + (2*cluster_count+1) * sizeof(int));
+			info->out_msg_pos = 0;
+			info->out_msg_length = 4 * sizeof(uint32_t) + (2*cluster_count+1) * sizeof(int);
 
-			msg = (uint32_t *) message_buffer_direct_write_access(info->out_msg, 3 * sizeof(uint32_t));
+			msg = (uint32_t *) info->out_msg;
 
 			msg[0] = OPCODE_HANDSHAKE_ACCEPTED;
 			msg[1] = cluster_rank;
 			msg[2] = cluster_count;
+			msg[3] = fragment_size;
 
-			error = message_buffer_write(info->out_msg, (unsigned char *)cluster_sizes, cluster_count * sizeof(int));
+			offset = 4 * sizeof(uint32_t);
 
-			if (error != cluster_count * sizeof(int)) {
-				ERROR(1, "Failed to create reply for compute node 0!");
-				close(info->socketfd);
-				return ERROR_HANDSHAKE_FAILED;
-			}
+			memcpy(info->out_msg + offset, (unsigned char *)cluster_sizes, cluster_count * sizeof(int));
 
-			error = message_buffer_write(info->out_msg, (unsigned char *)cluster_offsets, (cluster_count+1) * sizeof(int));
+			offset += cluster_count * sizeof(int);
 
-			if (error != (cluster_count+1) * sizeof(int)) {
-				ERROR(1, "Failed to create reply for compute node 0!");
-				close(info->socketfd);
-				return ERROR_HANDSHAKE_FAILED;
-			}
+			memcpy(info->out_msg + offset, (unsigned char *)cluster_offsets, (cluster_count+1) * sizeof(int));
+
 		} else {
 			// We send the compute node with rank != 0 a simple opcode.
-			info->out_msg = message_buffer_create(sizeof(uint32_t));
-			msg = (uint32_t *) message_buffer_direct_write_access(info->out_msg, 1 * sizeof(uint32_t));
+			info->out_msg = malloc(sizeof(uint32_t));
+			info->out_msg_pos = 0;
+			info->out_msg_length = sizeof(uint32_t);
+
+			msg = (uint32_t *) info->out_msg;
 			msg[0] = OPCODE_HANDSHAKE_ACCEPTED;
 		}
 
@@ -1971,42 +2388,51 @@ static int read_handshake_compute_node(socket_info *info)
 static int write_handshake_compute_node(socket_info *info)
 {
 	int error;
-	ssize_t written;
+	ssize_t written, bytes_left;
 
 	if (info->state != STATE_WRITING_HANDSHAKE) {
 		ERROR(1, "Socket %d in invalid state %d", info->socketfd, info->state);
-		return ERROR_HANDSHAKE_FAILED;
+		return -1; // error
 	}
 
 //	error = perform_non_blocking_write(info);
 
-	written = socket_send_mb(info->socketfd, info->out_msg, 0, false);
+	bytes_left = info->out_msg_length - info->out_msg_pos;
+
+	written = socket_send(info->socketfd, info->out_msg + info->out_msg_pos, bytes_left, false);
 
 	if (written < 0) {
 		ERROR(1, "Failed to write handshake message to compute node!");
-		return ERROR_HANDSHAKE_FAILED;
+		return -1; // error
 	}
 
-	if (message_buffer_max_read(info->out_msg) == 0) {
-		// Full message has been written. Socket will be idle until all nodes have connected.
-		info->state = STATE_IDLE;
+	info->out_msg_pos += written;
+	bytes_left -= written;
 
-		message_buffer_destroy(info->out_msg);
+	if (bytes_left == 0) {
+		// Full message has been written. Socket will be idle until all nodes have connected.
+		free(info->out_msg);
 		info->out_msg = NULL;
+		info->out_msg_length = 0;
+		info->out_msg_pos = 0;
+		info->state = STATE_IDLE;
 
 		error = socket_set_idle(epollfd, info->socketfd, info);
 
 		if (error != 0) {
-			return error;
+			ERROR(1, "Failed to set socket to idle state!");
+			return -1; // error
 		}
 
 		INFO(2, "Handshake with compute node %d of %d completed!", info->index, local_application_size);
 
 		pending_local_connections--;
 		local_connections++;
+
+		return 0; // done
 	}
 
-	return 0;
+	return 1; // wouldblock
 }
 
 
@@ -2035,12 +2461,15 @@ static int accept_new_connection(socket_info *info)
 		return ERROR_ALLOCATE;
 	}
 
-	new_info->in_msg = message_buffer_create(3 * sizeof(uint32_t));
+	// Allocate a temporary message buffer.
+	new_info->in_msg = malloc(3 * sizeof(uint32_t));
 
 	if (new_info->in_msg == NULL) {
 		ERROR(1, "Failed to allocate handshake message!");
 		return ERROR_ALLOCATE;
 	}
+
+	new_info->in_msg_length = 3 * sizeof(uint32_t);
 
 	error = socket_add_to_epoll(epollfd, new_socket, new_info);
 
@@ -2054,7 +2483,6 @@ static int accept_new_connection(socket_info *info)
 	return 0;
 }
 
-
 static int accept_local_connections()
 {
 	int listenfd, error, count, i;
@@ -2065,7 +2493,7 @@ static int accept_local_connections()
 	pending_local_connections = 0;
 
 	// Allocate space for the local connection info.
-	local_compute_nodes = malloc(local_application_size * sizeof(socket_info *));
+	local_compute_nodes = calloc(local_application_size, sizeof(socket_info *));
 
 	if (local_compute_nodes == NULL) {
 		WARN(1, "Failed to allocate space for local compute node connection info!");
@@ -2073,7 +2501,7 @@ static int accept_local_connections()
 		return ERROR_ALLOCATE;
 	}
 
-	memset(local_compute_nodes, 0, local_application_size * sizeof(socket_info *));
+	// memset(local_compute_nodes, 0, local_application_size * sizeof(socket_info *));
 
 	// open local server socket at local_port
 	error = socket_listen(local_port, 0, 0, 100, &listenfd);
@@ -2167,12 +2595,13 @@ static int accept_local_connections()
 			return ERROR_CONNECTION;
 		}
 
-		local_compute_nodes[i]->state = STATE_READ_HEADER;
-		local_compute_nodes[i]->in_msg = message_buffer_create(MESSAGE_HEADER_SIZE);
+		local_compute_nodes[i]->state = STATE_READY;
+		local_compute_nodes[i]->in_msg = NULL;
 	}
 
 	return 0;
 }
+
 
 /*****************************************************************************/
 /*                      Initialization of gateway                            */
@@ -2301,14 +2730,15 @@ static int gateway_init(int argc, char **argv)
 	}
 
 	// All gateway info from this cluster is now send to the server. We allocate space for gateway info for all clusters.
-	gateway_addresses = malloc(sizeof(gateway_address) * cluster_count * gateway_count);
+	// gateway_addresses = malloc(sizeof(gateway_address) * cluster_count * gateway_count);
+	gateway_addresses = calloc(cluster_count * gateway_count, sizeof(gateway_address));
 
 	if (gateway_addresses == NULL) {
 		ERROR(1, "Failed to allocate space for gateway addresses!");
 		return ERROR_ALLOCATE;
 	}
 
-	memset(gateway_addresses, 0, sizeof(gateway_address) * cluster_count * gateway_count);
+	// memset(gateway_addresses, 0, sizeof(gateway_address) * cluster_count * gateway_count);
 
 	// Next, Receives all global gateway info from the server.
 	INFO(2, "Receiving IP information on all gateways from server");
@@ -2323,7 +2753,22 @@ static int gateway_init(int argc, char **argv)
 	// Generate my PID. All ones, except for the cluster rank.
 	my_pid = SET_PID(cluster_rank, 0xFFFFFF);
 
-	INFO(2, "All IP information received -- connecting to other gateways");
+	INFO(2, "All IP information received -- creating message buffers");
+
+	// Init the fragment buffers here.
+	nodes_to_gateway_fragment_buffer = fragment_buffer_create(fragment_size, fragment_count);
+
+	if (nodes_to_gateway_fragment_buffer == NULL) {
+		FATAL("Failed to create nodes_to_gateway_fragment_buffer!");
+	}
+
+	gateway_to_nodes_fragment_buffer = fragment_buffer_create(fragment_size, fragment_count);
+
+	if (gateway_to_nodes_fragment_buffer == NULL) {
+		FATAL("Failed to create gateway_to_nodes_fragment_buffer!");
+	}
+
+	INFO(2, "Connecting to other gateways");
 
 	// Now connect all gateway processes to each other. This assumes a direct connection is possible between each pair of gateways!
 	status = connect_gateways();
@@ -2351,13 +2796,24 @@ static int gateway_init(int argc, char **argv)
 		return status;
 	}
 
-	// We are done talking to the server for now. We add the serverfd to the epollfdf, and perform any additional
+	INFO(2, "All gateways and their compute nodes are ready -- sending the all clear local compute node 0");
+
+	status = send_all_clear();
+
+	if (status != 0) {
+		close(serverfd);
+		return status;
+	}
+
+	// Accept all connections from the local compute nodes.
+
+	// We are done talking to the server for now. We add the serverfd to the epollfd, and perform any additional
 	// communication with the server in an asynchronous fashion.
 
 	INFO(2, "Adding server connection to epoll set");
 
-	server_info->in_msg = message_buffer_create(MESSAGE_HEADER_SIZE);
-	server_info->state = STATE_READ_HEADER;
+	clear_socket_info_in_msg(server_info);
+	clear_socket_info_out_msg(server_info);
 
 	error = socket_set_non_blocking(server_info->socketfd);
 
@@ -2385,39 +2841,135 @@ static int gateway_init(int argc, char **argv)
 	return 0;
 }
 
+//static void handle_incoming_message(socket_info *info)
+//{
+//	// Read produced a message.
+//	if (info->type == TYPE_SERVER) {
+//		enqueue_message_from_server(info);
+//	} else {
+//		enqueue_message_from_compute_node(info);
+//	}
+//}
+
+static void shutdown_compute_node(int index)
+{
+	socket_info *info;
+
+	info = local_compute_nodes[index];
+
+	close(info->socketfd);
+
+	// TODO: cleanup socket_info and print statistics ?
+}
+
+static void shutdown_compute_node_connections()
+{
+	int i;
+
+	for (i=0;i<local_application_size;i++) {
+		shutdown_compute_node(i);
+	}
+}
+
+static int shutdown_gateway_connection(int index)
+{
+	int i;
+	gateway_connection *gw;
+	void *result;
+
+	if (index != cluster_rank) {
+
+		gw = &gateway_connections[index];
+
+		// Tell the sender threads to stop
+		for (i=0;i<gw->stream_count;i++) {
+			set_done_at_socket_info(gw->sockets[i]);
+		}
+
+		// Wait until the sender threads have stopped.
+		for (i=0;i<gw->stream_count;i++) {
+			pthread_join(gw->sockets[i]->send_thread, &result);
+		}
+
+		// Close the sockets. This will upset the receiver ...
+		for (i=0;i<gw->stream_count;i++) {
+			if (gw->sockets[i]->type == TYPE_GATEWAY_TCP) {
+				// close the sending part of the socket, but leave the receiveing part open!
+				shutdown(gw->sockets[i]->socketfd, SHUT_WR);
+			} else if (gw->sockets[i]->type == TYPE_GATEWAY_UDT) {
+				udt4_close(gw->sockets[i]->socketfd);
+			} else {
+				FATAL("INTERNAL ERROR: Unknown socket type in gateway connection %d.%d", index, i);
+			}
+		}
+
+		// Wait until the receiver threads have stopped.
+		for (i=0;i<gw->stream_count;i++) {
+			pthread_join(gw->sockets[i]->receive_thread, &result);
+		}
+
+		// Close the sockets. This will upset the receiver ...
+		for (i=0;i<gw->stream_count;i++) {
+			if (gw->sockets[i]->type == TYPE_GATEWAY_TCP) {
+				// close the entire socket
+				close(gw->sockets[i]->socketfd);
+			} else if (gw->sockets[i]->type == TYPE_GATEWAY_UDT) {
+				// ignored
+			} else {
+				FATAL("INTERNAL ERROR: Unknown socket type in gateway connection %d.%d", index, i);
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int shutdown_gateway_connections()
+{
+	int i, status;
+
+	for (i=0;i<cluster_count;i++) {
+		status = shutdown_gateway_connection(i);
+
+		if (status != CONNECT_OK) {
+			WARN(1, "Failed to disconnect to gateway %d (error=%d)", i, status);
+		}
+	}
+
+	return 0;
+}
 
 
 static int process_messages()
 {
-	int i, error, count, active_connections;
+	int i, error, count;
 	struct epoll_event *events;
 	socket_info *info;
-	message_buffer *m;
-	bool disconnect;
 	uint32_t event;
 	uint64_t now, last_print;
+	bool keep_going = true;
 
 	application_start_time = current_time_micros();
 	last_print = application_start_time;
 
-	// Allocate space for the events, one per compute node.
-	events = malloc(local_application_size * sizeof(struct epoll_event));
+	// Allocate space for the events, one per compute node plus one for the server.
+	events = malloc((local_application_size+1) * sizeof(struct epoll_event));
 
 	if (events == NULL) {
 		ERROR(1, "Failed to allocate space for epoll events!");
 		return ERROR_ALLOCATE;
 	}
 
-	active_connections = local_application_size + 1;
+	while (keep_going) {
 
-	while (active_connections > 1) {
-
-		count = epoll_wait(epollfd, events, local_application_size, 500);
+		count = epoll_wait(epollfd, events, local_application_size+1, EPOLL_TIMEOUT);
 
 		if (count < 0) {
 			ERROR(1, "Failed to wait for socket event!");
 			return ERROR_POLL;
 		}
+
+INFO(1, "GATEWAY epoll returned %d events", count);
 
 		if (count > 0) {
 			for (i=0;i<count;i++) {
@@ -2426,52 +2978,54 @@ static int process_messages()
 				event = events[i].events;
 
 				if ((event & (EPOLLERR | EPOLLHUP)) != 0) {
-					// Error or hang up occurred in file descriptor!
+					// Error or hang up occurred in this socket!
 					ERROR(1, "Unexpected error/hangup on connection to compute node %d", info->index);
 					return ERROR_POLL;
 				}
 
 				if (event & EPOLLOUT) {
-					error = write_message(info);
+					// This socket has room to write some data.
+					error = write_message(info, false);
 
-					if (error != 0) {
-						ERROR(1, "Failed to handle event on connection to compute node %d (error=%d)", i, error);
+					if (error == -1) {
+						ERROR(1, "Failed to handle write event on connection to compute node %d (error=%d)", i, error);
 						return ERROR_CONNECTION;
 					}
 				}
 
 				if (event & EPOLLIN) {
-					m = NULL;
+					// This socket has room to read some data.
+					error = read_message(info, false);
 
-					// We only read data from this compute node if it hasn't got too much data waiting to be send.
-					error = read_message(info, false, &m, &disconnect);
-
-					if (error != 0) {
-						ERROR(1, "Failed to handle event on connection to compute node %d (error=%d)", i, error);
-						return ERROR_CONNECTION;
-					}
-
-					if (m != NULL) {
-						// Read produced a message.
+					switch (error) {
+					case 0: // Complete message: determine type and queue it.
 						if (info->type == TYPE_SERVER) {
-							enqueue_message_from_server(m);
+							keep_going = enqueue_message_from_server(info);
 						} else {
-							enqueue_message_from_compute_node(m);
+							enqueue_message_from_compute_node(info);
 						}
-					}
+						break;
 
-					if (disconnect) {
-						if (info->state == STATE_TERMINATING) {
-							// Disconnect was expected!
-							INFO(1, "Disconnecting compute node %d", info->index);
-							socket_remove_from_epoll(epollfd, info->socketfd);
-							close(info->socketfd);
-							info->state = STATE_TERMINATED;
-							active_connections--;
-						} else {
+					case 1: // Would block: so continue loop to next epoll_wait
+						break;
+
+					case 2: // Disconnect: this should not happen!
+//						if (info->state == STATE_TERMINATING) {
+//							// Disconnect was expected!
+//							INFO(1, "Disconnecting compute node %d", info->index);
+//							socket_remove_from_epoll(epollfd, info->socketfd);
+//							close(info->socketfd);
+//							info->state = STATE_TERMINATED;
+//							active_connections--;
+//						} else {
 							ERROR(1, "Unexpected termination of link to compute node %d", info->index);
 							return ERROR_CONNECTION;
-						}
+//						}
+//						break;
+
+					default: // Also case -1, error
+						ERROR(1, "Failed to handle event on connection to compute node %d (error=%d)", i, error);
+						return ERROR_CONNECTION;
 					}
 				}
 			}
@@ -2486,8 +3040,15 @@ static int process_messages()
 		}
 	}
 
+	// Disconnect all compute nodes
+	shutdown_compute_node_connections();
+
+	// Disconnect all gateways
+	shutdown_gateway_connections();
+
 	// We should now have 1 active connection left (to the server)
-	cleanup();
+	close(epollfd);
+	close(serverfd);
 
 	return 0;
 }

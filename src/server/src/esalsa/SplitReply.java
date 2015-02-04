@@ -2,7 +2,7 @@ package esalsa;
 
 import java.io.IOException;
 
-public class SplitReply extends Message {
+public class SplitReply extends ServerMessage {
 
     // These a the new virtual communicator values.
     public final int newComm;
@@ -26,8 +26,8 @@ public class SplitReply extends Message {
     public final int [] memberClusterIndex;
     public final int [] localRanks;
     
-    SplitReply(int destinationPID) {
-        super(Protocol.OPCODE_SPLIT_REPLY, 0xFFFFFFFF, destinationPID, 7*4);
+    SplitReply() {
+        super(Protocol.OPCODE_SPLIT_REPLY, 7*4);
         this.newComm = -1;
         this.color = -1;
         this.rank = 0;
@@ -43,14 +43,13 @@ public class SplitReply extends Message {
         this.localRanks = null;
     }
     
-    SplitReply(int destinationPID, 
-               int newComm, int rank, int size,
+    SplitReply(int newComm, int rank, int size,
                int color, int key,
                int clusterCount, int flags,
                int [] coordinators, int [] clusterSizes, int [] members,
                int [] clusterRanks, int [] memberClusterIndex, int [] localRanks) {
 
-        super(Protocol.OPCODE_SPLIT_REPLY, 0xFFFFFFFF, destinationPID, 7*4 + clusterCount*4*3 + size*4*3);
+        super(Protocol.OPCODE_SPLIT_REPLY, 7*4 + clusterCount*4*3 + size*4*3);
 
         this.newComm = newComm;
         this.rank = rank;

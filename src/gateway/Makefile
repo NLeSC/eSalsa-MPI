@@ -1,6 +1,6 @@
 include ../../empi.config
 
-OBJECTS = gateway.o udt4.o udt_util.o
+OBJECTS = fragments_buffer.o udt4.o udt_util.o gateway.o 
 
 LIBDIR  = $(EMPI_HOME)/lib
 

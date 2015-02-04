@@ -24,7 +24,7 @@ import java.io.IOException;
  * @since 1.0
  *
  */
-public class CommunicatorRequest extends Message {
+public class CommunicatorRequest extends ServerMessage {
 
     /** Target communicator. */
     public final int communicator;

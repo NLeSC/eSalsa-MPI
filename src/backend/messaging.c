@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <netdb.h>
 #include <string.h>
 #include <unistd.h>
@@ -43,9 +44,11 @@
 // Available sequence numbers is 2^32
 #define SEQUENCE_NUMBERS (0x80000000)
 
-#define MAX_PENDING_BYTES (16*1024*1024)
+// The size of the send window.
+#define MAX_PENDING_BYTES (128*1024*1024)
 
-#define MAX_PENDING_MESSAGES (MAX_PENDING_BYTES / MESSAGE_SIZE)
+// The point at which an ACK is send (2=halfway buffer, 4=quarter buffer, etc).
+#define ACK_POINT (8)
 
 // Size of the node cache in the receive request queue (shared by all).
 #define RECEIVE_REQUEST_QUEUE_CACHE_SIZE (16)
@@ -56,7 +59,7 @@
 // A generic server message.
 typedef struct {
 	int opcode;  // opcode of operation
-	int length;  // length of the message, including this header
+	int length; // length of the entire message, including this header. (NOTE: may be much larger than fragment_size)
 } server_message;
 
 #define SERVER_MSG_SIZE (2*sizeof(int))
@@ -296,17 +299,7 @@ static int read_config_file() {
 
 int messaging_init(int rank, int size, int *argc, char ***argv) {
 	int error, i;
-	uint32_t msg[3];
-
-	receive_fragment = (generic_message *) malloc(MESSAGE_SIZE);
-	receive_fragment_pos = 0;
-
-
-	send_fragment = (generic_message *) malloc(MESSAGE_SIZE);
-	send_fragment->flags = SET_MAGIC(0);
-	send_fragment_connection_index = -1;
-	send_fragment_pos = 0;
-	fragment_size = (MESSAGE_SIZE - GENERIC_MESSAGE_SIZE);
+	uint32_t msg[4];
 
 	active_connections = calloc(INITIAL_ACTIVE_CONNECTIONS_SIZE, sizeof(virtual_connection *));
 	active_connections_size = INITIAL_ACTIVE_CONNECTIONS_SIZE;
@@ -362,21 +355,17 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 		msg[1] = rank;
 		msg[2] = size;
 
-		error = socket_sendfully(gatewayfd, (unsigned char *) &msg,
-				3 * sizeof(uint32_t));
+		error = socket_sendfully(gatewayfd, (unsigned char *) &msg, 3 * sizeof(uint32_t));
 
 		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to complete handshake with gateway! (error=%d)",
-					error);
+			ERROR(1, "Failed to complete handshake with gateway! (error=%d)", error);
 			return EMPI_ERR_GATEWAY;
 		}
 
-		error = socket_receivefully(gatewayfd, (unsigned char *) &msg,
-				3 * sizeof(uint32_t));
+		error = socket_receivefully(gatewayfd, (unsigned char *) &msg, 4 * sizeof(uint32_t));
 
 		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to complete handshake with gateway! (error=%d)",
-					error);
+			ERROR(1, "Failed to complete handshake with gateway! (error=%d)", error);
 			return EMPI_ERR_GATEWAY;
 		}
 
@@ -388,6 +377,7 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 
 		cluster_rank = msg[1];
 		cluster_count = msg[2];
+		fragment_size = msg[3];
 	}
 
 	// Tell everyone about how many clusters there are.
@@ -405,6 +395,25 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 		return EMPI_ERR_INTERN;
 	}
 
+	error = PMPI_Bcast(&fragment_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	if (error != MPI_SUCCESS) {
+		ERROR(1, "Failed to broadcast fragment_size! (error=%d)", error);
+		return EMPI_ERR_INTERN;
+	}
+
+	WARN(1, "Cluster rank = %d", cluster_rank);
+	WARN(1, "Cluster count = %d", cluster_count);
+	WARN(1, "Fragment size = %d", fragment_size);
+
+	// Allocate space for send / receive fragments
+	receive_fragment = (generic_message *) malloc(fragment_size);
+	receive_fragment_pos = 0;
+
+	send_fragment = (generic_message *) malloc(fragment_size);
+	send_fragment_connection_index = -1;
+	send_fragment_pos = 0;
+
 	// Allocate space for the cluster information
 	cluster_sizes = malloc(cluster_count * sizeof(int));
 	cluster_offsets = malloc((cluster_count + 1) * sizeof(int));
@@ -417,8 +426,7 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 	// Rank 0 receives cluster information from the gateway
 	if (rank == 0) {
 
-		error = socket_receivefully(gatewayfd, (unsigned char *) cluster_sizes,
-				cluster_count * sizeof(int));
+		error = socket_receivefully(gatewayfd, (unsigned char *) cluster_sizes, cluster_count * sizeof(int));
 
 		if (error != SOCKET_OK) {
 			ERROR(1, "Failed to receive cluster sizes from gateway! (error=%d)",
@@ -439,16 +447,14 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 	}
 
 	// Tell everyone about the cluster sizes and offsets.
-	error = PMPI_Bcast(cluster_sizes, cluster_count, MPI_INT, 0,
-	MPI_COMM_WORLD);
+	error = PMPI_Bcast(cluster_sizes, cluster_count, MPI_INT, 0, MPI_COMM_WORLD);
 
 	if (error != MPI_SUCCESS) {
 		ERROR(1, "Failed to broadcast cluster sizes! (error=%d)", error);
 		return EMPI_ERR_INTERN;
 	}
 
-	error = PMPI_Bcast(cluster_offsets, (cluster_count + 1), MPI_INT, 0,
-	MPI_COMM_WORLD);
+	error = PMPI_Bcast(cluster_offsets, (cluster_count + 1), MPI_INT, 0, MPI_COMM_WORLD);
 
 	if (error != MPI_SUCCESS) {
 		ERROR(1, "Failed to broadcast cluster offsets! (error=%d)", error);
@@ -478,13 +484,18 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 
 	connections = malloc((total_size + 1) * sizeof(virtual_connection *));
 
-	for (i = 0; i < total_size; i++) {
+	for (i = 0; i < total_size+1; i++) {
 		connections[i] = NULL;
 	}
 
+	// Generate my PID.
+	my_pid = SET_PID(cluster_rank, rank);
+
+	// The server PID is all 1's
+	server_pid = 0xFFFFFFFF;
+
 	// Create a special virtual connection to the server.
-	connections[total_size] = virtual_connection_create(total_size, server_pid,
-			-1, 1);
+	connections[total_size] = virtual_connection_create(total_size, server_pid, -1, 1);
 
 	// Next, all other ranks connect to the gateway
 	if (rank != 0) {
@@ -500,21 +511,17 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 		msg[1] = rank;
 		msg[2] = size;
 
-		error = socket_sendfully(gatewayfd, (unsigned char *) &msg,
-				3 * sizeof(uint32_t));
+		error = socket_sendfully(gatewayfd, (unsigned char *) &msg, 3 * sizeof(uint32_t));
 
 		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to complete handshake with gateway! (error=%d)",
-					error);
+			ERROR(1, "Failed to complete handshake with gateway! (error=%d)", error);
 			return EMPI_ERR_GATEWAY;
 		}
 
-		error = socket_receivefully(gatewayfd, (unsigned char *) &msg,
-				1 * sizeof(uint32_t));
+		error = socket_receivefully(gatewayfd, (unsigned char *) &msg, 1 * sizeof(uint32_t));
 
 		if (error != SOCKET_OK) {
-			ERROR(1, "Failed to complete handshake with gateway! (error=%d)",
-					error);
+			ERROR(1, "Failed to complete handshake with gateway! (error=%d)", error);
 			return EMPI_ERR_GATEWAY;
 		}
 
@@ -525,11 +532,22 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 		}
 	}
 
-	// Generate my PID.
-	my_pid = SET_PID(cluster_rank, rank);
+	// Next, rank 0 waits for the all clear from the gateway.
+	if (rank == 0) {
 
-	// The server PID is all 1's
-	server_pid = 0xFFFFFFFF;
+		error = socket_receivefully(gatewayfd, (unsigned char *) &msg, 1 * sizeof(uint32_t));
+
+		if (error != SOCKET_OK) {
+			ERROR(1, "Failed to complete handshake with gateway! (error=%d)", error);
+			return EMPI_ERR_GATEWAY;
+		}
+
+		if (msg[0] != OPCODE_GATEWAY_READY) {
+			ERROR(1, "Gateway did not give all clear!");
+			close(gatewayfd);
+			return EMPI_ERR_GATEWAY;
+		}
+	}
 
 	// Perform a barrier here, to ensure that the application processes are initialized.
 	error = PMPI_Barrier(MPI_COMM_WORLD);
@@ -584,13 +602,17 @@ static virtual_connection *select_active_connection() {
 			}
 
 			// Calculate the number of pending message fragments. Make sure to wrap around where needed.
-			pending = ((vc->transmit_sequence + SEQUENCE_NUMBERS) - vc->acknowledged_sequence_received) % SEQUENCE_NUMBERS;
+			pending = ((vc->transmit_sequence + SEQUENCE_NUMBERS)
+					- vc->acknowledged_sequence_received) % SEQUENCE_NUMBERS;
 
 			if (pending <= vc->sliding_window_size) {
 				// There is room in the send window for this fragment, so return the connections.
 				return vc;
 			}
-
+			// HIERO
+			//else {
+			//	WARN(1, "VC %d has run out of it window pending=%d window=%d", vc->index, pending, vc->sliding_window_size);
+			//}
 			// Not enough credits, so try the next connection....
 
 		} else {
@@ -615,15 +637,14 @@ static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 			FATAL("Failed to copy active fragment from virtual connection: no data left in message!");
 		}
 
-		// If there are too many byte we fragment the message.
-		if (avail > fragment_size) {
-			avail = fragment_size;
+		// If there are too many bytes we fragment the message.
+		if (avail > (fragment_size - GENERIC_MESSAGE_HEADER_SIZE)) {
+			avail = (fragment_size - GENERIC_MESSAGE_HEADER_SIZE);
 		}
 
 	} else if (vc->force_ack) {
 		// The virtual connection has no data message waiting, but must send an ack for flow control.
 		avail = 0;
-
 	} else {
 		// Should not happen!
 		FATAL("INTERNAL ERROR: selected virtual connection %d with no data to send!", vc->index);
@@ -635,9 +656,12 @@ static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 	m->dst_pid = vc->peer_pid;
 	m->transmit_seq = vc->transmit_sequence;
 	m->ack_seq = vc->receive_sequence;
-	m->length = GENERIC_MESSAGE_SIZE + avail;
+	m->length = GENERIC_MESSAGE_HEADER_SIZE + avail;
 
 	if (avail > 0) {
+		INFO(1, "copy_fragment_to_send peer=%d:%d length=%d offset=%d", GET_CLUSTER_RANK(vc->peer_pid),
+				GET_PROCESS_RANK(vc->peer_pid), avail, vc->send_position);
+
 		// Copy the data to the fragment
 		memcpy(&(m->payload), vc->send_message + vc->send_position, avail);
 
@@ -648,8 +672,12 @@ static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 	// Update the sliding window administration (even if no flow control is used).
 	vc->transmit_sequence = (vc->transmit_sequence + 1) % SEQUENCE_NUMBERS;
 	vc->acknowledged_sequence_sent = vc->receive_sequence;
-	vc->force_ack = false;
 
+//	if (vc->force_ack) {
+//		FATAL("HIERO!");
+//	}
+
+	vc->force_ack = false;
 	return 0;
 }
 
@@ -690,9 +718,11 @@ static int add_active_sender(virtual_connection *vc) {
 		tmp = active_connections;
 
 		// FIXME: change to INFO when done
-		WARN(1, "Increasing size of active connection list from %d to %d", active_connections_size, active_connections_size * 2);
+		WARN(1, "Increasing size of active connection list from %d to %d",
+				active_connections_size, active_connections_size * 2);
 
-		active_connections = calloc(2 * active_connections_size, sizeof(virtual_connection *));
+		active_connections = calloc(2 * active_connections_size,
+				sizeof(virtual_connection *));
 
 		if (active_connections == NULL) {
 			ERROR(0, "Failed to allocate space for active connection index!");
@@ -701,7 +731,8 @@ static int add_active_sender(virtual_connection *vc) {
 
 		active_connections_size = active_connections_size * 2;
 
-		memcpy(active_connections, tmp, active_connections_size * sizeof(virtual_connection *));
+		memcpy(active_connections, tmp,
+				active_connections_size * sizeof(virtual_connection *));
 
 		free(tmp);
 	}
@@ -783,47 +814,72 @@ static int receive_message_fragment() {
 	//
 	// NOTE: the 'no message reordering assumption' has implications for the implementation of the gateway processes!
 
+	int i;
 	size_t to_read;
 	ssize_t bytes_read;
+
+	//INFO(1, "START READ at position %ld", receive_fragment_pos);
 
 	// NOTE: We receive at most one message here.
 	while (true) {
 
 		// Check if there is enough data available for a message header.
-		if (receive_fragment_pos >= GENERIC_MESSAGE_SIZE) {
+		if (receive_fragment_pos >= GENERIC_MESSAGE_HEADER_SIZE) {
 
 			// There should be at least a message header in the buffer!
-			INFO(1, "GOT WA MESSAGE opcode=%d src=%d:%d dst=%d:%d length=%d", receive_fragment->header.opcode,
-					GET_CLUSTER_RANK(receive_fragment->header.src_pid), GET_PROCESS_RANK(receive_fragment->header.src_pid),
-					GET_CLUSTER_RANK(receive_fragment->header.dst_pid), GET_PROCESS_RANK(receive_fragment->header.dst_pid),
-					receive_fragment->header.length);
+//			INFO(1, "GOT WA MESSAGE opcode=%d src=%d:%d dst=%d:%d length=%d", receive_fragment->header.opcode,
+//					GET_CLUSTER_RANK(receive_fragment->header.src_pid), GET_PROCESS_RANK(receive_fragment->header.src_pid),
+//					GET_CLUSTER_RANK(receive_fragment->header.dst_pid), GET_PROCESS_RANK(receive_fragment->header.dst_pid),
+//					receive_fragment->header.length);
 
 			if (receive_fragment_pos == receive_fragment->length) {
 				// There is a complete message in the buffer!
-				INFO(2, "MESSAGE COMPLETE");
+				INFO(1, "MESSAGE RECV COMPLETE for magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d seq=%d ack=%d length=%d",
+						GET_MAGIC0(receive_fragment->flags),
+						GET_MAGIC1(receive_fragment->flags),
+						GET_FLAGS(receive_fragment->flags),
+						GET_OPCODE(receive_fragment->flags),
+						GET_CLUSTER_RANK(receive_fragment->src_pid),
+						GET_PROCESS_RANK(receive_fragment->src_pid),
+						GET_CLUSTER_RANK(receive_fragment->dst_pid),
+						GET_PROCESS_RANK(receive_fragment->dst_pid),
+						receive_fragment->transmit_seq,
+						receive_fragment->ack_seq,
+						receive_fragment->length);
 				return 0;
 			}
 
-			INFO(2, "MESSAGE INCOMPLETE");
 			to_read = receive_fragment->length - receive_fragment_pos;
 		} else {
-			to_read = GENERIC_MESSAGE_SIZE - receive_fragment_pos;
+			to_read = GENERIC_MESSAGE_HEADER_SIZE - receive_fragment_pos;
 		}
 
-		// Not enough data for a complete message, so we poll the socket and attempt to receive some data.
-		bytes_read = socket_receive(gatewayfd, (unsigned char *) receive_fragment, to_read);
+		//INFO(1, "WILL READ %d to position %ld", to_read, receive_fragment_pos);
 
-		if (bytes_read < 0) {
+//		INFO(2, "MESSAGE INCOMPLETE pos=%d len=%d toread=%d", receive_fragment_pos, receive_fragment->length, to_read);
+
+		// Not enough data for a complete message, so we poll the socket and attempt to receive some data.
+		bytes_read = socket_receive(gatewayfd, ((unsigned char *) receive_fragment) + receive_fragment_pos, to_read, false);
+
+		if (bytes_read > 0) {
+			receive_fragment_pos += bytes_read;
+
+			INFO(1, "READ %d position now %ld", bytes_read, receive_fragment_pos);
+		} else if (bytes_read == 0) {
+			// We give up if we fail to read any data and we are in non-blocking mode.
+			return 1;
+		} else { // bytes_read < 0
 			ERROR(1, "Failed to read gateway message!");
 			return EMPI_ERR_GATEWAY;
 		}
 
-		if (bytes_read == 0) {
-			// We give up if we fail to read any data and we are in non-blocking mode.
-			return 1;
-		}
+		//INFO(2, "READ %d bytes", bytes_read);
 
-		receive_fragment_pos += bytes_read;
+		//for (i=0;i<bytes_read;i++) {
+//			INFO(2, " byte[%d]=%d", i, *(((unsigned char *) receive_fragment) + receive_fragment_pos + i));
+		//}
+
+
 	}
 
 	// Unreachable
@@ -843,7 +899,8 @@ static void process_ack_message() {
 
 	index = cluster_offsets[cluster] + process;
 
-	WARN(1, "Received ack for %d:%d with sequence number %ld", cluster, process, receive_fragment->ack_seq);
+	WARN(1, "Received ack for %d:%d with sequence number %ld", cluster, process,
+			receive_fragment->ack_seq);
 
 	vc = connections[index];
 
@@ -857,9 +914,8 @@ static void deliver_data_message(data_message *m) {
 	request *req;
 	unsigned char *buffer;
 
-	DEBUG(4, "Data message received from opcode=%d src_pid=%d dst_pid=%d length=%d comm=%d source=%d dest=%d tag=%d count=%d",
-			m->header.opcode, m->header.src_pid, m->header.dst_pid, m->header.length,
-			m->comm, m->source, m->dest, m->tag, m->count);
+	INFO(4, "Data message received from src=%d dst=%d length=%d comm=%d tag=%d count=%d",
+			m->source, m->dest, m->length, m->comm, m->tag, m->count);
 
 	req = request_queue_dequeue_matching(receive_request_queue, m->comm, m->source, m->tag);
 
@@ -869,7 +925,7 @@ static void deliver_data_message(data_message *m) {
 	}
 
 	// This is the right message, so unpack it into the application buffer.
-	DEBUG(5, "Found matching request. Directly unpacking message to application buffer!");
+	INFO(5, "Found matching request. Directly unpacking message to application buffer!");
 
 	// Get read access to the message
 	buffer = &(m->payload[0]);
@@ -883,9 +939,12 @@ static void deliver_data_message(data_message *m) {
 	req->message_tag = m->tag;
 	req->message_count = m->count;
 	req->flags |= REQUEST_FLAG_COMPLETED;
+
+	free_data_message(m);
 }
 
-static int create_message_to_receive(virtual_connection *vc, uint32_t opcode, size_t length) {
+static int create_message_to_receive(virtual_connection *vc, uint32_t opcode,
+		size_t length) {
 
 	if (vc->receive_message != NULL) {
 		FATAL("INTERNAL ERROR: Attempt do overwrite received data message!");
@@ -920,15 +979,16 @@ static void process_data_fragment() {
 
 	index = cluster_offsets[cluster] + process;
 
-	WARN(1, "Received data message from %d:%d", cluster, process);
+	INFO(1, "Received data message from %d:%d", cluster, process);
 
 	// Next, check if the virtual connection already exists. If not we create one on the fly.
 	if (connections[index] == NULL) {
 
 		// No active connection to cluster:process yet, so create it. FIXME: change to INFO once debugged.
-		WARN(0, "Creating virtual connection to %d:%d", cluster, process);
+		INFO(0, "Creating virtual connection to %d:%d", cluster, process);
 
-		connections[index] = virtual_connection_create(index, pid, MAX_PENDING_MESSAGES, SEND_REQUEST_QUEUE_CACHE_SIZE);
+		connections[index] = virtual_connection_create(index, pid,
+				MAX_PENDING_BYTES / fragment_size, SEND_REQUEST_QUEUE_CACHE_SIZE);
 
 		if (connections[index] == NULL) {
 			FATAL("Failed to create virtual connection to destination %d:%d", cluster, process);
@@ -939,7 +999,8 @@ static void process_data_fragment() {
 
 	// Next, we check the sequence number of the message fragment to make sure we are not receiving out-of-order.
 	if (receive_fragment->transmit_seq != vc->receive_sequence) {
-		FATAL("INTERNAL ERROR: Received message fragment out of order!");
+		FATAL("INTERNAL ERROR: Received message fragment out of order %d != %d !", receive_fragment->transmit_seq,
+				vc->receive_sequence);
 	}
 
 	// Next, we check if the virtual connection has an active receive message. If not we create one.
@@ -957,17 +1018,28 @@ static void process_data_fragment() {
 	// Check if we have exhausted the sliding window. If so, we may need to force the send of an ACK.
 	window_used = ((vc->receive_sequence + SEQUENCE_NUMBERS) - vc->acknowledged_sequence_sent) % SEQUENCE_NUMBERS;
 
-	if (window_used >= vc->sliding_window_size) {
+INFO(1, "Windows used on VC %d window_used=%d last seq rec=%d last ack sent=%d",
+		vc->index, window_used, vc->receive_sequence, vc->acknowledged_sequence_sent);
+
+// FIXME TODO FIXME TODO!!!
+	if (window_used >= vc->sliding_window_size / ACK_POINT) {
 // FIXME: too late ? should ack earlier, as it will take a round trip for the next message to come in!
 		// Force an ack.
+
+INFO(1, "Will FORCE ACK on VC %d window_used=%d last seq rec=%d last ack sent=%d",
+		vc->index, window_used, vc->receive_sequence, vc->acknowledged_sequence_sent);
+
 		vc->force_ack = true;
+		vc->acknowledged_sequence_sent = vc->receive_sequence;
+
 		add_active_sender(vc);
 	}
 
 	// Next we copy the fragment payload to the data message
-	memcpy(vc->receive_message + vc->receive_position, &(receive_fragment->payload), receive_fragment->length);
+	memcpy(vc->receive_message + vc->receive_position, &(receive_fragment->payload),
+			receive_fragment->length-GENERIC_MESSAGE_HEADER_SIZE);
 
-	vc->receive_position += receive_fragment->length;
+	vc->receive_position += receive_fragment->length-GENERIC_MESSAGE_HEADER_SIZE;
 
 	// Check if the data message is complete
 	if (vc->receive_position == vc->receive_length) {
@@ -979,10 +1051,14 @@ static void process_data_fragment() {
 		vc->receive_length = 0;
 		vc->receive_opcode = 0;
 		vc->receive_position = 0;
+	} else {
+		INFO(4, "Data message NOT delivered %d %d!", vc->receive_position, vc->receive_length);
 	}
 }
 
 static void process_server_fragment() {
+
+	// FIXME: merge with process data fragment!!!!
 
 	// We've received an SERVER message reply.
 	virtual_connection *vc;
@@ -1006,7 +1082,8 @@ static void process_server_fragment() {
 	}
 
 	// Next we copy the fragment payload to the data message
-	memcpy(vc->receive_message + vc->receive_position, &(receive_fragment->payload), receive_fragment->length);
+	memcpy(vc->receive_message + vc->receive_position,
+			&(receive_fragment->payload), receive_fragment->length-GENERIC_MESSAGE_HEADER_SIZE);
 
 	// Next, we update the receive sequence number, wrapping around if needed.
 	vc->receive_sequence = (vc->receive_sequence + 1) % SEQUENCE_NUMBERS;
@@ -1016,16 +1093,16 @@ static void process_server_fragment() {
 
 	/* No flow control on server link, so we do not check the window for necessary acks ...
 
-	// Check if we have exhausted the sliding window. If so, we may need to force the send of an ACK.
-	window_used = ((vc->receive_sequence + SEQUENCE_NUMBERS) - vc->acknowledged_sequence_sent) % SEQUENCE_NUMBERS;
+	 // Check if we have exhausted the sliding window. If so, we may need to force the send of an ACK.
+	 window_used = ((vc->receive_sequence + SEQUENCE_NUMBERS) - vc->acknowledged_sequence_sent) % SEQUENCE_NUMBERS;
 
-	if (window_used >= vc->sliding_window_size) {
-		// Force an ack.
-		vc->force_ack = true;
-		add_active_sender(vc);
-	}
+	 if (window_used >= vc->sliding_window_size) {
+	 // Force an ack.
+	 vc->force_ack = true;
+	 add_active_sender(vc);
+	 }
 
-	*/
+	 */
 
 	vc->receive_position += receive_fragment->length;
 }
@@ -1033,6 +1110,7 @@ static void process_server_fragment() {
 static int poll_receive() {
 
 	int result;
+	int opcode;
 
 	while (true) {
 
@@ -1046,19 +1124,24 @@ static int poll_receive() {
 			return -1;
 		}
 
-		// We have received a message fragment here, so now figure out what to do with it...
-		if (GET_OPCODE(receive_fragment->flags) == OPCODE_DATA) {
+		opcode = GET_OPCODE(receive_fragment->flags);
+
+		switch (opcode) {
+		case OPCODE_DATA:
 			// We've received a data message fragment, so forward it to the demux and defrag layer.
 			process_data_fragment();
-		} else if (GET_OPCODE(receive_fragment->flags) == OPCODE_SERVER) {
+			break;
+		case OPCODE_SERVER:
 			// We've received a server message fragment, so forward it to the demux and defrag layer.
 			process_server_fragment();
-		} else if (GET_OPCODE(receive_fragment->flags) == OPCODE_ACK) {
+			break;
+		case OPCODE_ACK:
 			// We've received an ACK message, so process it.
 			process_ack_message();
-		} else {
+			break;
+		default:
 			// We've received an unknown message type, so complain about it!
-			ERROR(0, "Received generic message with unknown opcode!");
+			FATAL("Received generic message with unknown opcode: %d!", opcode);
 			return -1;
 		}
 
@@ -1111,10 +1194,12 @@ static int create_data_message_to_send(virtual_connection *vc) {
 
 	// Copy the data to the message
 	tmp = 0;
-	error = PMPI_Pack(req->buf, req->count, req->type->type, &(m->payload), bytes, &tmp, req->c->comm);
+	error = PMPI_Pack(req->buf, req->count, req->type->type, &(m->payload),
+			bytes, &tmp, req->c->comm);
 
 	if (error != MPI_SUCCESS) {
-		ERROR(1, "Failed to pack payload into data message! (error=%d)", TRANSLATE_ERROR(error));
+		ERROR(1, "Failed to pack payload into data message! (error=%d)",
+				TRANSLATE_ERROR(error));
 		return -1;
 	}
 
@@ -1124,7 +1209,6 @@ static int create_data_message_to_send(virtual_connection *vc) {
 
 	return 0;
 }
-
 
 static void finish_active_message_fragment() {
 	virtual_connection *tmp;
@@ -1137,17 +1221,27 @@ static void finish_active_message_fragment() {
 
 		if (send_fragment_connection_index == total_size) {
 
+INFO(1, "finish_active_message_fragment SERVER");
+
 			// this is the server link, so only one send at a time and no request used.
 			tmp->send_message = NULL;
+			tmp->send_length = 0;
 			remove_active_sender(tmp);
 
 		} else {
-			// complete request
-			tmp->current_send_request->flags |= REQUEST_FLAG_COMPLETED;
 
-			// Free data message
-			free(tmp->send_message);
-			tmp->send_position = 0;
+INFO(1, "finish_active_message_fragment COMPUTE NODE");
+
+			// Check if there was a send request (will be NULL for a forced ACK)
+			if (tmp->current_send_request != NULL) {
+				// complete request
+				tmp->current_send_request->flags |= REQUEST_FLAG_COMPLETED;
+
+				// Free data message
+				free(tmp->send_message);
+				tmp->send_position = 0;
+				tmp->send_length = 0;
+			}
 
 			// Dequeue next message if possible.
 			tmp->current_send_request = request_queue_dequeue(tmp->send_request_queue);
@@ -1158,6 +1252,7 @@ static void finish_active_message_fragment() {
 			} else {
 				// No more send requests, so remove this connection from the list of active connections.
 				tmp->send_message = NULL;
+				tmp->send_length = 0;
 				remove_active_sender(tmp);
 			}
 		}
@@ -1177,25 +1272,41 @@ static int write_active_fragment() {
 
 		if (send_fragment_pos == send_fragment->length) {
 			// Fragment is written completely, so return 'done'.
+			INFO(1, "MESSAGE SEND COMPLETE for magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d seq=%d ack=%d length=%d",
+									GET_MAGIC0(send_fragment->flags),
+									GET_MAGIC1(send_fragment->flags),
+									GET_FLAGS(send_fragment->flags),
+									GET_OPCODE(send_fragment->flags),
+									GET_CLUSTER_RANK(send_fragment->src_pid),
+									GET_PROCESS_RANK(send_fragment->src_pid),
+									GET_CLUSTER_RANK(send_fragment->dst_pid),
+									GET_PROCESS_RANK(send_fragment->dst_pid),
+									send_fragment->transmit_seq,
+									send_fragment->ack_seq,
+									send_fragment->length);
+
 			return 0;
 		}
 
 		// Write as much of the fragment as we can.
 		written = socket_send(gatewayfd, ((unsigned char *) send_fragment) + send_fragment_pos,
-				send_fragment->length - send_fragment_pos);
+				send_fragment->length - send_fragment_pos, false);
 
-		if (written < 0) {
-			ERROR(1, "Failed to write message fragment");
-			// Write failed so return 'error'
-			return -1;
-		}
+		if (written > 0) {
+			// Successfull, so update position.
+			send_fragment_pos += written;
 
-		if (written == 0) {
+			INFO(1, "WROTE %d bytes, position now %ld length %d", written, send_fragment_pos, send_fragment->length);
+
+
+		} else if (written == 0) {
 			// No data written, so return 'wouldblock'
 			return 1;
+		} else { // if (written < 0) {
+			// Write failed so return 'error'
+			ERROR(1, "Failed to write message fragment");
+			return -1;
 		}
-
-		send_fragment_pos += written;
 	}
 }
 
@@ -1281,7 +1392,8 @@ static int messaging_send_nonblocking(void* buf, int count, datatype *t, int des
 		// No active connection to cluster:process yet, so create it. FIXME: change to INFO once debugged.
 		WARN(0, "Creating virtual connection to %d:%d", cluster, process);
 
-		connections[index] = virtual_connection_create(index, pid, MAX_PENDING_MESSAGES, SEND_REQUEST_QUEUE_CACHE_SIZE);
+		connections[index] = virtual_connection_create(index, pid,
+				MAX_PENDING_BYTES / fragment_size, SEND_REQUEST_QUEUE_CACHE_SIZE);
 
 		if (connections[index] == NULL) {
 			ERROR(1, "Failed to create virtual connection to destination %d:%d", cluster, process);
@@ -1311,7 +1423,7 @@ static int messaging_send_nonblocking(void* buf, int count, datatype *t, int des
 	// Next, poke the network and hope we send some data.
 	error = messaging_poll();
 
-	if (error != -1) {
+	if (error != 0) {
 		ERROR(1, "Failed to process pending send operation!");
 		return MPI_ERR_INTERN;
 	}
@@ -1352,11 +1464,13 @@ static int messaging_send_blocking(void* buf, int count, datatype *t, int dest,
 }
 
 // Send a wide area DATA message.
-int messaging_send(void* buf, int count, datatype *t, int dest, int tag, communicator* c, request *req, bool needs_ack) {
+int messaging_send(void* buf, int count, datatype *t, int dest, int tag,
+		communicator* c, request *req, bool needs_ack) {
 	DEBUG(1, "Forwarding message to gateway");
 
 	if (needs_ack) {
-		WARN(1, "Message ACK not implemented yet (needed for MPI_Ssend and friends)");
+		WARN(1,
+				"Message ACK not implemented yet (needed for MPI_Ssend and friends)");
 	}
 
 	if (req == NULL) {
@@ -1367,7 +1481,8 @@ int messaging_send(void* buf, int count, datatype *t, int dest, int tag, communi
 }
 
 // Blocking receive for a wide area message.
-int messaging_receive(void *buf, int count, datatype *t, int source, int tag, EMPI_Status *status, communicator* c) {
+int messaging_receive(void *buf, int count, datatype *t, int source, int tag,
+		EMPI_Status *status, communicator* c) {
 	int error;
 	data_message *m;
 	request *req;
@@ -1409,12 +1524,14 @@ int messaging_receive(void *buf, int count, datatype *t, int source, int tag, EM
 }
 
 // Broadcast a message to all cluster coordinators in the communicator.
-int messaging_bcast(void* buf, int count, datatype *t, int root, communicator* c) {
+int messaging_bcast(void* buf, int count, datatype *t, int root,
+		communicator* c) {
 	int i, error;
 
 	for (i = 0; i < cluster_count; i++) {
 		if (i != cluster_rank) {
-			error = messaging_send(buf, count, t, c->coordinators[i], BCAST_TAG, c, NULL, false);
+			error = messaging_send(buf, count, t, c->coordinators[i], BCAST_TAG,
+					c, NULL, false);
 			// error = do_send(OPCODE_COLLECTIVE_BCAST, buf, count, t, c->coordinators[i], BCAST_TAG, c);
 
 			if (error != EMPI_SUCCESS) {
@@ -1428,8 +1545,10 @@ int messaging_bcast(void* buf, int count, datatype *t, int root, communicator* c
 }
 
 // Receive a broadcast message on the cluster coordinators.
-int messaging_bcast_receive(void *buf, int count, datatype *t, int root, communicator* c) {
-	return messaging_receive(buf, count, t, root, BCAST_TAG, EMPI_STATUS_IGNORE, c);
+int messaging_bcast_receive(void *buf, int count, datatype *t, int root,
+		communicator* c) {
+	return messaging_receive(buf, count, t, root, BCAST_TAG, EMPI_STATUS_IGNORE,
+			c);
 }
 
 /*
@@ -1468,8 +1587,9 @@ int messaging_poll_receive_queue(request *r) {
 		r->message_tag = m->tag;
 		r->message_count = m->count;
 
-		r->error = TRANSLATE_ERROR(PMPI_Unpack(&(m->payload[0]), m->length-DATA_MESSAGE_SIZE, &position, r->buf, r->count,
-				r->type->type, r->c->comm));
+		r->error =
+				TRANSLATE_ERROR(
+						PMPI_Unpack(&(m->payload[0]), m->length-DATA_MESSAGE_SIZE, &position, r->buf, r->count, r->type->type, r->c->comm));
 
 		r->flags |= REQUEST_FLAG_COMPLETED;
 		free_data_message(m);
@@ -1538,7 +1658,8 @@ static int wait_for_server_reply(int opcode) {
 	}
 
 	// Wait until the message is complete
-	while (connections[total_size]->receive_position < connections[total_size]->receive_length) {
+	while (connections[total_size]->receive_position
+			< connections[total_size]->receive_length) {
 		error = messaging_poll();
 
 		if (error != 0) {
@@ -1588,14 +1709,14 @@ int messaging_comm_split_send(communicator* c, int color, int key) {
 	}
 
 	req->header.opcode = OPCODE_SPLIT;
-	req->header.length = SPLIT_REQUEST_MSG_SIZE;
 
+	req->header.length = SPLIT_REQUEST_MSG_SIZE;
 	req->comm = c->handle;
 	req->src = c->global_rank;
 	req->color = color;
 	req->key = key;
 
-	error = messaging_send_server((server_message *)req);
+	error = messaging_send_server((server_message *) req);
 
 	free(req);
 
@@ -1651,22 +1772,24 @@ int messaging_comm_split_receive(comm_reply *reply) {
 	DEBUG(1, "*Received comm reply (newComm=%d rank=%d size=%d color=%d key=%d cluster_count=%d flag=%d)",
 			reply->newComm, reply->rank, reply->size, reply->color, reply->key, reply->cluster_count, reply->flags);
 
-	reply->coordinators = copy_int_array((int *) &(msg->payload[0]), 0, reply->cluster_count);
+	reply->coordinators = copy_int_array((int *) &(msg->payload[0]), 0,
+			reply->cluster_count);
 
 	if (reply->coordinators == NULL) {
 		ERROR(1, "Failed to allocate or receive coordinators");
 		return EMPI_ERR_INTERN;
 	}
 
-	reply->cluster_sizes = copy_int_array((int *) &(msg->payload[0]), reply->cluster_count,
-			reply->cluster_count);
+	reply->cluster_sizes = copy_int_array((int *) &(msg->payload[0]),
+			reply->cluster_count, reply->cluster_count);
 
 	if (reply->cluster_sizes == NULL) {
 		ERROR(1, "Failed to allocate or receive cluster sizes");
 		return EMPI_ERR_INTERN;
 	}
 
-	reply->cluster_ranks = copy_int_array((int *) &(msg->payload[0]), 2 * reply->cluster_count, reply->cluster_count);
+	reply->cluster_ranks = copy_int_array((int *) &(msg->payload[0]),
+			2 * reply->cluster_count, reply->cluster_count);
 
 	if (reply->cluster_ranks == NULL) {
 		ERROR(1, "Failed to allocate or receive cluster ranks");
@@ -1675,26 +1798,31 @@ int messaging_comm_split_receive(comm_reply *reply) {
 
 	if (reply->size > 0) {
 
-		reply->members = (uint32_t *) copy_int_array((int *) &(msg->payload[0]), 3 * reply->cluster_count, reply->size);
+		reply->members = (uint32_t *) copy_int_array((int *) &(msg->payload[0]),
+				3 * reply->cluster_count, reply->size);
 
 		if (reply->members == NULL) {
 			ERROR(1, "Failed to allocate or receive communicator members");
 			return EMPI_ERR_INTERN;
 		}
 
-		reply->member_cluster_index = (uint32_t *) copy_int_array((int *) &(msg->payload[0]),
+		reply->member_cluster_index = (uint32_t *) copy_int_array(
+				(int *) &(msg->payload[0]),
 				3 * reply->cluster_count + reply->size, reply->size);
 
 		if (reply->member_cluster_index == NULL) {
-			ERROR(1, "Failed to allocate or receive communicator member cluster index");
+			ERROR(1,
+					"Failed to allocate or receive communicator member cluster index");
 			return EMPI_ERR_INTERN;
 		}
 
-		reply->local_ranks = (uint32_t *) copy_int_array((int *)&(msg->payload[0]),
+		reply->local_ranks = (uint32_t *) copy_int_array(
+				(int *) &(msg->payload[0]),
 				3 * reply->cluster_count + 2 * reply->size, reply->size);
 
 		if (reply->local_ranks == NULL) {
-			ERROR(1, "Failed to allocate or receive communicator member local ranks");
+			ERROR(1,
+					"Failed to allocate or receive communicator member local ranks");
 			return EMPI_ERR_INTERN;
 		}
 	} else {
@@ -1739,7 +1867,7 @@ int messaging_comm_create_send(communicator* c, group *g) {
 
 	DEBUG(1, "Group request header %d %d %d %d %d", req->header.opcode, req->header.length, req->comm, req->src, req->size);
 
-	error = messaging_send_server((server_message *)req);
+	error = messaging_send_server((server_message *) req);
 
 	free(req);
 
@@ -1795,21 +1923,24 @@ int messaging_comm_create_receive(group_reply *reply) {
 
 	if (reply->type == GROUP_TYPE_ACTIVE) {
 
-		reply->coordinators = copy_int_array((int *)&(msg->payload[0]), 0, reply->cluster_count);
+		reply->coordinators = copy_int_array((int *) &(msg->payload[0]), 0,
+				reply->cluster_count);
 
 		if (reply->coordinators == NULL) {
 			ERROR(1, "Failed to allocate or receive coordinators");
 			return EMPI_ERR_INTERN;
 		}
 
-		reply->cluster_sizes = copy_int_array((int *)&(msg->payload), reply->cluster_count, reply->cluster_count);
+		reply->cluster_sizes = copy_int_array((int *) &(msg->payload),
+				reply->cluster_count, reply->cluster_count);
 
 		if (reply->cluster_sizes == NULL) {
 			ERROR(1, "Failed to allocate or receive cluster sizes");
 			return EMPI_ERR_INTERN;
 		}
 
-		reply->cluster_ranks = copy_int_array((int *) &(msg->payload[0]), 2 * reply->cluster_count, reply->cluster_count);
+		reply->cluster_ranks = copy_int_array((int *) &(msg->payload[0]),
+				2 * reply->cluster_count, reply->cluster_count);
 
 		if (reply->cluster_ranks == NULL) {
 			ERROR(1, "Failed to allocate or receive cluster ranks");
@@ -1818,26 +1949,32 @@ int messaging_comm_create_receive(group_reply *reply) {
 
 		if (reply->size > 0) {
 
-			reply->members = (uint32_t *) copy_int_array((int *)&(msg->payload[0]), 3 * reply->cluster_count, reply->size);
+			reply->members = (uint32_t *) copy_int_array(
+					(int *) &(msg->payload[0]), 3 * reply->cluster_count,
+					reply->size);
 
 			if (reply->members == NULL) {
 				ERROR(1, "Failed to allocate or receive communicator members");
 				return EMPI_ERR_INTERN;
 			}
 
-			reply->member_cluster_index = (uint32_t *) copy_int_array((int *)&(msg->payload[0]),
+			reply->member_cluster_index = (uint32_t *) copy_int_array(
+					(int *) &(msg->payload[0]),
 					3 * reply->cluster_count + reply->size, reply->size);
 
 			if (reply->member_cluster_index == NULL) {
-				ERROR(1, "Failed to allocate or receive communicator member cluster index");
+				ERROR(1,
+						"Failed to allocate or receive communicator member cluster index");
 				return EMPI_ERR_INTERN;
 			}
 
-			reply->local_ranks = (uint32_t *) copy_int_array((int *)&(msg->payload[0]),
+			reply->local_ranks = (uint32_t *) copy_int_array(
+					(int *) &(msg->payload[0]),
 					3 * reply->cluster_count + 2 * reply->size, reply->size);
 
 			if (reply->local_ranks == NULL) {
-				ERROR(1, "Failed to allocate or receive communicator member local ranks");
+				ERROR(1,
+						"Failed to allocate or receive communicator member local ranks");
 				return EMPI_ERR_INTERN;
 			}
 		} else {
@@ -1878,7 +2015,7 @@ int messaging_comm_dup_send(communicator* c) {
 	req->comm = c->handle;
 	req->src = c->global_rank;
 
-	error = messaging_send_server((server_message *)req);
+	error = messaging_send_server((server_message *) req);
 
 	free(req);
 
@@ -1933,7 +2070,7 @@ int messaging_comm_free_send(communicator* c) {
 	req->comm = c->handle;
 	req->src = c->global_rank;
 
-	error = messaging_send_server((server_message *)req);
+	error = messaging_send_server((server_message *) req);
 
 	free(req);
 
@@ -1946,10 +2083,11 @@ int messaging_finalize() {
 	int error;
 	finalize_request_msg *req;
 	communicator *c;
+	unsigned char buffer;
 
 	c = handle_to_communicator(0);
 
-	DEBUG(1, "Sending finalize request %d:%d", c->handle, c->global_rank);
+	INFO(1, "Sending finalize request %d:%d %ld %ld ", c->handle, c->global_rank, sizeof(finalize_request_msg), FINALIZE_REQUEST_MSG_SIZE);
 
 	req = (finalize_request_msg *) malloc(FINALIZE_REQUEST_MSG_SIZE);
 
@@ -1964,7 +2102,7 @@ int messaging_finalize() {
 	req->comm = c->handle;
 	req->src = c->global_rank;
 
-	error = messaging_send_server((server_message *)req);
+	error = messaging_send_server((server_message *) req);
 
 	free(req);
 
@@ -1973,27 +2111,31 @@ int messaging_finalize() {
 		return EMPI_ERR_INTERN;
 	}
 
-	DEBUG(1, "Finalize request %d:%d send", c->handle, c->global_rank);DEBUG(1, "Receiving finalize reply %d:%d send",
+	INFO(1, "Finalize request %d:%d send", c->handle, c->global_rank);DEBUG(1, "Receiving finalize reply %d:%d send",
 			c->handle, c->global_rank);
 
-	error = wait_for_server_reply(OPCODE_FINALIZE_REPLY);
+	// Wait for the gateway to disconnect.
+	error = socket_receive(gatewayfd, &buffer, 1, true);
 
-	if (error != EMPI_SUCCESS) {
-		return error;
+	// error = wait_for_server_reply(OPCODE_FINALIZE_REPLY);
+
+	if (error != SOCKET_DISCONNECT) {
+		WARN(1, "Failed to cleanly disconnect from gateway error=%d", error);
 	}
 
-	connections[total_size]->receive_message = NULL;
-	connections[total_size]->receive_opcode = 0;
-	connections[total_size]->receive_length = 0;
-	connections[total_size]->receive_position = 0;
+	//connections[total_size]->receive_message = NULL;
+	//connections[total_size]->receive_opcode = 0;
+	//connections[total_size]->receive_length = 0;
+	//connections[total_size]->receive_position = 0;
 
-	DEBUG(1, "Received finalize reply %d:%d send", c->handle, c->global_rank);
+	INFO(1, "Gateway disconnected as expected");
 
-	error = PMPI_Barrier(MPI_COMM_WORLD);
+	// Do we need this barrier ?
+	// error = PMPI_Barrier(MPI_COMM_WORLD);
 	error = PMPI_Finalize();
 
 	if (error != MPI_SUCCESS) {
-		ERROR(1, "INTERNAL ERROR: failed to perform FINALIZE of local MPI! (error=%d)",	error);
+		ERROR(1, "INTERNAL ERROR: failed to perform FINALIZE of local MPI! (error=%d)", error);
 		return TRANSLATE_ERROR(error);
 	}
 

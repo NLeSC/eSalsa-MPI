@@ -1,6 +1,6 @@
 include ../../empi.config
 
-OBJECTS = request_queue.o logical.o communicator.o debugging.o file.o group.o message_queue.o data_message_queue.o operation.o request.o datatype.o empi.o info.o messaging.o reduce_ops.o status.o 
+OBJECTS = virtual_connection.o request_queue.o logical.o communicator.o debugging.o file.o group.o message_queue.o data_message_queue.o operation.o request.o datatype.o empi.o info.o messaging.o reduce_ops.o status.o 
 
 LIBDIR  = $(EMPI_HOME)/lib
 

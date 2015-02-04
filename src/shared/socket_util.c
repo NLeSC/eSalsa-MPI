@@ -204,7 +204,6 @@ ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t len, size_t p
 }
 */
 
-/*
 ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, bool blocking)
 {
 	register ssize_t r;
@@ -245,8 +244,8 @@ ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, bool b
 
 	return count;
 }
-*/
 
+/*
 ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count)
 {
 	register ssize_t r;
@@ -284,7 +283,7 @@ ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count)
 
 	return count;
 }
-
+*/
 
 
 /*
@@ -321,7 +320,6 @@ ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t to_read, 
 
 */
 
-/*
 ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, bool blocking)
 {
 	 register ssize_t r;
@@ -355,8 +353,8 @@ ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, bool bloc
 
 	 return count;
 }
-*/
 
+/*
 ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count)
 {
 	 register ssize_t r;
@@ -385,7 +383,7 @@ ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count)
 
 	 return count;
 }
-
+*/
 
 /*
 ssize_t socket_send(int socketfd, unsigned char *buffer, size_t len, size_t packet_size, bool blocking)
@@ -642,6 +640,8 @@ int socket_connect(unsigned long ipv4, unsigned short port, int send_buffer, int
 
    INFO(1, "Created connection to %s:%d", ipstring, port);
 
+   //socket_set_nodelay(*socketfd, true);
+
    return SOCKET_OK;
 }
 
@@ -702,6 +702,8 @@ int socket_listen(unsigned short local_port, int send_buffer, int receive_buffer
 //			return SOCKET_ERROR_BLOCKING;
 //		}
 //	}
+
+	//socket_set_nodelay(sd, true);
 
 	*listenfd = sd;
 	return SOCKET_OK;

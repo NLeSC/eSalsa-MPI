@@ -40,11 +40,13 @@ typedef struct s_data_msg {
    int count;                 // data size in elements
    int tag;                   // message tag
 
+   int padding1;              // padding to make the header 32 bytes total.
+
    // Message payload.
    unsigned char payload[];   // message data
 } data_message;
 
-#define DATA_MESSAGE_SIZE (sizeof(size_t) + sizeof(int)*5)
+#define DATA_MESSAGE_SIZE (sizeof(size_t) + sizeof(int)*(5+1))
 
 // This struct is used to return the servers reply to a comm-split request.
 typedef struct {

@@ -2,7 +2,7 @@ package esalsa;
 
 import java.io.IOException;
 
-public class GroupReply extends Message {
+public class GroupReply extends ServerMessage {
 
     public static final int TYPE_ACTIVE     = 0;
     public static final int TYPE_SEPERATIST = 1;
@@ -28,9 +28,9 @@ public class GroupReply extends Message {
     // This field indicates if the
     public final int type;
 
-    GroupReply(int destinationPID, boolean overlap) {
+    GroupReply(boolean overlap) {
 
-        super(Protocol.OPCODE_GROUP_REPLY, 0xFFFFFFFF, destinationPID, 6*4);
+        super(Protocol.OPCODE_GROUP_REPLY, 6*4);
 
         this.newComm = -1;
         this.rank = -1;
@@ -51,11 +51,11 @@ public class GroupReply extends Message {
         }
     }
 
-    GroupReply(int destinationPID, int newComm, int rank, int size, int clusterCount, int flags,
+    GroupReply(int newComm, int rank, int size, int clusterCount, int flags,
             int [] coordinators, int [] clusterSizes, int [] members,
             int [] clusterRanks, int [] memberClusterIndex, int [] localRanks) {
 
-        super(Protocol.OPCODE_GROUP_REPLY, 0xFFFFFFFF, destinationPID, 6*4 + clusterCount*4*3 + size*4*3);
+        super(Protocol.OPCODE_GROUP_REPLY, 6*4 + clusterCount*4*3 + size*4*3);
 
         this.newComm = newComm;
         this.rank = rank;

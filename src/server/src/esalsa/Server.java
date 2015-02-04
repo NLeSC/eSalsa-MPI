@@ -14,8 +14,8 @@ import java.util.StringTokenizer;
 
 public class Server {
 
-    public static final int MAX_CLUSTERS = 256;
-    public static final int MAX_PROCESSES_PER_CLUSTER = 16777216;
+    public static final int MAX_CLUSTERS = 255; // 0xFF
+    public static final int MAX_PROCESSES_PER_CLUSTER = 16777215; // OxFFFFFF
     public static final int MAX_LENGTH_CLUSTER_NAME = 128;
     
     class AcceptThread extends Thread { 
@@ -44,6 +44,11 @@ public class Server {
     private final int numberOfApplicationProcesses;
     private final int numberOfGatewaysPerCluster;
     private final int numberOfStreamsPerGatewayConnection;
+    
+    private final int protocol;
+    
+    private final int messageSize;
+    private final int messageBufferSize;
     
     private final Cluster [] clusters;
     
@@ -85,6 +90,28 @@ public class Server {
             throw new Exception("Number of streams per gateway connection out of bounds! (" + numberOfStreamsPerGatewayConnection + ")");
         }
         
+        messageSize = Integer.parseInt(readline(r));
+
+        if (messageSize < 64) { 
+            throw new Exception("Message size too small (" + messageSize + ")! Must be >= 64.");
+        }
+
+        messageBufferSize = Integer.parseInt(readline(r));
+
+        if (messageBufferSize < 1) { 
+            throw new Exception("MessageBuffer size too small (" + messageBufferSize + ")!. Must be > 0.");
+        }
+        
+        String prot = readline(r);
+        
+        if (prot.equalsIgnoreCase("TCP")) { 
+            protocol = 0;            
+        } else if (prot.equalsIgnoreCase("UDT")) {             
+            protocol = 1;                        
+        } else { 
+            throw new Exception("Unknown WA protocol " + prot);
+        }
+
         clusters = new Cluster[numberOfClusters];
 
         int tmp = 0;
@@ -103,6 +130,9 @@ public class Server {
         Logging.println("   Total processes          : " 
                 + (numberOfApplicationProcesses + numberOfClusters * numberOfGatewaysPerCluster));
         Logging.println("   Parallel streams         : " + numberOfStreamsPerGatewayConnection);
+        Logging.println("   Message size             : " + messageSize);
+        Logging.println("   Message Buffer size      : " + messageBufferSize);
+        Logging.println("   Wide area protocol       : " + (protocol == 0 ? "TCP" : "UDT"));
         Logging.println("   Server listening on port : " + port);
         
         for (int i=0;i<numberOfClusters;i++) { 
@@ -208,7 +238,7 @@ public class Server {
         byte [] network = readNetwork(cidr.substring(0, slashIndex));
         byte [] netmask = generateNetmask(cidr.substring(slashIndex+1));
         
-        return new Cluster(this, name, size, port, index, numberOfGatewaysPerCluster, network, netmask);
+        return new Cluster(this, name, size, port, index, numberOfGatewaysPerCluster, network, netmask, messageSize);
     }
  
     private void connectionHandshake(Socket s) throws Exception {
@@ -239,16 +269,19 @@ public class Server {
 
         EndianDataInputStream din;
         EndianDataOutputStream dout;
+        boolean littleEndian;
         
         if (opcode[0] == 42) {
             // Little endian machine on the other side!
             din = new LittleEndianDataInputStream(in);
             dout = new LittleEndianDataOutputStream(out);
+            littleEndian = true;
             Logging.println("Got connection from " + s + " (little endian)");
         } else if (opcode[3] == 42) { 
             // Big endian machine on the other side!
             din = new BigEndianDataInputStream(in);
             dout = new BigEndianDataOutputStream(out);
+            littleEndian = false;
             Logging.println("Got connection from " + s + " (big endian)");
         } else { 
             Logging.println("Rejecting connection from " + s + " (UNKNOWN OPCODE)");
@@ -276,8 +309,7 @@ public class Server {
             throw new Exception("Unknown cluster: " + name);
         }
         
-        c.setConnection(s, din, dout);
-        c.performHandshake();        
+        c.performHandshake(s, din, dout, littleEndian);        
         // From this moment on, the cluster gateways should be completely initialized.       
     }
     
@@ -313,17 +345,19 @@ public class Server {
         c.deliverRequest(req);
     }
 
-    protected void enqueueReply(int destinationCluster, Message m) {
+    protected void enqueueReply(int destinationPID, ServerMessage m) throws IOException {
 
+        int destinationCluster = Communicator.getClusterRank(destinationPID);
+        //parent.enqueueReply(destinationCluster, m);
+
+        // Sanity check
         if (destinationCluster < 0 || destinationCluster >= clusters.length) {
             Logging.error("Cannot enqueue message, unknown cluster " + destinationCluster);
-            
             new Exception().printStackTrace(System.out);
-            
             return;
         }
         
-        clusters[destinationCluster].enqueue(m);
+        clusters[destinationCluster].enqueue(destinationPID, m);
     }
     
     protected Communicator createCommunicator(int [] members) {
@@ -582,6 +616,20 @@ public class Server {
     }
     
     /**
+     * @return
+     */
+    public int getMessageSize() {
+        return messageSize;
+    }
+    
+    /**
+     * @return
+     */
+    public int getMessageBufferSize() {
+        return messageBufferSize;
+    }
+    
+    /**
      * 
      * @param index
      * @return
@@ -597,6 +645,13 @@ public class Server {
         return numberOfStreamsPerGatewayConnection;
     }
 
+    /**
+     * @return
+     */
+    public int getProtocol() {
+        return protocol;
+    }
+    
     public void run() {
         try {         
             acceptConnections();

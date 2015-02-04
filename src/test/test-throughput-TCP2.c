@@ -54,7 +54,7 @@ int run_send_test(int msgsize)
 
     while (now <= start + TOTAL_TIME*1000000) {
 
-    	error = socket_send(socketfd, buf, msgsize, msgsize, true);
+    	error = socket_send(socketfd, buf, msgsize, true);
 
     	if (error != msgsize) {
     		fprintf(stderr, "Test %d/%d failed! (error = %d)\n", i, j, error);
@@ -90,7 +90,7 @@ int run_send_test(int msgsize)
 
     buf[0] = 1;
 
-	error = socket_send(socketfd, buf, msgsize, msgsize, true);
+	error = socket_send(socketfd, buf, msgsize, true);
 
 	if (error != msgsize) {
 		fprintf(stderr, "Test %d/%d failed! (error = %d)\n", i, j, error);
@@ -101,7 +101,7 @@ int run_send_test(int msgsize)
 	totaldata += msgsize;
 	totalmsg++;
 
-	error = socket_receive(socketfd, buf, 1, 1, true);
+	error = socket_receive(socketfd, buf, 1, true);
 
 	if (error != 1) {
 		fprintf(stderr, "Test %d/%d failed! (error = %d)\n", i, j, error);
@@ -143,7 +143,7 @@ int run_receive_test(int msgsize)
 
     while (buf[0] == 0) {
 
-    	error = socket_receive(socketfd, buf,  msgsize, msgsize, true);
+    	error = socket_receive(socketfd, buf,  msgsize, true);
 
     	if (error != msgsize) {
     		fprintf(stderr, "Test %d/%d failed! (error = %d)\n", i, j, error);
@@ -154,7 +154,7 @@ int run_receive_test(int msgsize)
 
     fprintf(stderr, "Done receiving -- Barrier\n");
 
-    error = socket_send(socketfd, buf, 1, 1, true);
+    error = socket_send(socketfd, buf, 1,  true);
 
     if (error != 1) {
     	fprintf(stderr, "Test %d/%d failed! (error = %d)\n", i, j, error);

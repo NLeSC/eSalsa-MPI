@@ -1,5 +1,6 @@
 package esalsa;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -26,7 +27,7 @@ public class Communicator {
     private final int size;
     private final Server parent;
 
-    private final Message [] messages;
+    private final ServerMessage [] messages;
     private int participants = 0;
 
     private long commMessages;
@@ -98,7 +99,7 @@ public class Communicator {
         this.communicator = communicator;
         this.members = members;
         this.size = members.length;
-        this.messages = new Message[size];
+        this.messages = new ServerMessage[size];
 
         this.localRanks = new int[size];
         this.memberClusterIndex = new int[size];
@@ -137,13 +138,17 @@ public class Communicator {
         }
     }
 
-    private int getClusterRank(int pid) {
+    public static int getClusterRank(int pid) {
         return ((pid & 0xFF000000) >> 24) & 0xFF;
     }
     
-//    private int getProcessRank(int pid) {
-//        return (pid & 0xFFFFFF);
-//    }
+    public static int getProcessRank(int pid) {
+        return (pid & 0xFFFFFF);
+    }
+
+    public static int getPID(int clusterRank, int processRank) {
+        return ((clusterRank & 0xFF) << 24) | (processRank & 0xFFFFFF);  
+    }
     
     public int getNumber() {
         return communicator;
@@ -191,10 +196,13 @@ public class Communicator {
         return COMM_FLAG_LOCAL;
     }
 
-    private void enqueueReply(Message m) { 
-        int destinationCluster = getClusterRank(m.destination);
+    private void enqueueReply(int destinationPID, ServerMessage m) throws IOException { 
         
-        parent.enqueueReply(destinationCluster, m);
+        //int destinationCluster = getClusterRank(destinationPID);
+        //parent.enqueueReply(destinationCluster, m);
+
+        //int destinationCluster = getClusterRank(destinationPID);
+        parent.enqueueReply(destinationPID, m);
         
         commReplies++;
         commReplyBytes += m.length;
@@ -241,7 +249,7 @@ public class Communicator {
 //    }
 
     // This implements the split operation. 
-    private void processSplit() {
+    private void processSplit() throws IOException {
 
         // First gather all messages sharing a colors together in a list.
         HashMap<Integer, LinkedList<SplitRequest>> tmp = new HashMap<Integer, LinkedList<SplitRequest>>();
@@ -316,7 +324,7 @@ public class Communicator {
 
                     // Send a reply to each participant, generating the appropriate local rank for each participant.
                     for (int j=0;j<size;j++) {
-                        enqueueReply(new SplitReply(pids[j], number, j, size, color, localRanks[j] /* is the key */, 
+                        enqueueReply(pids[j], new SplitReply(number, j, size, color, localRanks[j] /* is the key */, 
                                     coordinators.length, flags, coordinators, clusterSizes, members,
                                     clusterRanks, memberClusterIndex, localRanks));
                     }
@@ -324,14 +332,14 @@ public class Communicator {
                     // We must also send a reply to all participants with color -1.
                     // As these will not actually create a new virtual communicator, we can send a simplified reply.
                     for (SplitRequest m : l) {
-                        enqueueReply(new SplitReply(m.source));
+                        enqueueReply(members[m.rank], new SplitReply());
                     }
                 }
             }
         }
     }
 
-    private void processGroup() {
+    private void processGroup() throws IOException {
 
         Logging.println("Creating new group from communicator " + communicator);
 
@@ -402,7 +410,7 @@ public class Communicator {
             // Add the cluster to the set of participants.
             activeClusters[destinationCluster] = true;
 
-            enqueueReply(new GroupReply(pid, number, j, members.length, coordinators.length, flags,
+            enqueueReply(pid, new GroupReply(number, j, members.length, coordinators.length, flags,
                         coordinators, clusterSizes, members, clusterRanks, memberClusterIndex, localRanks));
         }
 
@@ -411,11 +419,11 @@ public class Communicator {
         // result in the GroupReply.
         for (int pid : tmp) {
             boolean participant = activeClusters[getClusterRank(pid)];
-            enqueueReply(new GroupReply(pid, participant));
+            enqueueReply(pid, new GroupReply(participant));
         }
     }
 
-    private void processDup() {
+    private void processDup() throws IOException {
 
         Logging.println("Performing DUP of communicator " + communicator);
 
@@ -424,7 +432,7 @@ public class Communicator {
 
         // Next, we send a reply to all participants, providing them with the new virtual communicator.
         for (int j=0;j<members.length;j++) {
-            enqueueReply(new DupReply(members[j], communicator, number));            
+            enqueueReply(members[j], new DupReply(communicator, number));            
         }
     }
 
@@ -458,24 +466,23 @@ public class Communicator {
         parent.freeCommunicator(0);
 
         // We send a reply to all application processes instructing them to FINALIZE.
-        for (int j=0;j<members.length;j++) {
-            enqueueReply(new FinalizeReply(members[j]));
-        }
+        //for (int j=0;j<members.length;j++) {
+            //enqueueReply(members[j], new FinalizeReply());
+        //}
 
         // We send a reply to all gateways instructing them to FINALIZE.
         for (int i=0;i<parent.getNumberOfClusters();i++) {
-
-            Cluster c = parent.getCluster(i);            
-            
+                        
             // We send to non-master gateways first, since the master gateway needs to forward
             // these messages (and therefore remain active until all messages are forwarded).
+
             for (int j=1;j<parent.getNumberOfGatewaysPerCluster();j++) {
-                int pid = parent.getPID(i, Server.MAX_PROCESSES_PER_CLUSTER-1);
-                enqueueReply(new FinalizeReply(pid));
+                int pid = parent.getPID(i, Server.MAX_PROCESSES_PER_CLUSTER);
+                enqueueReply(pid, new FinalizeReply());
             }
             
             // Finally send to the master gateway.
-            enqueueReply(new FinalizeReply(parent.getPID(i, Server.MAX_PROCESSES_PER_CLUSTER-1)));
+            enqueueReply(parent.getPID(i, Server.MAX_PROCESSES_PER_CLUSTER), new FinalizeReply());
         }
     }
        

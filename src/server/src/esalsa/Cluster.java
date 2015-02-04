@@ -13,15 +13,20 @@ public class Cluster {
         private final String name;
         private final int rank;
         private final short port;
+        private final short protocol;
         private final short streams;
         private final byte [] address;
-
-        public GatewayInfo(String name, int rank, short port, short streams, byte [] address) {
+        private final VirtualConnection vc;  
+        
+        public GatewayInfo(String name, int rank, short port, short protocol, short streams, byte [] address, 
+                VirtualConnection vc) {
             this.name = name;
             this.rank = rank;
             this.port = port;
+            this.protocol = protocol;
             this.streams = streams;
             this.address = address;
+            this.vc = vc;
         }
 
         public String getName() {
@@ -32,16 +37,24 @@ public class Cluster {
             return rank;
         }
 
-        public int getPort() {
+        public short getPort() {
             return port;
+        }
+        
+        public short getProtocol() {
+            return protocol;
         }
         
         public short getStreams() {
             return streams;
         }
         
-        public byte [] getAddres() {
+        public byte [] getAddress() {
             return address;
+        }
+
+        public VirtualConnection getVirtualConnection() {
+            return vc;
         }
     }
 
@@ -70,7 +83,9 @@ public class Cluster {
                     more = receiveMessage();
                 }
             } catch (Exception e) {
-                e.printStackTrace(System.err);
+                if (!isDone()) { 
+                    e.printStackTrace(System.err);
+                }
             }
         }
     }
@@ -94,7 +109,10 @@ public class Cluster {
      *  should be reachable at port <code>basePort + gatewayRank</code> 
      */
     private final int basePort; 
-
+    
+    /** Fragment length to use **/
+    private final int fragmentSize;
+    
     /** Information on all gateways available in this cluster */
     private GatewayInfo [] gateways;
 
@@ -107,6 +125,9 @@ public class Cluster {
     /** EndianDataOutputStream used to write data to the master gateway. */
     private EndianDataOutputStream out;
 
+    /** Endianness of this cluster **/
+    private boolean littleEndian;
+    
     /** Is the gateway ready ? (has the local initialization completed ?) */
     private boolean ready = false;
     
@@ -114,8 +135,10 @@ public class Cluster {
     private boolean done = false;
 
     /** Message queue, used to store messages waiting to be send. */
-    private final LinkedList<Message> incoming = new LinkedList<Message>();
-
+//    private final LinkedList<ServerMessage> incoming = new LinkedList<ServerMessage>();
+    
+    private final LinkedList<byte []> outgoing = new LinkedList<byte[]>();
+    
     /** Number of messages received. */
     private long messagesReceived = 0;
 
@@ -127,6 +150,9 @@ public class Cluster {
     
     /** Network mask to use */
     private byte [] netmask;
+    
+    /** Array of virtual connections to each process in this cluster */
+    private VirtualConnection [] virtualConnections;
     
     /** 
      * Constructor for Cluster.
@@ -147,7 +173,7 @@ public class Cluster {
      *          Network to use on this gateway in CIDR format, e.g., "192.168.1.0/24" 
      */
     public Cluster(Server owner, String name, int applicationProcesses, int basePort, int clusterRank, int numberOfGateways, 
-            byte [] network, byte [] netmask) {
+            byte [] network, byte [] netmask, int fragmentSize) {
         this.owner = owner;
         this.name = name;
         this.applicationProcesses = applicationProcesses;
@@ -156,8 +182,23 @@ public class Cluster {
         this.gateways = new GatewayInfo[numberOfGateways];    
         this.network = network;
         this.netmask = netmask;
+        this.fragmentSize = fragmentSize;
+               
+        virtualConnections = new VirtualConnection[applicationProcesses];        
     }
 
+    private VirtualConnection getVirtualConnection(int pid) { 
+        
+        int processRank = Communicator.getProcessRank(pid);
+
+        // Check if the pid represents a gateway.
+        if (processRank >= (Server.MAX_PROCESSES_PER_CLUSTER-(gateways.length-1))) { 
+            return gateways[Server.MAX_PROCESSES_PER_CLUSTER-processRank].getVirtualConnection();
+        }
+        
+        return virtualConnections[processRank];
+    }
+    
     /**
      * Returns the rank of this cluster.
      * 
@@ -171,9 +212,7 @@ public class Cluster {
     /**
      * Returns the number of application processes in this cluster.
      * 
-     * @returnGatewayInfo info = gateways[index];
-
-
+     * @return
      *          the number of application processes in this cluster.
      */
     public int getApplicationSize() {
@@ -192,7 +231,7 @@ public class Cluster {
 
     /**
      * Set the connection of this cluster consisting of a {@link Socket} connected to the master gateway and its associated  
-     * {@link DataInputStream} and {@link DataOutputStream}.    
+     * {@link EndianDataInputStream} and {@link EndianDataOutputStream}.    
      * 
      * @param socket
      *          The {@link Socket} connected to the master gateway of this cluster. 
@@ -203,17 +242,31 @@ public class Cluster {
      * @throws Exception
      *          If the connection was set.  
      */
-    public synchronized void setConnection(Socket socket, EndianDataInputStream in, EndianDataOutputStream out) throws Exception {
+    public void performHandshake(Socket socket, EndianDataInputStream in, EndianDataOutputStream out, boolean littleEndian) throws Exception {
 
-        if (this.socket != null) { 
-            throw new Exception("Cluster " + name + " is already connected!");
+        synchronized (this) {
+            if (this.socket != null) { 
+                throw new Exception("Cluster " + name + " is already connected!");
+            }
+
+            this.socket = socket;
+            this.in = in;
+            this.out = out;
+            this.littleEndian = littleEndian;
         }
-
-        this.socket = socket;
-        this.in = in;
-        this.out = out;
-
+                
+        // Once we know the endianness we can create the virtual connections.
+        for (int i=0;i<applicationProcesses;i++) { 
+            virtualConnections[i] = new VirtualConnection(fragmentSize, littleEndian, Communicator.getPID(clusterRank, i));
+        }
+        
         Logging.println("Cluster " + name + " connected to gateway at " + socket);
+        Logging.println("Performing handshake with cluster " + name);
+        
+        sendHandshakeReply();
+        receiveAllGatewayInfo();
+        sendAllGatewayInfo();
+        allClearBarrier();
     }
 
     /**
@@ -232,6 +285,8 @@ public class Cluster {
         out.writeInt(owner.getNumberOfClusters());
         out.writeInt(applicationProcesses);
         out.writeInt(owner.getNumberOfGatewaysPerCluster());
+        out.writeInt(owner.getMessageSize());
+        out.writeInt(owner.getMessageBufferSize());
 
         for (int i=0;i<owner.getNumberOfClusters();i++) {
             out.writeInt(owner.getCluster(i).getApplicationSize());
@@ -366,9 +421,12 @@ public class Cluster {
         }
 
         byte [] address = selectAddress(addresses);
-        
+                
+        VirtualConnection vc = new VirtualConnection(fragmentSize, littleEndian, Communicator.getPID(clusterRank, 
+                Server.MAX_PROCESSES_PER_CLUSTER-index));
+                
         setGatewayInfo(new GatewayInfo(name, index, (short) (basePort + index * owner.getNumberOfStreams()), 
-                (short) owner.getNumberOfStreams(), address));
+                (short) owner.getProtocol(), (short) owner.getNumberOfStreams(), address, vc));
     }
 
     private synchronized void setGatewayInfo(GatewayInfo info) {
@@ -401,8 +459,6 @@ public class Cluster {
         }
     }
 
-   
-
     /**
      * Send the connection information for one gateway to the master gateway.  
      * 
@@ -417,8 +473,9 @@ public class Cluster {
 
         Logging.println("Sending gateway info for gateway " + info.getName() + "/" + info.getRank());
 
-        out.write(info.getAddres());
+        out.write(info.getAddress());
         out.writeShort(info.getPort());
+        out.writeShort(info.getProtocol());
         out.writeShort(info.getStreams());
     }
 
@@ -446,6 +503,8 @@ public class Cluster {
             throw new Exception("Invalid opcode " + opcode);
         }
 
+        Logging.println("Received all clear barrier from cluster: " + name);
+
         synchronized (this) {
             ready = true;
             notifyAll();
@@ -454,17 +513,11 @@ public class Cluster {
         for (int i=0;i<owner.getNumberOfClusters();i++) { 
             owner.getCluster(i).waitUntilReady();
         }
-        
+
+        Logging.println("Sending all clear to cluster: " + name);
+
         out.writeInt(opcode);
         out.flush();
-    }
-
-    public void performHandshake() throws Exception {
-
-        sendHandshakeReply();
-        receiveAllGatewayInfo();
-        sendAllGatewayInfo();
-        allClearBarrier();
     }
 
     public synchronized boolean isReady() {
@@ -486,83 +539,103 @@ public class Cluster {
 
     
     private void done() {
-        synchronized (incoming) {
+        synchronized (outgoing) {
             done = true;
-            incoming.notifyAll();
+            outgoing.notifyAll();
         }
         
         owner.clusterDone();
     }
 
-    public void enqueue(Message m) {
-        synchronized (incoming) {
-            incoming.addLast(m);
-            incoming.notifyAll();
+
+    private boolean isDone() {
+        synchronized (outgoing) {
+            return done;
+        }
+    }
+    
+    public void enqueue(int destinationPID, ServerMessage m) throws IOException {
+        
+        VirtualConnection vc = getVirtualConnection(destinationPID);
+        
+        byte [][] result = vc.fragmentMessage(m);
+        
+        synchronized (outgoing) {
+            
+            for (int i=0;i<result.length;i++) { 
+                outgoing.addLast(result[i]);
+            }
+            
+            outgoing.notifyAll();
+        }
+        
+        if (m.opcode == Protocol.OPCODE_FINALIZE_REPLY) { 
+            done();
         }
     }
 
-    private Message dequeue() {
-        synchronized (incoming) {
-            while (!done && incoming.size() == 0) {
+    private byte [] dequeue() {
+        synchronized (outgoing) {
+            while (!done && outgoing.size() == 0) {
                 try {
-                    incoming.wait();
+                    outgoing.wait();
                 } catch (InterruptedException e) {
                     // ignored
                 }
             }
 
             // Note: Even if we are done we'll keep returning messages until the queue is empty.
-            if (incoming.size() == 0 && done) {               
+            if (outgoing.size() == 0 && done) {               
                 Logging.println("Cluster " + name + " is done!");                
                 return null;
             } 
             
-            return incoming.removeFirst();
+            return outgoing.removeFirst();
         }
     }
 
     private boolean sendMessage() throws Exception {
 
-        Message m = dequeue();
+        byte [] m = dequeue();
 
         if (m == null) {
             return false;
         }
 
-	//        Logging.println("Sending message to Cluster " + name + " with opcode " + m.opcode);
-        m.write(out);
+	out.write(m);
         out.flush();
         messagesSent++;        
         return true;
     }
 
+    /*
     private boolean receiveMessage() throws Exception {
 
         int opcode = in.readInt();
 
         CommunicatorRequest req = null;
 
-//        Logging.println("Cluster " + name + " received opcode " + opcode);
+        Logging.println("Cluster " + name + " received opcode " + opcode);
 
         switch (opcode) {
 
         case Protocol.OPCODE_SPLIT:
-//            Logging.println("Cluster " + name + " - Reading COMM message.");
+            Logging.println("Cluster " + name + " - Reading COMM message.");
             req = new SplitRequest(in);
             break;
 
         case Protocol.OPCODE_GROUP:
-//            Logging.println("Cluster " + name +" - Reading GROUP message.");
+            Logging.println("Cluster " + name +" - Reading GROUP message.");
             req = new GroupRequest(in);
             break;
 
         case Protocol.OPCODE_DUP:
-//            Logging.println("Cluster " + name + " - Reading DUP message.");
+            Logging.println("Cluster " + name + " - Reading DUP message.");
             req = new DupRequest(in);
             break;
 
         case Protocol.OPCODE_FREE:
-//            Logging.println("Cluster " + name + " - Reading FREE message.");
+            Logging.println("Cluster " + name + " - Reading FREE message.");
             req = new FreeRequest(in);
             break;
 
@@ -572,7 +645,7 @@ public class Cluster {
             Logging.println("Cluster " + name + " - Delivering FINALIZE message.");
             break;
         case Protocol.OPCODE_CLOSE_LINK:
-//            Logging.println("Cluster " + name + " - Closing link.");
+            Logging.println("Cluster " + name + " - Closing link.");
             done();           
             return false;
 
@@ -588,8 +661,79 @@ public class Cluster {
         owner.deliverRequest(req);
         return true;
     }
+     */
+    
+    private int readIntBigEndian(byte [] buffer, int offset) {
+        return (((buffer[offset] & 0xff) << 24) | 
+                ((buffer[offset+1] & 0xff) << 16) |
+                ((buffer[offset+2] & 0xff) << 8)  | 
+                 (buffer[offset+3] & 0xff));        
+    }
+    
+    private int readIntLittleEndian(byte [] buffer, int offset) {
+        return (((buffer[offset+3] & 0xff) << 24) | 
+                ((buffer[offset+2] & 0xff) << 16) |
+                ((buffer[offset+1] & 0xff) << 8)  | 
+                 (buffer[offset] & 0xff));
+    
+    }
+    
+    private int getLength(byte [] message) throws IOException {
+     
+        if (message[0] != 0x4D || message[1] != 0x67) { 
+            throw new IOException("Invalid Message - Header does not start with Mg! " + 
+                    (int)message[0] + "/"  + (int)message[1] + "/" + (int)message[2] + "/"  + (int)message[3]);
+        }
+        
+        if (littleEndian) { 
+            return readIntLittleEndian(message, 20);
+        } else { 
+            return readIntBigEndian(message, 20);
+        }
+    }
+    
+    private int getSource(byte [] message) throws IOException {
+        
+        if (message[0] != 0x4D || message[1] != 0x67) { 
+            throw new IOException("Invalid Message!");
+        }
+        
+        if (littleEndian) { 
+            return readIntLittleEndian(message, 4);
+        } else { 
+            return readIntBigEndian(message, 4);
+        }
+    }    
+    
+    private boolean receiveMessage() throws IOException {
 
-
+        byte [] message = new byte[fragmentSize];
+        
+        in.readFully(message, 0, FragmentationOutputStream.HEADER_LENGTH);
+        
+        int length = getLength(message);
+        
+        if (length < FragmentationOutputStream.HEADER_LENGTH) { 
+            System.err.println("EEP: got message smaller than header! " + length + " " + FragmentationOutputStream.HEADER_LENGTH);
+        }        
+        
+        in.readFully(message, FragmentationOutputStream.HEADER_LENGTH, length-FragmentationOutputStream.HEADER_LENGTH);
+        
+        VirtualConnection vc = getVirtualConnection(getSource(message));
+        
+        CommunicatorRequest req = vc.receivedMessage(message, length);
+        
+        if (req != null) { 
+            messagesReceived++;
+            owner.deliverRequest(req);
+        }
+        
+        // TODO: Figure out how to stop!
+        
+        return true;
+    }
+        
+        
     /**
      *
      */
@@ -610,30 +754,31 @@ public class Cluster {
         // Wait until all clusters are done!
         owner.allClustersDone();
 
-        try {
-            out.writeInt(Protocol.OPCODE_CLOSE_LINK);
-            out.flush();
-        } catch (Exception e) {
-            Logging.error("Failed write OPCODE_FINALIZE_REPLY to cluster " + name);
-        }
-
-        try {
-            in.close();
-        } catch (Exception e) {
-            Logging.error("Failed to close socket input from cluster " + name);
-        }
-
-        try {
-            out.close();
-        } catch (Exception e) {
-            Logging.error("Failed to close socket output to cluster " + name);
-        }
-
-        try {
-            socket.close();
-        } catch (Exception e) {
-            Logging.error("Failed to close socket connection to cluster " + name);
-        }
+//        
+//        try {
+//            out.writeInt(Protocol.OPCODE_CLOSE_LINK);
+//            out.flush();
+//        } catch (Exception e) {
+//            Logging.error("Failed write OPCODE_FINALIZE_REPLY to cluster " + name);
+//        }
+//
+//        try {
+//            in.close();
+//        } catch (Exception e) {
+//            Logging.error("Failed to close socket input from cluster " + name);
+//        }
+//
+//        try {
+//            out.close();
+//        } catch (Exception e) {
+//            Logging.error("Failed to close socket output to cluster " + name);
+//        }
+//
+//        try {
+//            socket.close();
+//        } catch (Exception e) {
+//            Logging.error("Failed to close socket connection to cluster " + name);
+//        }
     }
 
     private void printNetwork(byte [] network, StringBuilder target) {

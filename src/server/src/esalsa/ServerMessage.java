@@ -2,19 +2,13 @@ package esalsa;
 
 import java.io.IOException;
 
-public abstract class Message {
+public abstract class ServerMessage {
 
     /** Standard message header. */
     
     /** Message opcode */
     public final int opcode;
-    
-    /** Source PID */ 
-    public final int source;
-    
-    /** Destination PID */
-    public final int destination;
-    
+        
     /** Message length */
     public final int length;
     
@@ -28,10 +22,8 @@ public abstract class Message {
      * @throws IOException
      *          If an IO error occurred while reading the message. 
      */
-    protected Message(int opcode, EndianDataInputStream in) throws IOException {
+    protected ServerMessage(int opcode, EndianDataInputStream in) throws IOException {
         this.opcode = opcode;
-        source = in.readInt();
-        destination = in.readInt();
         length = in.readInt();
     }
     
@@ -49,11 +41,9 @@ public abstract class Message {
      * @param communicator
      *          The communicator to which this message belongs.
      */
-    protected Message(int opcode, int source, int destination, int payloadSize) {
+    protected ServerMessage(int opcode, int payloadSize) {
         this.opcode = opcode;
-        this.source = source;
-        this.destination = destination;
-        this.length = 4*4 + payloadSize;
+        this.length = 2*4 + payloadSize;
     }
 
     /**
@@ -66,8 +56,6 @@ public abstract class Message {
      */
     void write(EndianDataOutputStream out) throws IOException {
         out.writeInt(opcode);
-        out.writeInt(source);
-        out.writeInt(destination);
         out.writeInt(length);
     }
 }

@@ -1994,7 +1994,7 @@ int MPI_Wait ( MPI_Request *r, MPI_Status *s )
 {
 #if PROFILE_LEVEL > 0
    uint64_t profile_start, profile_end;
-   MPI_Comm comm = eMPI_COMM_SELF;
+   MPI_Comm comm = MPI_COMM_SELF;
 #endif // PROFILE_LEVEL
 
 #ifdef TRACE_CALLS

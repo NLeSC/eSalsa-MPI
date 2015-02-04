@@ -63,8 +63,8 @@ int socket_set_blocking(int socketfd);
 int socket_sendfully(int socketfd, unsigned char *buffer, size_t len);
 int socket_receivefully(int socketfd, unsigned char *buffer, size_t len);
 
-ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count);
-ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count);
+ssize_t socket_receive(int socketfd, unsigned char *buffer, size_t count, bool blocking);
+ssize_t socket_send(int socketfd, unsigned char *buffer, size_t count, bool blocking);
 
 //ssize_t socket_send_mb(int socketfd, message_buffer *buffer, size_t packet_size, bool blocking);
 //ssize_t socket_receive_mb(int socketfd, message_buffer *buffer, size_t to_read, size_t packet_size, bool blocking);

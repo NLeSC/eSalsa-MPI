@@ -6,7 +6,7 @@
 
 // Total data to send per pair (must be power of two)
 //#define TOTAL_DATA   (1024L*1024L*1024L)
-#define TOTAL_DATA   (4*1024L*1024L*1024L)
+#define TOTAL_DATA   (1024L*1024L*1024L)
 
 // Min message size used (must be power of two)
 #define MIN_MSG_SIZE (256)

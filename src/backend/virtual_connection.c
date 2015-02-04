@@ -1,4 +1,7 @@
 #include <stdbool.h>
+#include <stdlib.h>
+
+#include "logging.h"
 #include "messaging.h"
 #include "request.h"
 #include "request_queue.h"
@@ -47,7 +50,7 @@ virtual_connection *virtual_connection_create(int index, int pid, int sliding_wi
 // Free a virtual connection.
 void virtual_connection_free(virtual_connection *virtual_connection)
 {
-	// TODO
+	// TODO: implement
 }
 
 // Enqueue send request
@@ -65,4 +68,5 @@ int virtual_connection_enqueue_send(virtual_connection *virtual_connection, requ
 int virtual_connection_cancel_send(virtual_connection *virtual_connection, request *req)
 {
 	// TODO: implement
+	return 0;
 }
