@@ -23,10 +23,10 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include "settings.h"
+// #include "settings.h"
 #include "logging.h"
 #include "socket_util.h"
-#include "message_buffer.h"
+//#include "message_buffer.h"
 
 /*****************************************************************************/
 /*                          Socket operations                                */

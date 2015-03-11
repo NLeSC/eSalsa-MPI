@@ -41,7 +41,7 @@
 
 #define INITIAL_ACTIVE_CONNECTIONS_SIZE 4
 
-// Available sequence numbers is 2^32
+// Available sequence numbers is 2^31
 #define SEQUENCE_NUMBERS (0x80000000)
 
 // The size of the send window.
@@ -627,6 +627,7 @@ static virtual_connection *select_active_connection() {
 static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 
 	size_t avail = 0;
+	uint32_t cluster, process;
 
 	if (vc->send_message != NULL) {
 		// The virtual connection has a data message waiting, so calculate the number of bytes that need to be send.
@@ -645,12 +646,13 @@ static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 	} else if (vc->force_ack) {
 		// The virtual connection has no data message waiting, but must send an ack for flow control.
 		avail = 0;
+		vc->send_opcode = OPCODE_ACK;
 	} else {
 		// Should not happen!
 		FATAL("INTERNAL ERROR: selected virtual connection %d with no data to send!", vc->index);
 	}
 
-	// Write the header fiels of the message fragment.
+	// Write the header fields of the message fragment.
 	m->flags = SET_FLAGS_FIELD(0, vc->send_opcode);
 	m->src_pid = my_pid;
 	m->dst_pid = vc->peer_pid;
@@ -667,6 +669,9 @@ static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 
 		// Update the position.
 		vc->send_position += avail;
+	} else {
+		DEBUG(1, "Send ack to %d:%d with sequence number tx=%d rx=%d", GET_CLUSTER_RANK(vc->peer_pid),
+				GET_PROCESS_RANK(vc->peer_pid), m->transmit_seq, m->ack_seq);
 	}
 
 	// Update the sliding window administration (even if no flow control is used).
@@ -814,7 +819,7 @@ static int receive_message_fragment() {
 	//
 	// NOTE: the 'no message reordering assumption' has implications for the implementation of the gateway processes!
 
-	int i;
+//	int i;
 	size_t to_read;
 	ssize_t bytes_read;
 
@@ -899,13 +904,24 @@ static void process_ack_message() {
 
 	index = cluster_offsets[cluster] + process;
 
-	WARN(1, "Received ack for %d:%d with sequence number %ld", cluster, process,
-			receive_fragment->ack_seq);
-
 	vc = connections[index];
+
+	DEBUG(1, "Received ack for %d:%d with sequence number tx=%d rx=%d expected tx=%d rx=%d", cluster, process,
+			receive_fragment->transmit_seq,
+			receive_fragment->ack_seq,
+			vc->transmit_sequence,
+			vc->receive_sequence);
+
+	if (receive_fragment->transmit_seq != vc->receive_sequence) {
+		FATAL("INTERNAL ERROR: Received message fragment out of order %d != %d !", receive_fragment->transmit_seq,
+				vc->receive_sequence);
+	}
 
 	// Save the ACK contained in the message. This will allow us to send some data later.
 	vc->acknowledged_sequence_received = receive_fragment->ack_seq;
+
+	// Increase the sequence number of the expected packet.
+	vc->receive_sequence = (vc->receive_sequence + 1) % SEQUENCE_NUMBERS;
 }
 
 static void deliver_data_message(data_message *m) {
@@ -1431,8 +1447,7 @@ static int messaging_send_nonblocking(void* buf, int count, datatype *t, int des
 	return EMPI_SUCCESS;
 }
 
-static int messaging_send_blocking(void* buf, int count, datatype *t, int dest,
-		int tag, communicator* c) {
+static int messaging_send_blocking(void* buf, int count, datatype *t, int dest, int tag, communicator* c) {
 	// This is a blocking send, which we implement using a non-blocking send followed by a wait.
 	int error;
 	request *req;
