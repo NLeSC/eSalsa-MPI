@@ -130,10 +130,10 @@ typedef struct {
 	bool done;
 
 	// Receiver thread (only used in gateway-to-gateway connections).
-	pthread_t receive_thread;
+	// pthread_t receive_thread;
 
 	// Sender thread (only used in gateway-to-gateway connections).
-	pthread_t send_thread;
+	// pthread_t send_thread;
 
 
 	/******* Current outgoing message *******/
@@ -483,9 +483,9 @@ static int enqueue_message_at_socket_info(socket_info *info, int index)
 		// We've just inserted a message into an empty queue, so set the socket to the correct mode (if needed),
 		// and wake up any waiting threads. We need do do this inside the lock to prevent the message from disappearing before
 		// we have updated the message state.
-		if (info->type == TYPE_SERVER || info->type == TYPE_COMPUTE_NODE_TCP) {
+		//if (info->type == TYPE_SERVER || info->type == TYPE_COMPUTE_NODE_TCP) {
 			error = socket_set_rw(epollfd, info->socketfd, info);
-		}
+		//}
 
 //		fprintf(stderr, "##### Sending bcast to wake up threads! (socket_info %d)", info->socketfd);
 
@@ -884,21 +884,23 @@ static int write_message(socket_info *info, bool blocking)
 	int status;
 	ssize_t written;
 	size_t bytes_left;
-	int64_t timeout;
+//	int64_t timeout;
 	generic_message *m;
 
 	// If there was no message in progress, we try to dequeue one.
 	if (info->out_msg == NULL) {
 
-		if (info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT) {
-			// Dequeue with 1 sec. wait.
-			timeout = 1000*1000;
-		} else {
-			// Non-blocking dequeue.
-			timeout = 0;
-		}
+//		if (info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT) {
+//			// Dequeue with 1 sec. wait.
+//			timeout = 1000*1000;
+//		} else {
+//			// Non-blocking dequeue.
+//			timeout = 0;
+//		}
+//
+//		status = dequeue_message_from_socket_info(info, timeout);
 
-		status = dequeue_message_from_socket_info(info, timeout);
+		status = dequeue_message_from_socket_info(info, 0L);
 
 		if (status != 0) {
 			// No message was dequeued, so return status which is either 1 ("wouldblock") or 2 ("done")
@@ -931,7 +933,7 @@ static int write_message(socket_info *info, bool blocking)
 
 	} else if (info->type == TYPE_GATEWAY_TCP || info->type == TYPE_GATEWAY_UDT) {
 		INFO(1, "Writing message to gateway %d socket=%d timeout=%ld type=%d bytes=%ld bytes_left=%ld!",
-						info->index, info->socketfd, timeout, info->type, info->out_msg_length, bytes_left);
+				info->index, info->socketfd, timeout, info->type, info->out_msg_length, bytes_left);
 	}
 
 	written = socket_send(info->socketfd, info->out_msg + info->out_msg_pos, bytes_left, blocking);
@@ -972,7 +974,7 @@ static int read_message(socket_info *info, bool blocking)
 {
 	// A socket is ready for reading, so read something!
 	int status;
-	int64_t timeout;
+	//int64_t timeout;
 	ssize_t bytes_read, bytes_needed;
 	fragment_buffer *fb;
 
@@ -980,35 +982,42 @@ static int read_message(socket_info *info, bool blocking)
 
 	bytes_needed = -1;
 	fb = NULL;
-	timeout = 0;
+//	timeout = 0;
 
 	switch (info->state) {
 	case STATE_READY:
 
 		// No message fragment available yet, so try to get one. If we fail, we'll simply return 1 (for "wouldblock"). Make sure
 		// that we do get the fragment from the appropriate fragment buffer.
-		switch (info->type) {
-		case TYPE_COMPUTE_NODE_TCP:
-			timeout = 0;
+//		switch (info->type) {
+//		case TYPE_COMPUTE_NODE_TCP:
+//			timeout = 0;
+//			fb = nodes_to_gateway_fragment_buffer;
+//			break;
+//
+//		case TYPE_GATEWAY_TCP:
+//		case TYPE_GATEWAY_UDT:
+//			timeout = 1000*1000;
+//			fb = gateway_to_nodes_fragment_buffer;
+//			break;
+//
+//		case TYPE_SERVER:
+//			timeout = 0;
+//			fb = gateway_to_nodes_fragment_buffer;
+//			break;
+//
+//		default:
+//			FATAL("INTERNAL ERROR: unknown socket_info type %d in socket info %d", info->type, info->socketfd);
+//		}
+
+		if (info->type == TYPE_COMPUTE_NODE_TCP) {
 			fb = nodes_to_gateway_fragment_buffer;
-			break;
-
-		case TYPE_GATEWAY_TCP:
-		case TYPE_GATEWAY_UDT:
-			timeout = 1000*1000;
+		} else {
 			fb = gateway_to_nodes_fragment_buffer;
-			break;
-
-		case TYPE_SERVER:
-			timeout = 0;
-			fb = gateway_to_nodes_fragment_buffer;
-			break;
-
-		default:
-			FATAL("INTERNAL ERROR: unknown socket_info type %d in socket info %d", info->type, info->socketfd);
 		}
 
-		status = fragment_buffer_pop_free_fragment_wait(fb, &(info->in_msg_index), timeout);
+//		status = fragment_buffer_pop_free_fragment_wait(fb, &(info->in_msg_index), timeout);
+		status = fragment_buffer_pop_free_fragment_wait(fb, &(info->in_msg_index), 0L);
 
 		if (status == 0) {
 			// We have a buffer.
@@ -1089,7 +1098,7 @@ static int read_message(socket_info *info, bool blocking)
 	return 0;
 }
 
-
+/*
 // Sender thread for sockets.
 void* tcp_sender_thread(void *arg)
 {
@@ -1136,10 +1145,11 @@ void* tcp_sender_thread(void *arg)
 
 	return NULL;
 }
+*/
 
+/*
 void* udt_sender_thread(void *arg)
 {
-	/*
 	size_t avail;
 	socket_info *info;
 	bool more;
@@ -1190,10 +1200,11 @@ void* udt_sender_thread(void *arg)
 	}
 
 	//INFO(1, "UDT Sender done!");
-*/
 	return NULL;
 }
+*/
 
+/*
 // Receiver thread for sockets.
 void* tcp_receiver_thread(void *arg)
 {
@@ -1260,11 +1271,12 @@ void* tcp_receiver_thread(void *arg)
 
 	return NULL;
 }
+*/
 
+/*
 // Receiver thread for sockets.
 void* udt_receiver_thread(void *arg)
 {
-	/*
 	socket_info *info;
 	bool more;
 	message_header mh;
@@ -1344,10 +1356,11 @@ void* udt_receiver_thread(void *arg)
 
 		}
 	}
-*/
+
 	// FIXME: close link
 	return NULL;
 }
+*/
 
 static socket_info *create_socket_info(int socketfd, int type, int state)
 {
@@ -1420,6 +1433,7 @@ static socket_info *create_socket_info(int socketfd, int type, int state)
 	return info;
 }
 
+/*
 static int init_socket_info_threads(socket_info *info)
 {
 	int error;
@@ -1467,7 +1481,9 @@ static int init_socket_info_threads(socket_info *info)
 
 	return 0;
 }
+*/
 
+/*
 static int start_gateway_threads(int index)
 {
     int i, status;
@@ -1479,7 +1495,7 @@ static int start_gateway_threads(int index)
 
     for (i=0;i<gateway_connections[index].stream_count;i++) {
 
-    	INFO(1, "Starting gatways thread %d.%d", index, i);
+    	INFO(1, "Starting gateway thread %d.%d", index, i);
 
     	status = init_socket_info_threads(gateway_connections[index].sockets[i]);
 
@@ -1491,6 +1507,7 @@ static int start_gateway_threads(int index)
 
     return CONNECT_OK;
 }
+*/
 
 static int receive_gateway_ready_opcode(int index)
 {
@@ -1670,21 +1687,76 @@ static int connect_gateways()
 	}
 
 	// Second, we start the send and receive threads for all connections.
-	for (i=0;i<cluster_count;i++) {
+//	for (i=0;i<cluster_count;i++) {
+//
+//		if (i != cluster_rank) {
+//			status = start_gateway_threads(i);
+//
+//			if (status != CONNECT_OK) {
+//				ERROR(1, "Failed to add gateway %d to epoll (error=%d)", i, status);
+//				return status;
+//			}
+//		}
+//	}
 
-		if (i != cluster_rank) {
-			status = start_gateway_threads(i);
+	return 0;
+}
 
-			if (status != CONNECT_OK) {
-				ERROR(1, "Failed to add gateway %d to epoll (error=%d)", i, status);
-				return status;
-			}
+static int add_gateway_to_epoll(int index)
+{
+	int i, error;
+	socket_info *info;
+
+	if (index == cluster_rank) {
+		// No connection to my own cluster.
+		return 0;
+	}
+
+	for (i=0;i<gateway_connections[index].stream_count;i++) {
+
+		info = gateway_connections[index].sockets[i];
+
+		error = socket_set_non_blocking(info->socketfd);
+
+		if (error != 0) {
+			ERROR(1, "Failed to set gateway socket to non-blocking!");
+			return error;
+		}
+
+		error = socket_add_to_epoll(epollfd, info->socketfd, info);
+
+		if (error != 0) {
+			ERROR(1, "Failed to add gateway socket to epoll set!");
+			return error;
+		}
+
+		error = socket_set_ro(epollfd, info->socketfd, info);
+
+		if (error != 0) {
+			ERROR(1, "Failed to set gateway socket connection to RO!");
+			return error;
 		}
 	}
 
 	return 0;
 }
 
+static int add_gateways_to_epoll()
+{
+	int i, status;
+
+	// First, we do an SMPD-style all-to-all connection setup.
+	for (i=0;i<cluster_count;i++) {
+		status = add_gateway_to_epoll(i);
+
+		if (status != CONNECT_OK) {
+			ERROR(1, "Failed to add gateway to epoll %d (error=%d)", i, status);
+			return status;
+		}
+	}
+
+	return 0;
+}
 
 #ifdef DETAILED_TIMING
 static void flush_read_timings()
@@ -2794,6 +2866,14 @@ static int gateway_init(int argc, char **argv)
 		return status;
 	}
 
+	// Add all gateway connections to the epoll_fd.
+	status = add_gateways_to_epoll();
+
+	if (status != 0) {
+		close(serverfd);
+		return status;
+	}
+
 	INFO(2, "All local compute nodes connected -- performing -all clear barrier- with server");
 
 	status = all_clear_barrier();
@@ -2894,9 +2974,9 @@ static int shutdown_gateway_connection(int index)
 		}
 
 		// Wait until the sender threads have stopped.
-		for (i=0;i<gw->stream_count;i++) {
-			pthread_join(gw->sockets[i]->send_thread, &result);
-		}
+//		for (i=0;i<gw->stream_count;i++) {
+//			pthread_join(gw->sockets[i]->send_thread, &result);
+//		}
 
 		// Close the sockets. This will upset the receiver ...
 		for (i=0;i<gw->stream_count;i++) {
@@ -2911,9 +2991,9 @@ static int shutdown_gateway_connection(int index)
 		}
 
 		// Wait until the receiver threads have stopped.
-		for (i=0;i<gw->stream_count;i++) {
-			pthread_join(gw->sockets[i]->receive_thread, &result);
-		}
+//		for (i=0;i<gw->stream_count;i++) {
+//			pthread_join(gw->sockets[i]->receive_thread, &result);
+//		}
 
 		// Close the sockets. This will upset the receiver ...
 		for (i=0;i<gw->stream_count;i++) {
@@ -2949,7 +3029,7 @@ static int shutdown_gateway_connections()
 
 static int process_messages()
 {
-	int i, error, count, ops;
+	int i, error, count, event_count, ops;
 	struct epoll_event *events;
 	socket_info *info;
 	uint32_t event;
@@ -2959,8 +3039,15 @@ static int process_messages()
 	application_start_time = current_time_micros();
 	last_print = application_start_time;
 
+	// The following sockets are in the epollfd:
+	//
+	// - one to every compute node in my cluster (local_application_size)
+	// - gateway_count for every other cluster (gateway_count * (cluster_count-1))
+	// - one for the server (1)
+	event_count = local_application_size + (gateway_count * (cluster_count-1)) + 1;
+
 	// Allocate space for the events, one per compute node plus one for the server.
-	events = malloc((local_application_size+1) * sizeof(struct epoll_event));
+	events = malloc(event_count * sizeof(struct epoll_event));
 
 	if (events == NULL) {
 		ERROR(1, "Failed to allocate space for epoll events!");
@@ -2969,12 +3056,7 @@ static int process_messages()
 
 	while (keep_going) {
 
-		count = epoll_wait(epollfd, events, local_application_size+1, EPOLL_TIMEOUT);
-
-		if (count < 0) {
-			ERROR(1, "Failed to wait for socket event!");
-			return ERROR_POLL;
-		}
+		count = epoll_wait(epollfd, events, event_count, EPOLL_TIMEOUT);
 
 INFO(1, "GATEWAY epoll returned %d events", count);
 
@@ -3020,11 +3102,26 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 //						ops++;
 
 					if (error == 0) {
-						if (info->type == TYPE_SERVER) {
-							keep_going = enqueue_message_from_server(info);
-						} else {
+						switch (info->type) {
+						case TYPE_GATEWAY_TCP:
+						case TYPE_GATEWAY_UDT:
+							enqueue_message_from_wa_link(info);
+							break;
+						case TYPE_COMPUTE_NODE_TCP:
 							enqueue_message_from_compute_node(info);
+							break;
+						case TYPE_SERVER:
+							keep_going = enqueue_message_from_server(info);
+							break;
+						default:
+							FATAL("INTERNAL ERROR: unknown connection type %d", info->type);
 						}
+
+//						if (info->type == TYPE_SERVER) {
+//							keep_going = enqueue_message_from_server(info);
+//						} else {
+//							enqueue_message_from_compute_node(info);
+//						}
 					} else if (error == -1 || error == 2) {
 						// Unexpected disconnect: this should not happen!
 						ERROR(1, "Unexpected termination of link to compute node %d", info->index);
@@ -3032,7 +3129,11 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 					}
 				}
 			}
+		} else if (count < 0) {
+			ERROR(1, "Failed to wait for socket event!");
+			return ERROR_POLL;
 		}
+
 
 		// Check if we need to print anything...
 		now = current_time_micros();
