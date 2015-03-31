@@ -46,10 +46,10 @@
 #define MAX_LENGTH_CLUSTER_NAME 128
 
 // Maximum consecutive write operations to perform on a socket before performing another epoll.
-#define WRITE_OPS_LIMIT 2
+#define WRITE_OPS_LIMIT 1
 
 // Maximum consecutive read operations to perform on a socket before performing another epoll.
-#define READ_OPS_LIMIT 2
+#define READ_OPS_LIMIT 1
 
 //#define MAX_STREAMS 16
 
@@ -2995,13 +2995,13 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 
 					// This socket has room to write some data.
 					error = write_message(info, false);
-					ops = 1;
-
-					// Keep writing wile we have data and there is buffer space in TCP.
-					while (error == 0 && ops < WRITE_OPS_LIMIT) {
-						error = write_message(info, false);
-						ops++;
-					}
+//					ops = 1;
+//
+//					// Keep writing wile we have data and there is buffer space in TCP.
+//					while (error == 0 && ops < WRITE_OPS_LIMIT) {
+//						error = write_message(info, false);
+//						ops++;
+//					}
 
 					if (error == -1) {
 						ERROR(1, "Failed to handle write event on connection to compute node %d (error=%d)", i, error);
@@ -3011,24 +3011,21 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 
 				if (event & EPOLLIN) {
 					// This socket has room to read some data.
-					error = 0;
-					ops = 0;
+//					error = 0;
+//					ops = 0;
+//
+//					// Keep reading while there is more data to read.
+//					while (error == 0 && ops < READ_OPS_LIMIT) {
+					error = read_message(info, false);
+//						ops++;
 
-					// Keep reading while there is more data to read.
-					while (error == 0 && ops < READ_OPS_LIMIT) {
-						error = read_message(info, false);
-						ops++;
-
-						if (error == 0) {
-							if (info->type == TYPE_SERVER) {
-								keep_going = enqueue_message_from_server(info);
-							} else {
-								enqueue_message_from_compute_node(info);
-							}
+					if (error == 0) {
+						if (info->type == TYPE_SERVER) {
+							keep_going = enqueue_message_from_server(info);
+						} else {
+							enqueue_message_from_compute_node(info);
 						}
-					}
-
-					if (error == -1 || error == 2) {
+					} else if (error == -1 || error == 2) {
 						// Unexpected disconnect: this should not happen!
 						ERROR(1, "Unexpected termination of link to compute node %d", info->index);
 						return ERROR_CONNECTION;
