@@ -44,6 +44,13 @@
 #define EPOLL_TIMEOUT 500
 
 #define MAX_LENGTH_CLUSTER_NAME 128
+
+// Maximum consecutive write operations to perform on a socket before performing another epoll.
+#define WRITE_OPS_LIMIT 2
+
+// Maximum consecutive read operations to perform on a socket before performing another epoll.
+#define READ_OPS_LIMIT 2
+
 //#define MAX_STREAMS 16
 
 //#define RECEIVE_BUFFER_SIZE (32*1024*1024)
@@ -954,11 +961,11 @@ static int write_message(socket_info *info, bool blocking)
 		}
 
 		clear_socket_info_out_msg(info);
+		return 0;
 	} else {
 		INFO(1, "Message was partly written!");
+		return 1; // "wouldblock"
 	}
-
-	return 0;
 }
 
 static int read_message(socket_info *info, bool blocking)
@@ -1555,7 +1562,7 @@ static int connect_to_gateways(int crank, int local_port)
 
 				if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_TCP) {
 					// Create a path to the target gateway.
-					status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, 0, 0,
+					status = socket_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
 							&socket);
 
 					if (status != CONNECT_OK) {
@@ -1600,7 +1607,7 @@ static int connect_to_gateways(int crank, int local_port)
 
 			if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_TCP) {
 				// Create a path to the target gateway.
-				status = socket_accept_one(local_port + s, gateway_addresses[remoteIndex].ipv4, 0, 0, &socket);
+				status = socket_accept_one(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
 
 				if (status != CONNECT_OK) {
 					ERROR(1, "Failed to accept!");
@@ -2942,7 +2949,7 @@ static int shutdown_gateway_connections()
 
 static int process_messages()
 {
-	int i, error, count;
+	int i, error, count, ops;
 	struct epoll_event *events;
 	socket_info *info;
 	uint32_t event;
@@ -2972,6 +2979,7 @@ static int process_messages()
 INFO(1, "GATEWAY epoll returned %d events", count);
 
 		if (count > 0) {
+
 			for (i=0;i<count;i++) {
 
 				info = events[i].data.ptr;
@@ -2984,8 +2992,16 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 				}
 
 				if (event & EPOLLOUT) {
+
 					// This socket has room to write some data.
 					error = write_message(info, false);
+					ops = 1;
+
+					// Keep writing wile we have data and there is buffer space in TCP.
+					while (error == 0 && ops < WRITE_OPS_LIMIT) {
+						error = write_message(info, false);
+						ops++;
+					}
 
 					if (error == -1) {
 						ERROR(1, "Failed to handle write event on connection to compute node %d (error=%d)", i, error);
@@ -2995,36 +3011,26 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 
 				if (event & EPOLLIN) {
 					// This socket has room to read some data.
-					error = read_message(info, false);
+					error = 0;
+					ops = 0;
 
-					switch (error) {
-					case 0: // Complete message: determine type and queue it.
-						if (info->type == TYPE_SERVER) {
-							keep_going = enqueue_message_from_server(info);
-						} else {
-							enqueue_message_from_compute_node(info);
+					// Keep reading while there is more data to read.
+					while (error == 0 && ops < READ_OPS_LIMIT) {
+						error = read_message(info, false);
+						ops++;
+
+						if (error == 0) {
+							if (info->type == TYPE_SERVER) {
+								keep_going = enqueue_message_from_server(info);
+							} else {
+								enqueue_message_from_compute_node(info);
+							}
 						}
-						break;
+					}
 
-					case 1: // Would block: so continue loop to next epoll_wait
-						break;
-
-					case 2: // Disconnect: this should not happen!
-//						if (info->state == STATE_TERMINATING) {
-//							// Disconnect was expected!
-//							INFO(1, "Disconnecting compute node %d", info->index);
-//							socket_remove_from_epoll(epollfd, info->socketfd);
-//							close(info->socketfd);
-//							info->state = STATE_TERMINATED;
-//							active_connections--;
-//						} else {
-							ERROR(1, "Unexpected termination of link to compute node %d", info->index);
-							return ERROR_CONNECTION;
-//						}
-//						break;
-
-					default: // Also case -1, error
-						ERROR(1, "Failed to handle event on connection to compute node %d (error=%d)", i, error);
+					if (error == -1 || error == 2) {
+						// Unexpected disconnect: this should not happen!
+						ERROR(1, "Unexpected termination of link to compute node %d", info->index);
 						return ERROR_CONNECTION;
 					}
 				}
