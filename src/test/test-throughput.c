@@ -8,15 +8,15 @@
 //#define TOTAL_DATA   (1024L*1024L*1024L)
 #define TOTAL_DATA   (512L*1024L*1024L)
 
-// Min message size used (TCP fragment size - generic message header size)
-#define MIN_MSG_SIZE (256)
+// Min message size used
+#define MIN_MSG_SIZE (1460-32)
 
 // Max message size used (must be power of two)
 //#define MAX_MSG_SIZE (1024L*1024L)
-#define MAX_MSG_SIZE (256)
+#define MAX_MSG_SIZE (MIN_MSG_SIZE*10)
 
 // Number of times to repeat a test
-#define REPEAT (100)
+#define REPEAT (50)
 
 static uint64_t current_time_micros()
 {
@@ -163,12 +163,11 @@ int main(int argc, char *argv[])
        peer = rank - size/2;
        fprintf(stderr, "My rank is %d and I will receive from %d\n", rank, peer);
     }
-
+   
     i=1;
 
     while (msgsize <= MAX_MSG_SIZE) {
-       // Run a test for a msgsize - 32 (which is the data message header).
-       result = run_test(rank, size, sender, peer, msgsize);
+       result = run_test(rank, size, sender, peer, msgsize-32);
 
        if (result != 0) {
           fprintf(stderr, "Test failed! (msgsize=%d)\n", msgsize);
@@ -177,7 +176,7 @@ int main(int argc, char *argv[])
        }
 
        i++;
-       msgsize *= 2; // i * MIN_MSG_SIZE;
+       msgsize = i * MIN_MSG_SIZE;
     }
 
     fprintf(stderr, "Done!\n");

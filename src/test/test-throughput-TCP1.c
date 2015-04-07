@@ -9,17 +9,14 @@
 #define TOTAL_DATA   (512*1024L*1024L)
 
 // Min message size used (must be power of two)
-#define MIN_MSG_SIZE (1460)
+#define MIN_MSG_SIZE (32)
 
 // Max message size used (must be power of two)
 //#define MAX_MSG_SIZE (1024L*1024L)
-#define MAX_MSG_SIZE (1460*30)
+#define MAX_MSG_SIZE (8*1024L*1024L)
 
 // Number of times to repeat a test
-#define REPEAT (10)
-
-// TCP Buffer size to use
-#define TCP_BUF (32*1024*1024)
+#define REPEAT (5)
 
 static int socketfd = -1;
 
@@ -158,20 +155,19 @@ int run_receive_test(int msgsize)
 
 static int run_server()
 {
-	int msgsize, error, i;
+	int msgsize, error;
 
 	msgsize = MIN_MSG_SIZE;
-        i=1;
 
 	while (msgsize <= MAX_MSG_SIZE) {
-                i++;
+
 		error = run_receive_test(msgsize);
 
 		if (error != 0) {
 			return error;
 		}
 
-		msgsize = MIN_MSG_SIZE*i;
+		msgsize *= 2;
 	}
 
 	return 0;
@@ -179,10 +175,9 @@ static int run_server()
 
 static int run_client()
 {
-	int msgsize, error,i;
+	int msgsize, error;
 
 	msgsize = MIN_MSG_SIZE;
-        i=1;
 
 	while (msgsize <= MAX_MSG_SIZE) {
 
@@ -192,7 +187,7 @@ static int run_client()
 			return error;
 		}
 
-		msgsize = MIN_MSG_SIZE*i;
+		msgsize *= 2;
 	}
 
 	return 0;
@@ -247,7 +242,7 @@ int main(int argc, char *argv[])
     		return 1;
     	}
 
-    	status = socket_connect(server_ipv4, server_port, TCP_BUF, TCP_BUF, &socketfd);
+    	status = socket_connect(server_ipv4, server_port, 0, 0, &socketfd);
 
     	if (status != SOCKET_OK) {
     		fprintf(stderr, "Failed to connect to server!\n");
@@ -259,7 +254,7 @@ int main(int argc, char *argv[])
     } else {
     	// I am the server!
 
-    	status = socket_accept_one(server_port, 0, TCP_BUF, TCP_BUF, &socketfd);
+    	status = socket_accept_one(server_port, 0, 0, 0, &socketfd);
 
     	if (status != SOCKET_OK) {
     		fprintf(stderr, "Failed to connect to client!\n");

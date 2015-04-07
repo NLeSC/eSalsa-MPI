@@ -1,0 +1,36 @@
+####
+#
+# This configuration file defines several variables 
+# used in Makefiles and script of eSalsa-MPI.
+#
+# CC the C compiler to use (e.g., gcc or icc)
+# FC the Fortran compiler to use (e.g., gfortran or ifort)
+# MPICC the MPI compiles cript to use (e.g., mpicc)
+# OPT the compiler optimization options to use when compiling eSalsaMPI
+
+CC=gcc
+FC=gfortran
+MPICC=mpicc
+OPT=-O3
+
+
+# MPI_HOME contains the location of your MPI installation, for example
+# '/usr/lib/openmpi' or '/opt/apps/intel13/impi'. 
+# MPI_INCLUDE contains the location of the MPI include files. 
+# MPI_LIBS contains the location of the MPI libraries
+# MPI_LIB contains the name of the MPI library (without the "lib" prefix).
+
+MPI_HOME=/usr/lib/openmpi 
+MPI_INCLUDE=$MPI_HOME/include
+MPI_LIBS=$MPI_HOME/lib
+MPI_LIB=mpi
+
+UDT_HOME=/home/jason/Workspace/udt4
+UDT_INCLUDE=$UDT_HOME/src
+UDT_LIBS=$UDT_HOME/src
+UDT_LIB=udt
+
+# The following options should be OK.
+AR=ar
+RM=rm
+

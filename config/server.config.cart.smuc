@@ -1,0 +1,54 @@
+##########################################
+# Start with global configuration
+
+# Name of this experiment
+Example 1
+
+# Port at which the server should listnen. 
+20000
+
+# Number of locations used in this experiment
+2
+
+# Number of gateways used per location
+1
+
+# Number of streams used to connect gateways 
+1
+
+# Message fragmentation size 
+# (NOTE: set to 22*1460 fragments, which is slightly below 32K, as this triples the bandwidth to SuperMUC!) 
+2920
+
+# Default send / receive buffer size on gateways (in messages)
+131072
+
+# Wide area protocol to use between gateways. "TCP" and "UDT" are currently supported. 
+TCP
+
+##########################################
+# Name of the first location
+cart
+
+# Number of application processes
+1
+
+# Start of the TCP port range
+22000
+
+# Network device to use for the TCP streams on the gateways
+145.100.18.0/24
+
+##########################################
+# Name of second location
+smuc
+
+# Number of application processes.
+1
+
+# Start of port range.
+21000
+
+# Network device to use for the TCP streams on the gateways
+195.37.7.0/24
+

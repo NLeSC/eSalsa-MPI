@@ -1,0 +1,55 @@
+##########################################
+# Start with global configuration
+
+# Name of this experiment
+Example 1
+
+# Port at which the server should listnen. 
+6677
+
+# Number of locations used in this experiment
+2
+
+# Number of gateways used per location
+1
+
+# Number of streams used to connect gateways 
+1
+
+# Message fragmentation size
+8192
+
+# Default send / receive buffer size on gateways (in messages)
+65535
+
+# Wide area protocol to use between gateways. "TCP" and "UDT" are currently supported. 
+TCP
+
+##########################################
+# Name of second location
+location2
+
+# Number of application processes.
+1
+
+# Start of port range.
+14000
+
+# Network device to use for the TCP streams on the gateways
+#145.100.116.0/24
+192.168.0.5/24
+
+##########################################
+# Name of the first location
+location1
+
+# Number of application processes
+1
+
+# Start of the TCP port range
+12000
+
+# Network device to use for the TCP streams on the gateways
+#145.100.116.0/24
+192.168.0.5/24
+

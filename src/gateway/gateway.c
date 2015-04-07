@@ -22,9 +22,8 @@
 #include "generic_message.h"
 //#include "linked_queue.h"
 #include "socket_util.h"
-#include "udt_util.h"
+//#include "udt_util.h"
 #include "fragments_buffer.h"
-
 
 // We should now allocate a fixed amount of message fragments. We can either do this per processes (ie. 64 per process) or per
 // data volume (ie. 16 GB in total), or use the minimum useful count of the two.
@@ -202,10 +201,10 @@ typedef struct {
 	// linked_queue *output_queue;
 
 	// A mutex to make the output queue thread safe.
-	pthread_mutex_t output_mutex;
+//	pthread_mutex_t output_mutex;
 
 	// A condition variable that allows a dequeue on the output queue to block.
-	pthread_cond_t output_cond;
+//	pthread_cond_t output_cond;
 
 	// Queue for the messages that have been received from the socket (only in gateway-to-gateway TCP connections).
 	// linked_queue *input_queue;
@@ -293,8 +292,8 @@ static uint64_t wa_send_count = 0;
 static uint64_t wa_received_data = 0;
 static uint64_t wa_received_count = 0;
 
-static pthread_mutex_t send_data_mutex;
-static pthread_mutex_t received_data_mutex;
+//static pthread_mutex_t send_data_mutex;
+//static pthread_mutex_t received_data_mutex;
 
 // These represent the socket connections to the local compute nodes.
 static socket_info **local_compute_nodes;
@@ -345,46 +344,45 @@ static uint64_t current_time_micros()
 void store_sender_thread_stats(int index, uint64_t data, uint64_t count, uint64_t time)
 {
 	// Lock the send data first
-	pthread_mutex_lock(&send_data_mutex);
+//	pthread_mutex_lock(&send_data_mutex);
 
 	wa_send_data += data;
 	wa_send_count += count;
 
-	pthread_mutex_unlock(&send_data_mutex);
+//	pthread_mutex_unlock(&send_data_mutex);
 }
 
 void retrieve_sender_thread_stats(uint64_t *data, uint64_t *count)
 {
 	// Lock the send data first
-	pthread_mutex_lock(&send_data_mutex);
+//	pthread_mutex_lock(&send_data_mutex);
 
 	*data = wa_send_data;
 	*count = wa_send_count;
 
-	pthread_mutex_unlock(&send_data_mutex);
+//	pthread_mutex_unlock(&send_data_mutex);
 }
 
 void store_receiver_thread_stats(int index, uint64_t data, uint64_t count, uint64_t time)
 {
 	// Lock the send data first
-	pthread_mutex_lock(&received_data_mutex);
+//	pthread_mutex_lock(&received_data_mutex);
 
 	wa_received_data += data;
 	wa_received_count += count;
 
-	pthread_mutex_unlock(&received_data_mutex);
-
+//	pthread_mutex_unlock(&received_data_mutex);
 }
 
 void retrieve_receiver_thread_stats(uint64_t *data, uint64_t *count)
 {
 	// Lock the send data first
-	pthread_mutex_lock(&send_data_mutex);
+//	pthread_mutex_lock(&send_data_mutex);
 
-	*data = wa_received_data;
-	*count = wa_received_count;
+//	*data = wa_received_data;
+//	*count = wa_received_count;
 
-	pthread_mutex_unlock(&send_data_mutex);
+//	pthread_mutex_unlock(&send_data_mutex);
 }
 
 static void clear_socket_info_in_msg(socket_info *info)
@@ -407,15 +405,15 @@ static void clear_socket_info_out_msg(socket_info *info)
 static void set_done_at_socket_info(socket_info *info)
 {
 	// Lock the queue first.
-	pthread_mutex_lock(&(info->output_mutex));
+//	pthread_mutex_lock(&(info->output_mutex));
 
 	info->done = true;
 
 	// Tell any listners that something has happened.
-	pthread_cond_broadcast(&(info->output_cond));
+//	pthread_cond_broadcast(&(info->output_cond));
 
 	// Unlock the queue.
-	pthread_mutex_unlock(&(info->output_mutex));
+//	pthread_mutex_unlock(&(info->output_mutex));
 }
 
 static int enqueue_message_at_socket_info(socket_info *info, int index)
@@ -427,7 +425,7 @@ static int enqueue_message_at_socket_info(socket_info *info, int index)
 //	fprintf(stderr, "##### Enqueue for socket_info %d", info->socketfd);
 
 	// Lock the queue first.
-	pthread_mutex_lock(&info->output_mutex);
+//	pthread_mutex_lock(&info->output_mutex);
 
 	if (info->done) {
 		FATAL("Cannot enqueue message after done is set!");
@@ -490,11 +488,11 @@ static int enqueue_message_at_socket_info(socket_info *info, int index)
 //		fprintf(stderr, "##### Sending bcast to wake up threads! (socket_info %d)", info->socketfd);
 
 		// FIXME: is this alway needed ?
-		pthread_cond_broadcast(&info->output_cond);
+//		pthread_cond_broadcast(&info->output_cond);
 	}
 
 	// Unlock the queue.
-	pthread_mutex_unlock(&info->output_mutex);
+//	pthread_mutex_unlock(&info->output_mutex);
 
 //	fprintf(stderr, "##### Enqueue done for socket_info %d", info->socketfd);
 
@@ -563,8 +561,8 @@ static void add_ack_bytes(message_header *mh)
 
 static int dequeue_message_from_socket_info(socket_info *info, int64_t timeout_usec)
 {
-	struct timespec alarm;
-	struct timeval now;
+//	struct timespec alarm;
+//	struct timeval now;
 	int error;
 
 //	fprintf(stderr, "##### Dequeue message from socket_info %d", info->socketfd);
@@ -576,69 +574,69 @@ static int dequeue_message_from_socket_info(socket_info *info, int64_t timeout_u
 	info->out_msg_index = -1;
 
 	// Lock the queue first.
-	pthread_mutex_lock(&(info->output_mutex));
+//	pthread_mutex_lock(&(info->output_mutex));
 
 	INFO(2, "Dequeue message from socket info socketfd=%d output_queue_size=%d ", info->socketfd, info->output_queue_size);
 
 //	fprintf(stderr, "##### Dequeue grabbed lock! (socket_info %d)", info->socketfd);
 
-	while (info->output_queue_size == 0) {
-
-		if (info->done) {
-			// We are done. No more messages will be queued. Set the socket to read only before returning!.
-			if (info->type == TYPE_COMPUTE_NODE_TCP || info->type == TYPE_SERVER) {
-				error = socket_set_ro(epollfd, info->socketfd, info);
-
-				if (error != 0) {
-					WARN(1, "Failed to set socket %d to read only", info->socketfd);
-				}
-			}
-
-			pthread_mutex_unlock(&info->output_mutex);
-			return 2;
-		}
-
-		if (timeout_usec == 0) {
-			// We don't wait for an element to appear, but return immediately!
-			break;
-		}
-
-		if (timeout_usec < 0) {
-			// negative timeout, so perform a blocking wait.
-			error = pthread_cond_wait(&info->output_cond, &info->output_mutex);
-
-			if (error != 0) {
-				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
-			}
-		} else {
-			// positive timeout, so perform a timed wait.
-
-			//		fprintf(stderr, "##### Dequeue will sleep for %ld usec (socket_info %d)", timeout_usec, info->socketfd);
-
-			gettimeofday(&now, NULL);
-			alarm.tv_sec = now.tv_sec + (timeout_usec / 1000000);
-			alarm.tv_nsec = (now.tv_usec + (timeout_usec % 1000000)) * 1000;
-
-			if (alarm.tv_nsec >= 1000000000) {
-				alarm.tv_sec++;
-				alarm.tv_nsec -= 1000000000;
-			}
-
-			error = pthread_cond_timedwait(&info->output_cond, &info->output_mutex, &alarm);
-
-			//	fprintf(stderr, "##### Dequeue woke up!(socket_info %d)", info->socketfd);
-
-			if (error == ETIMEDOUT) {
-				// If the timeout expired we return.
-			//	fprintf(stderr, "##### Dequeue got timeout!(socket_info %d)", info->socketfd);
-				break;
-			}
-
-			if (error != 0) {
-				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
-			}
-		}
-	}
+//	while (info->output_queue_size == 0) {
+//
+//		if (info->done) {
+//			// We are done. No more messages will be queued. Set the socket to read only before returning!.
+//			if (info->type == TYPE_COMPUTE_NODE_TCP || info->type == TYPE_SERVER) {
+//				error = socket_set_ro(epollfd, info->socketfd, info);
+//
+//				if (error != 0) {
+//					WARN(1, "Failed to set socket %d to read only", info->socketfd);
+//				}
+//			}
+//
+//			pthread_mutex_unlock(&info->output_mutex);
+//			return 2;
+//		}
+//
+//		if (timeout_usec == 0) {
+//			// We don't wait for an element to appear, but return immediately!
+//			break;
+//		}
+//
+//		if (timeout_usec < 0) {
+//			// negative timeout, so perform a blocking wait.
+//			error = pthread_cond_wait(&info->output_cond, &info->output_mutex);
+//
+//			if (error != 0) {
+//				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
+//			}
+//		} else {
+//			// positive timeout, so perform a timed wait.
+//
+//			//		fprintf(stderr, "##### Dequeue will sleep for %ld usec (socket_info %d)", timeout_usec, info->socketfd);
+//
+//			gettimeofday(&now, NULL);
+//			alarm.tv_sec = now.tv_sec + (timeout_usec / 1000000);
+//			alarm.tv_nsec = (now.tv_usec + (timeout_usec % 1000000)) * 1000;
+//
+//			if (alarm.tv_nsec >= 1000000000) {
+//				alarm.tv_sec++;
+//				alarm.tv_nsec -= 1000000000;
+//			}
+//
+//			error = pthread_cond_timedwait(&info->output_cond, &info->output_mutex, &alarm);
+//
+//			//	fprintf(stderr, "##### Dequeue woke up!(socket_info %d)", info->socketfd);
+//
+//			if (error == ETIMEDOUT) {
+//				// If the timeout expired we return.
+//			//	fprintf(stderr, "##### Dequeue got timeout!(socket_info %d)", info->socketfd);
+//				break;
+//			}
+//
+//			if (error != 0) {
+//				WARN(1, "Failed to wait for message on output queue of socket %d", info->socketfd);
+//			}
+//		}
+//	}
 
 	if (info->output_queue_size > 0) {
 		// A message is available in the queue.
@@ -659,26 +657,7 @@ static int dequeue_message_from_socket_info(socket_info *info, int64_t timeout_u
 
 		INFO(3, "Dequeued message %d queue size now %d", info->out_msg_index, info->output_queue_size);
 
-	} else {
-
-		// No messages available, so set the socket to read-only! We need to do this inside the lock of the queue to prevent
-		// queue when we don't expect it.
-
-		if (info->type == TYPE_COMPUTE_NODE_TCP || info->type == TYPE_SERVER) {
-			error = socket_set_ro(epollfd, info->socketfd, info);
-
-			if (error != 0) {
-				WARN(1, "Failed to set socket %d to read only", info->socketfd);
-			}
-		}
-	}
-
-	// Unlock the queue.
-	pthread_mutex_unlock(&info->output_mutex);
-
-	if (info->out_msg_index != -1) {
-
-		// We've managed to get a message, so update some fields.
+		// Update some fields.
 		if (info->type == TYPE_COMPUTE_NODE_TCP) {
 
 			INFO(3, "Dequeued message for compute node - deq message data from g2n buffer");
@@ -705,8 +684,22 @@ static int dequeue_message_from_socket_info(socket_info *info, int64_t timeout_u
 		return 0;
 	}
 
+	// No messages available, so set the socket to read-only!
+	if (info->type == TYPE_COMPUTE_NODE_TCP || info->type == TYPE_SERVER) {
+		error = socket_set_ro(epollfd, info->socketfd, info);
 
-	return 1;
+		if (error != 0) {
+			WARN(1, "Failed to set socket %d to read only", info->socketfd);
+		}
+	}
+
+	if (info->done) {
+		// We are done. No more messages will be queued.
+		return 2;
+	} else {
+		// We return "wouldblock"
+		return 1;
+	}
 }
 
 static bool enqueue_message_from_server(socket_info *info)
@@ -721,18 +714,18 @@ static bool enqueue_message_from_server(socket_info *info)
 	if (m->dst_pid == my_pid) {
 		INFO(1, "RECEIVED SERVER REPLY for this gateway length=%d index=%d", m->length, info->in_msg_index);
 
-		if ((m->length - GENERIC_MESSAGE_HEADER_SIZE) != 8 || (((uint32_t *)&m->payload)[0] != OPCODE_FINALIZE_REPLY)) {
-			ERROR(1, "RECEIVED UNEXPECTED SERVER REPLY for magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d length=%d index=%d",
-					GET_MAGIC0(m->flags),
-					GET_MAGIC1(m->flags),
-					GET_FLAGS(m->flags),
-					GET_OPCODE(m->flags),
-					GET_CLUSTER_RANK(m->src_pid),
-					GET_PROCESS_RANK(m->src_pid),
-					GET_CLUSTER_RANK(m->dst_pid),
-					GET_PROCESS_RANK(m->dst_pid),
-					m->length, info->in_msg_index);
-		}
+//		if ((m->length - GENERIC_MESSAGE_HEADER_SIZE) != 8 || (((uint32_t *)&m->payload)[0] != OPCODE_FINALIZE_REPLY)) {
+//			ERROR(1, "RECEIVED UNEXPECTED SERVER REPLY for magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d length=%d index=%d",
+//					GET_MAGIC0(m->flags),
+//					GET_MAGIC1(m->flags),
+//					GET_FLAGS(m->flags),
+//					GET_OPCODE(m->flags),
+//					GET_CLUSTER_RANK(m->src_pid),
+//					GET_PROCESS_RANK(m->src_pid),
+//					GET_CLUSTER_RANK(m->dst_pid),
+//					GET_PROCESS_RANK(m->dst_pid),
+//					m->length, info->in_msg_index);
+//		}
 
 		// We've received a finalize command from the server. This can only happen if all processes have called an MPI_Finalize,
 		// after which they have notified the server that they want to quit. Once all request are in, the server replies by
@@ -885,7 +878,9 @@ static int write_message(socket_info *info, bool blocking)
 	ssize_t written;
 	size_t bytes_left;
 //	int64_t timeout;
+#if VERBOSE > 2
 	generic_message *m;
+#endif
 
 	// If there was no message in progress, we try to dequeue one.
 	if (info->out_msg == NULL) {
@@ -907,6 +902,7 @@ static int write_message(socket_info *info, bool blocking)
 			return status;
 		}
 
+#if VERBOSE > 2
 		m = (generic_message *)info->out_msg;
 
 		INFO(1, "DEQ DATA MESSAGE at index %d magic=%d:%d flag=%d opcode=%d src=%d:%d dst=%d:%d seq=%d ack=%d length=%d",
@@ -922,7 +918,7 @@ static int write_message(socket_info *info, bool blocking)
 									m->transmit_seq,
 									m->ack_seq,
 									m->length);
-
+#endif
 	}
 
 	bytes_left = info->out_msg_length - info->out_msg_pos;
@@ -1364,7 +1360,7 @@ void* udt_receiver_thread(void *arg)
 
 static socket_info *create_socket_info(int socketfd, int type, int state)
 {
-	int error;
+//	int error;
 	socket_info *info;
 
 	info = (socket_info *) malloc(sizeof(socket_info));
@@ -1412,17 +1408,17 @@ static socket_info *create_socket_info(int socketfd, int type, int state)
 	info->output_queue_head = 0;
 	info->output_queue_tail = 0;
 
-	error = pthread_cond_init(&(info->output_cond), NULL);
-
-	if (error != 0) {
-		FATAL("Failed to create socket info!");
-	}
-
-	error = pthread_mutex_init(&(info->output_mutex), NULL);
-
-	if (error != 0) {
-		FATAL("Failed to create socket info!");
-	}
+//	error = pthread_cond_init(&(info->output_cond), NULL);
+//
+//	if (error != 0) {
+//		FATAL("Failed to create socket info!");
+//	}
+//
+//	error = pthread_mutex_init(&(info->output_mutex), NULL);
+//
+//	if (error != 0) {
+//		FATAL("Failed to create socket info!");
+//	}
 
 //	error = pthread_mutex_init(&(info->bytes_mutex), NULL);
 
@@ -1520,8 +1516,8 @@ static int receive_gateway_ready_opcode(int index)
 
 	if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_TCP) {
 		status = socket_receivefully(socketfd, (unsigned char *) &opcode, 4);
-	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
-		status = udt_receivefully(socketfd, (unsigned char *) &opcode, 4);
+//	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
+//		status = udt_receivefully(socketfd, (unsigned char *) &opcode, 4);
 	} else {
 		FATAL("Unknown gateway protocol (%d)!", gateway_connections[index].sockets[0]->type);
 	}
@@ -1542,8 +1538,8 @@ static int send_gateway_ready_opcode(int index)
 
 	if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_TCP) {
 		status = socket_sendfully(socketfd, (unsigned char *) &opcode, 4);
-	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
-		status = udt_sendfully(socketfd, (unsigned char *) &opcode, 4);
+//	} else if (gateway_connections[index].sockets[0]->type == TYPE_GATEWAY_UDT) {
+//		status = udt_sendfully(socketfd, (unsigned char *) &opcode, 4);
 	} else {
 		FATAL("Unknown gateway protocol (%d)!", gateway_connections[index].sockets[0]->type);
 	}
@@ -1589,16 +1585,16 @@ static int connect_to_gateways(int crank, int local_port)
 
 					gateway_connections[i].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_TCP, STATE_READY);
 
-				} else if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_UDT) {
-					status = udt_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
-							&socket);
-
-					if (status != CONNECT_OK) {
-						ERROR(1, "Failed to connect!");
-						return status;
-					}
-
-					gateway_connections[i].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_UDT, STATE_READY);
+//				} else if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_UDT) {
+//					status = udt_connect(gateway_addresses[remoteIndex].ipv4, gateway_addresses[remoteIndex].port + s, -1, -1,
+//							&socket);
+//
+//					if (status != CONNECT_OK) {
+//						ERROR(1, "Failed to connect!");
+//						return status;
+//					}
+//
+//					gateway_connections[i].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_UDT, STATE_READY);
 				}
 
 				INFO(1, "Created connection to remote gateway stream %d.%d.%d socket = %d!", i, gateway_rank, s, socket);
@@ -1633,15 +1629,15 @@ static int connect_to_gateways(int crank, int local_port)
 
 				gateway_connections[crank].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_TCP, STATE_READY);
 
-			} else if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_UDT) {
-				status = udt_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
-
-				if (status != CONNECT_OK) {
-					ERROR(1, "Failed to accept!");
-					return status;
-				}
-
-				gateway_connections[crank].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_UDT, STATE_READY);
+//			} else if (gateway_addresses[remoteIndex].protocol == WIDE_AREA_PROTOCOL_UDT) {
+//				status = udt_accept(local_port + s, gateway_addresses[remoteIndex].ipv4, -1, -1, &socket);
+//
+//				if (status != CONNECT_OK) {
+//					ERROR(1, "Failed to accept!");
+//					return status;
+//				}
+//
+//				gateway_connections[crank].sockets[s] = create_socket_info(socket, TYPE_GATEWAY_UDT, STATE_READY);
 			}
 
 			INFO(1, "Accepted connection from remote gateway %d.%d.%d socket = %d!", crank, gateway_rank, s, socket);
@@ -1890,14 +1886,15 @@ static void print_gateway_statistics(uint64_t deltat)
 */
 
 
-
 static void print_gateway_statistics(uint64_t deltat)
 {
+	int i,j;
+	socket_info *info;
 	uint64_t sec, millis, dt;
-        uint64_t receive_data, receive_count, send_data, send_count;
-        uint64_t delta_receive_data, delta_receive_count, delta_send_data, delta_send_count;
-        double gbit_in, gbit_out;
-        uint64_t prate_in, prate_out;
+	uint64_t receive_data, receive_count, send_data, send_count;
+	uint64_t delta_receive_data, delta_receive_count, delta_send_data, delta_send_count;
+	double gbit_in, gbit_out;
+	uint64_t prate_in, prate_out;
 
 	sec = deltat / 1000000UL;
 	millis = (deltat % 1000000UL) / 1000UL;
@@ -1905,8 +1902,25 @@ static void print_gateway_statistics(uint64_t deltat)
 	dt = deltat - prev_deltat;
 
 	// Retrieve stats for sending and receiving
-	retrieve_receiver_thread_stats(&receive_data, &receive_count);
-	retrieve_sender_thread_stats(&send_data, &send_count);
+//	retrieve_receiver_thread_stats(&receive_data, &receive_count);
+//	retrieve_sender_thread_stats(&send_data, &send_count);
+
+	receive_data = 0L;
+	receive_count = 0L;
+	send_data = 0L;
+	send_count = 0L;
+
+	for (j=0;j<cluster_count;j++) {
+		if (j != cluster_rank) {
+			for (i=0;i<gateway_connections[j].stream_count;i++) {
+				info = gateway_connections[j].sockets[i];
+				receive_data += info->out_msg_bytes_total;
+				receive_count += info->out_msg_count;
+				send_data += info->in_msg_bytes_total;
+				send_count += info->in_msg_count;
+			}
+		}
+	}
 
         delta_receive_data = receive_data - prev_received_data;
         delta_receive_count = receive_count - prev_received_count;
@@ -2709,19 +2723,19 @@ static int gateway_init(int argc, char **argv)
 	cluster_count = 0;
 	cluster_rank = -1;
 
-	error = pthread_mutex_init(&send_data_mutex, NULL);
-
-	if (error != 0) {
-		ERROR(1, "Failed to init mutex!");
-		return ERROR_MUTEX;
-	}
-
-	error = pthread_mutex_init(&received_data_mutex, NULL);
-
-	if (error != 0) {
-		ERROR(1, "Failed to init mutex!");
-		return ERROR_MUTEX;
-	}
+//	error = pthread_mutex_init(&send_data_mutex, NULL);
+//
+//	if (error != 0) {
+//		ERROR(1, "Failed to init mutex!");
+//		return ERROR_MUTEX;
+//	}
+//
+//	error = pthread_mutex_init(&received_data_mutex, NULL);
+//
+//	if (error != 0) {
+//		ERROR(1, "Failed to init mutex!");
+//		return ERROR_MUTEX;
+//	}
 
 	// Read the cluster name and server location from a file.
 	error = init_cluster_info(argc, argv);
@@ -2962,7 +2976,7 @@ static int shutdown_gateway_connection(int index)
 {
 	int i;
 	gateway_connection *gw;
-	void *result;
+//	void *result;
 
 	if (index != cluster_rank) {
 
@@ -2983,8 +2997,8 @@ static int shutdown_gateway_connection(int index)
 			if (gw->sockets[i]->type == TYPE_GATEWAY_TCP) {
 				// close the sending part of the socket, but leave the receiveing part open!
 				shutdown(gw->sockets[i]->socketfd, SHUT_WR);
-			} else if (gw->sockets[i]->type == TYPE_GATEWAY_UDT) {
-				udt4_close(gw->sockets[i]->socketfd);
+//			} else if (gw->sockets[i]->type == TYPE_GATEWAY_UDT) {
+//				udt4_close(gw->sockets[i]->socketfd);
 			} else {
 				FATAL("INTERNAL ERROR: Unknown socket type in gateway connection %d.%d", index, i);
 			}
@@ -3029,7 +3043,7 @@ static int shutdown_gateway_connections()
 
 static int process_messages()
 {
-	int i, error, count, event_count, ops;
+	int i, error, count, event_count; //, ops;
 	struct epoll_event *events;
 	socket_info *info;
 	uint32_t event;

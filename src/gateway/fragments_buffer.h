@@ -3,15 +3,17 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <pthread.h>
+//#include <pthread.h>
+
+#define PAGE_SIZE 4096L
 
 typedef struct {
 
 	// A mutex to make the fragment buffer thread safe.
-	pthread_mutex_t mutex;
+//	pthread_mutex_t mutex;
 
 	// A condition variable that allows a pop on the output queue to block until a fragment is available.
-	pthread_cond_t cond;
+//	pthread_cond_t cond;
 
 	// The buffer containing all message fragments.
 	unsigned char *buffer;
@@ -21,6 +23,9 @@ typedef struct {
 
 	// The number of fragments available in the buffer.
 	int fragment_count;
+
+	// The number of pages used by each fragment.
+	int pages_per_fragment;
 
 	// A stack containing all free message fragments.
 	int *free_stack;

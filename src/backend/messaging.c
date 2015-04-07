@@ -627,7 +627,7 @@ static virtual_connection *select_active_connection() {
 static int copy_fragment_to_send(virtual_connection *vc, generic_message *m) {
 
 	size_t avail = 0;
-	uint32_t cluster, process;
+//	uint32_t cluster, process;
 
 	if (vc->send_message != NULL) {
 		// The virtual connection has a data message waiting, so calculate the number of bytes that need to be send.
