@@ -8,11 +8,15 @@
 # MPICC the MPI compiles cript to use (e.g., mpicc)
 # OPT the compiler optimization options to use when compiling eSalsaMPI
 
+#CC=icc
+#FC=ifort
+#MPICC=mpiicc
+#OPT=-O2
+
 CC=gcc
 FC=gfortran
 MPICC=mpicc
 OPT=-O3
-
 
 # MPI_HOME contains the location of your MPI installation, for example
 # '/usr/lib/openmpi' or '/opt/apps/intel13/impi'. 
@@ -20,12 +24,12 @@ OPT=-O3
 # MPI_LIBS contains the location of the MPI libraries
 # MPI_LIB contains the name of the MPI library (without the "lib" prefix).
 
-MPI_HOME=/usr/lib/openmpi 
-MPI_INCLUDE=$MPI_HOME/include
-MPI_LIBS=$MPI_HOME/lib
+MPI_HOME=/lrz/sys/intel/mpi_41_3_048
+MPI_INCLUDE=$MPI_HOME/include64
+MPI_LIBS=$MPI_HOME/lib64
 MPI_LIB=mpi
 
-UDT_HOME=/home/jason/Workspace/udt4
+UDT_HOME=/home/hpc/pr87ji/di68tok/udt4
 UDT_INCLUDE=$UDT_HOME/src
 UDT_LIBS=$UDT_HOME/src
 UDT_LIB=udt
