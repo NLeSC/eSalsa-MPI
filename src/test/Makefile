@@ -1,6 +1,6 @@
 include $(EMPI_HOME)/empi.config
 
-TESTS = test-throughput-TCP.exe test-throughput-TCP2.exe test_allreduce.exe test_collectives.exe test_group.exe test_init.exe test_irecv_self.exe test_isend_irecv.exe test_send_irecv.exe test_send_recv.exe test_split.exe test-throughput.exe test-throughput-OCN.exe test-throughput-ATM.exe test_barrier.exe
+TESTS = test-throughput-TCP.exe test-throughput-TCP1.exe test-throughput-TCP2.exe test_allreduce.exe test_collectives.exe test_group.exe test_init.exe test_irecv_self.exe test_isend_irecv.exe test_send_irecv.exe test_send_recv.exe test_split.exe test-throughput.exe test-throughput2.exe test-throughput-OCN.exe test-throughput-ATM.exe test_barrier.exe
 
 all: $(TESTS)
 
