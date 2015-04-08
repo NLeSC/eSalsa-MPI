@@ -66,8 +66,6 @@ public class Cluster {
                 while (more) {
                     more = sendMessage();
                 }
-                
-                closeSocket();
             } catch (Exception e) {
                 e.printStackTrace(System.err);
             }
@@ -83,9 +81,7 @@ public class Cluster {
                     more = receiveMessage();
                 }
             } catch (Exception e) {
-                if (!isDone()) { 
-                    e.printStackTrace(System.err);
-                }
+                e.printStackTrace(System.err);
             }
         }
     }
@@ -547,7 +543,6 @@ public class Cluster {
         owner.clusterDone();
     }
 
-
     private boolean isDone() {
         synchronized (outgoing) {
             return done;
@@ -567,10 +562,6 @@ public class Cluster {
             }
             
             outgoing.notifyAll();
-        }
-        
-        if (m.opcode == Protocol.OPCODE_FINALIZE_REPLY) { 
-            done();
         }
     }
 
@@ -704,6 +695,15 @@ public class Cluster {
             return readIntBigEndian(message, 4);
         }
     }    
+
+    private int getOpcode(byte [] message) throws IOException {
+        
+        if (message[0] != 0x4D || message[1] != 0x67) { 
+            throw new IOException("Invalid Message!");
+        }
+        
+        return (int) message[3];
+    }    
     
     private boolean receiveMessage() throws IOException {
 
@@ -718,19 +718,25 @@ public class Cluster {
         }        
         
         in.readFully(message, FragmentationOutputStream.HEADER_LENGTH, length-FragmentationOutputStream.HEADER_LENGTH);
+                
+        System.err.println("Got MESSAGE with opcode " + getOpcode(message));
         
-        VirtualConnection vc = getVirtualConnection(getSource(message));
+        if (getOpcode(message) == FragmentationOutputStream.OPCODE_TERMINATE) {
+            // We are in the termination phase, and the gateway of this cluster is telling us his cluster is done. 
+            done();
+            return false;
+        } else { 
+            VirtualConnection vc = getVirtualConnection(getSource(message));
         
-        CommunicatorRequest req = vc.receivedMessage(message, length);
+            CommunicatorRequest req = vc.receivedMessage(message, length);
         
-        if (req != null) { 
-            messagesReceived++;
-            owner.deliverRequest(req);
+            if (req != null) { 
+                messagesReceived++;
+                owner.deliverRequest(req);
+            }
+            
+            return true;
         }
-        
-        // TODO: Figure out how to stop!
-        
-        return true;
     }
         
         
@@ -750,35 +756,34 @@ public class Cluster {
         return basePort;
     }
 
-    void closeSocket() {
-        // Wait until all clusters are done!
-        owner.allClustersDone();
+    public void shutdown() {
+        
+        // Shutdown this cluster. Will only be called is all application processed have signed off, 
+        // and all gateways have indicated that they are ready to terminate.
+        try {
+            out.writeInt(Protocol.OPCODE_CLOSE_LINK);
+            out.flush();
+        } catch (Exception e) {
+            Logging.error("Failed write OPCODE_CLOSE_LINK to cluster " + name);
+        }
 
-//        
-//        try {
-//            out.writeInt(Protocol.OPCODE_CLOSE_LINK);
-//            out.flush();
-//        } catch (Exception e) {
-//            Logging.error("Failed write OPCODE_FINALIZE_REPLY to cluster " + name);
-//        }
-//
-//        try {
-//            in.close();
-//        } catch (Exception e) {
-//            Logging.error("Failed to close socket input from cluster " + name);
-//        }
-//
-//        try {
-//            out.close();
-//        } catch (Exception e) {
-//            Logging.error("Failed to close socket output to cluster " + name);
-//        }
-//
-//        try {
-//            socket.close();
-//        } catch (Exception e) {
-//            Logging.error("Failed to close socket connection to cluster " + name);
-//        }
+        try {
+            in.close();
+        } catch (Exception e) {
+            Logging.error("Failed to close socket input from cluster " + name);
+        }
+
+        try {
+            out.close();
+        } catch (Exception e) {
+            Logging.error("Failed to close socket output to cluster " + name);
+        }
+
+        try {
+            socket.close();
+        } catch (Exception e) {
+            Logging.error("Failed to close socket connection to cluster " + name);
+        }
     }
 
     private void printNetwork(byte [] network, StringBuilder target) {

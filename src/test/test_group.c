@@ -28,13 +28,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    fprintf(stderr, "Performing MPI_Comm_group\n");
+
     error = MPI_Comm_group(MPI_COMM_WORLD, &world);
 
     if (error != MPI_SUCCESS) {
-	fprintf(stderr, "MPI_Comm_Group failed!\n");
+    	fprintf(stderr, "MPI_Comm_Group failed!\n");
         MPI_Finalize();
         return 1;
     }
+
+    fprintf(stderr, "Performing MPI_Group_rank\n");
 
     error = MPI_Group_rank(world, &newrank);
 
@@ -43,6 +47,8 @@ int main(int argc, char *argv[])
         MPI_Finalize();
         return 1;
     }
+
+    fprintf(stderr, "Performing MPI_Group_size\n");
 
     error = MPI_Group_size(world, &newsize);
 
@@ -58,6 +64,8 @@ int main(int argc, char *argv[])
     rev[0][1] = 0;
     rev[0][2] = -1;
 
+    fprintf(stderr, "Performing MPI_Group_range_incl\n");
+
     error = MPI_Group_range_incl(world, 1, rev, &reverse);
 
     if (error != MPI_SUCCESS) {
@@ -66,6 +74,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    fprintf(stderr, "Performing MPI_Group_rank of reverse group\n");
+
     error = MPI_Group_rank(reverse, &newrank);
 
     if (error != MPI_SUCCESS) {
@@ -73,6 +83,8 @@ int main(int argc, char *argv[])
         MPI_Finalize();
         return 1;
     }
+
+    fprintf(stderr, "Performing MPI_Group_size of reverse group\n");
 
     error = MPI_Group_size(reverse, &newsize);
 
@@ -84,6 +96,8 @@ int main(int argc, char *argv[])
 
     fprintf(stderr, "I am process %d of %d in reverse group\n", newrank, newsize);
 
+    fprintf(stderr, "Performing MPI_Comm_create of reverse group\n");
+
     error = MPI_Comm_create(MPI_COMM_WORLD, reverse, &c1);
 
     if (error != MPI_SUCCESS) {
@@ -92,6 +106,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    fprintf(stderr, "Performing MPI_Comm_size of reverse comm\n");
+
     error = MPI_Comm_size(c1, &newsize);
 
     if (error != MPI_SUCCESS) {
@@ -99,6 +115,8 @@ int main(int argc, char *argv[])
         MPI_Finalize();
         return 1;
     }
+
+    fprintf(stderr, "Performing MPI_Comm_rank of reverse comm\n");
 
     error = MPI_Comm_rank(c1, &newrank);
 

@@ -708,7 +708,6 @@ static bool enqueue_message_from_server(socket_info *info)
 	// is handled by a single epoll thread (together with all compute node links), only one of these calls is active at a time.
 	int rank;
 
-	bool result;
 	generic_message *m = (generic_message *) info->in_msg;
 
 	if (m->dst_pid == my_pid) {
@@ -759,11 +758,11 @@ static bool enqueue_message_from_server(socket_info *info)
 	}
 
 */
-	result = enqueue_message_at_socket_info(local_compute_nodes[rank], info->in_msg_index);
+	enqueue_message_at_socket_info(local_compute_nodes[rank], info->in_msg_index);
 
 	clear_socket_info_in_msg(info);
 
-	return result;
+	return true;
 }
 
 static void enqueue_message_from_compute_node(socket_info *info)
@@ -1056,7 +1055,7 @@ static int read_message(socket_info *info, bool blocking)
 
 		bytes_read = socket_receive(info->socketfd, info->in_msg + info->in_msg_pos, bytes_needed, blocking);
 
-//		INFO(1, "XXX Receive of message from socket %d done! pos=%ld needed=%ld read=%ld", info->socketfd, info->in_msg_pos,
+//		WARN(1, "XXX Receive of message from socket %d done! pos=%ld needed=%ld read=%ld", info->socketfd, info->in_msg_pos,
 //				bytes_needed, bytes_read);
 
 		if (bytes_read > 0) {
@@ -2297,7 +2296,7 @@ static int receive_gateway(int index)
 	gateway_addresses[index].protocol = protocol;
 	gateway_addresses[index].streams = streams;
 
-	WARN(2, "Received gateway info %d address=%d port %d protocol %d streams %d", index, ipv4, port, protocol, streams);
+//	WARN(2, "Received gateway info %d address=%d port %d protocol %d streams %d", index, ipv4, port, protocol, streams);
 
 	return 0;
 }
@@ -3027,8 +3026,44 @@ static int shutdown_gateway_connection(int index)
 
 static int shutdown_gateway_connections()
 {
-	int i, status;
+	int i, status, opcode, error;
+	generic_message m;
 
+	// Before closing the gateway connections, we need to be sure all gateways are informed that they need to ready to stop.
+	// Otherwise, the gateways that have not receive the server message yet will treat this as an error!
+
+	// Set server socket to blocking mode.
+	error = socket_set_blocking(serverfd);
+
+	if (error != 0) {
+		ERROR(1, "Failed to set server socket connection to blocking!");
+		return error;
+	}
+
+	// We construct a terminate message here.
+	m.flags = SET_FLAGS_FIELD(0, OPCODE_TERMINATE);
+	m.dst_pid = server_pid;
+	m.src_pid = my_pid;
+	m.ack_seq = 0;
+	m.transmit_seq = 0;
+	m.length = GENERIC_MESSAGE_HEADER_SIZE;
+
+	// Send the terminate message to the server.
+	error = socket_sendfully(serverfd, (unsigned char *) &m, GENERIC_MESSAGE_HEADER_SIZE);
+
+	if (error != SOCKET_OK) {
+		ERROR(1, "Failed to send OPCODE_GATEWAY_DONE to server!");
+		return 1;
+	}
+
+	error = socket_receivefully(serverfd, (unsigned char *) &opcode, sizeof(int));
+
+	if (error != SOCKET_OK || opcode != OPCODE_CLOSE_LINK) {
+		ERROR(1, "Failed to receive OPCODE_CLOSE_LINK from server!");
+		return 1;
+	}
+
+	// Now we are sure all gateways agree and we may close the links.
 	for (i=0;i<cluster_count;i++) {
 		status = shutdown_gateway_connection(i);
 
@@ -3138,7 +3173,8 @@ INFO(1, "GATEWAY epoll returned %d events", count);
 //						}
 					} else if (error == -1 || error == 2) {
 						// Unexpected disconnect: this should not happen!
-						ERROR(1, "Unexpected termination of link to compute node %d", info->index);
+						ERROR(1, "Unexpected termination of link to node %d of type %d with error %d", info->index, info->type,
+								error);
 						return ERROR_CONNECTION;
 					}
 				}

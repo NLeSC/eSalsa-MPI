@@ -9,7 +9,7 @@
 #define OPCODE_HANDSHAKE_REJECTED         44
 #define OPCODE_GATEWAY_INFO               45
 #define OPCODE_GATEWAY_READY              46
-
+#define OPCODE_GATEWAY_DONE               47
 
 // These are used by all processes to communicate with the server.
 #define OPCODE_SPLIT                      51

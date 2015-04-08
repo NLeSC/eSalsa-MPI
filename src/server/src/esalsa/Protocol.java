@@ -8,7 +8,9 @@ public interface Protocol {
 
     public static final byte OPCODE_GATEWAY_INFO       = 45;
     public static final byte OPCODE_GATEWAY_READY      = 46;
-
+    public static final byte OPCODE_GATEWAY_DONE       = 47;    
+    public static final byte OPCODE_TERMINATE          = 48;
+    
     public static final int OPCODE_SPLIT        = 51;
     public static final int OPCODE_SPLIT_REPLY  = 52;
 

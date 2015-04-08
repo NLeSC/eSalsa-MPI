@@ -1,3 +1,4 @@
 #!/bin/bash
 source $EMPI_HOME/empi.config
-$CC $@ -L$EMPI_HOME/lib -lempi-frontend -lempi-backend -lempi-shared -L$UDT_LIBS -l$UDT_LIB -L$MPI_LIBS -l$MPI_LIB
+#$CC $@ -L$EMPI_HOME/lib -lempi-frontend -lempi-backend -lempi-shared -L$UDT_LIBS -l$UDT_LIB -L$MPI_LIBS -l$MPI_LIB
+$CC $@ -L$EMPI_HOME/lib -lempi-frontend -lempi-backend -lempi-shared -L$MPI_LIBS -l$MPI_LIB

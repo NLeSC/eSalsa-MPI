@@ -38,10 +38,11 @@
 #define SET_MAGIC(Y) ((MAGIC_BYTES << 16) | (Y & 0x0000FFFF))
 
 // These are the valid opcodes
-#define OPCODE_MISC    0
-#define OPCODE_DATA    1
-#define OPCODE_SERVER  2
-#define OPCODE_ACK     3
+#define OPCODE_MISC      0
+#define OPCODE_DATA      1
+#define OPCODE_SERVER    2
+#define OPCODE_ACK       3
+#define OPCODE_TERMINATE 4
 
 // This is a generic message, consisting of a header plus some data.
 typedef struct {

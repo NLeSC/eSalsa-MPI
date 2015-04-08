@@ -54,8 +54,6 @@ public class Server {
     
     private int clustersDone = 0;
     
-    private boolean done = false;
-    
     private ArrayList<Communicator> communicators = new ArrayList<Communicator>();
 
     public Server(File file) throws Exception {
@@ -565,33 +563,30 @@ public class Server {
         clustersDone++;
         notifyAll();
     }
-
-    public synchronized void allClustersDone() {
-        
-        while (clustersDone < numberOfClusters) { 
-            try { 
-                wait();
-            } catch (InterruptedException e) {
-                // ignored                
-            }
-        }
-        
-        done = true;
-        notifyAll();
-    }
     
     private synchronized void waitUntilDone() { 
 
-        while (!done) { 
+        while (clustersDone < numberOfClusters) {
             
             Logging.println("Server waiting until application terminates.");
             
             try { 
                 wait(10000);
             } catch (InterruptedException e) {
-                // ignored
+                // ignored                
             }
-        }        
+        }
+
+        Logging.println("All clusters are done.");
+    }
+    
+    private void cleanup() {
+        for (Cluster c : clusters) {
+            Logging.println("Shutting down link to cluster " + c.getName());
+            c.shutdown();
+        }
+        
+        Logging.println("We are done -- server terminating.");
     }
 
     /**
@@ -656,6 +651,7 @@ public class Server {
         try {         
             acceptConnections();
             waitUntilDone();
+            cleanup();
         } catch (Exception e) { 
             System.err.println("Server died unexpectedly!");
             e.printStackTrace(System.err);

@@ -113,6 +113,11 @@ public class FragmentationInputStream {
             req = new FinalizeRequest(in);
             Logging.println("VirtualConnection " + name + " - Delivering FINALIZE message.");
             break;
+
+//        case Protocol.OPCODE_GATEWAY_DONE:
+//            req = new GatewayDoneRequest(in);
+//            break;
+            
         case Protocol.OPCODE_CLOSE_LINK:
             Logging.println("VirtualConnection " + name + " - Closing link.");
             req = null;
@@ -123,11 +128,12 @@ public class FragmentationInputStream {
             throw new IOException("Illegal opcode " + opcode + " sent by cluster " + name);
         }
         
-        return req;
-        
+        return req;        
     }
     
     public CommunicatorRequest addMessage(byte [] message, int length) throws IOException { 
+        
+        System.err.println("Received message fragment of size " + length);
         
         if (firstInMessage) {             
             // This is the first server message in a sequence.
@@ -139,6 +145,8 @@ public class FragmentationInputStream {
             buffer = new byte[messageLength];
             position = 0;
             firstInMessage = false;
+            
+            System.err.println("Total message size will be " + messageLength);
         }
         
         Logging.println("Copying message " + length + " " + messageLength  + " " + position + " " + HEADER_LENGTH);
@@ -149,6 +157,8 @@ public class FragmentationInputStream {
         
         if (position == messageLength) { 
             // We've have defragmented a complete server message, so decode it!
+            System.err.println("Message is complete!");
+            
             CommunicatorRequest req = decodeServerMessage();            
             firstInMessage = true;
             message = null;

@@ -16,10 +16,7 @@
 
 package esalsa;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 
 /**
  * @author Jason Maassen <J.Maassen@esciencecenter.nl>
@@ -29,8 +26,10 @@ import java.io.OutputStream;
  */
 public class FragmentationOutputStream {
     
+    public static final byte OPCODE_SERVER    = 2;
+    public static final byte OPCODE_TERMINATE = 4;   
+
     public static final int HEADER_LENGTH = 32;
-    public static final byte OPCODE_SERVER = 2;   
     public static final int SERVER_PID = 0xFFFFFFFF;
     
     private final boolean littleEndian;
@@ -81,14 +80,16 @@ public class FragmentationOutputStream {
         writeInt(message, 8, destinationPID);
         writeInt(message, 12, transmitSequence++);
         writeInt(message, 16, ackSequence);
-        writeInt(message, 20, payload + HEADER_LENGTH);        
+        writeInt(message, 20, payload + HEADER_LENGTH);       
+        writeInt(message, 24, 0); // padding
+        writeInt(message, 28, 0); // padding       
     }
     
     public byte [][] fragmentMessage(ServerMessage sm) throws IOException {
         
         EndianDataOutputStream out;
         
-        ByteArrayOutputStream bao = new ByteArrayOutputStream();
+        ByteArrayOutputStream bao = new ByteArrayOutputStream(sm.length);
         
         if (littleEndian) { 
             out = new LittleEndianDataOutputStream(bao);
@@ -97,8 +98,8 @@ public class FragmentationOutputStream {
         }
         
         sm.write(out);
-        
-        byte [] buffer = bao.toByteArray();
+
+        byte [] buffer = bao.getBuffer();
         
         Logging.println("Fragmenting server message opcode=" + sm.opcode + " length=" + sm.length + " bytes=" + buffer.length);
                 

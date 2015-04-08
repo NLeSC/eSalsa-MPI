@@ -402,9 +402,12 @@ int messaging_init(int rank, int size, int *argc, char ***argv) {
 		return EMPI_ERR_INTERN;
 	}
 
-	WARN(1, "Cluster rank = %d", cluster_rank);
-	WARN(1, "Cluster count = %d", cluster_count);
-	WARN(1, "Fragment size = %d", fragment_size);
+	if (rank == 0) {
+		WARN(1, "Size of this cluster %d", size);
+		WARN(1, "Rank of this cluster %d", cluster_rank);
+		WARN(1, "Number of clusters %d", cluster_count);
+		WARN(1, "Message fragmentation size %d", fragment_size);
+	}
 
 	// Allocate space for send / receive fragments
 	receive_fragment = (generic_message *) malloc(fragment_size);
@@ -823,7 +826,7 @@ static int receive_message_fragment() {
 	size_t to_read;
 	ssize_t bytes_read;
 
-	//INFO(1, "START READ at position %ld", receive_fragment_pos);
+	//WARN(1, "START READ at position %ld", receive_fragment_pos);
 
 	// NOTE: We receive at most one message here.
 	while (true) {
@@ -832,7 +835,7 @@ static int receive_message_fragment() {
 		if (receive_fragment_pos >= GENERIC_MESSAGE_HEADER_SIZE) {
 
 			// There should be at least a message header in the buffer!
-//			INFO(1, "GOT WA MESSAGE opcode=%d src=%d:%d dst=%d:%d length=%d", receive_fragment->header.opcode,
+//			WARN(1, "GOT WA MESSAGE opcode=%d src=%d:%d dst=%d:%d length=%d", receive_fragment->header.opcode,
 //					GET_CLUSTER_RANK(receive_fragment->header.src_pid), GET_PROCESS_RANK(receive_fragment->header.src_pid),
 //					GET_CLUSTER_RANK(receive_fragment->header.dst_pid), GET_PROCESS_RANK(receive_fragment->header.dst_pid),
 //					receive_fragment->header.length);
@@ -859,17 +862,19 @@ static int receive_message_fragment() {
 			to_read = GENERIC_MESSAGE_HEADER_SIZE - receive_fragment_pos;
 		}
 
-		//INFO(1, "WILL READ %d to position %ld", to_read, receive_fragment_pos);
+//		WARN(1, "WILL READ %d to position %ld", to_read, receive_fragment_pos);
 
-//		INFO(2, "MESSAGE INCOMPLETE pos=%d len=%d toread=%d", receive_fragment_pos, receive_fragment->length, to_read);
+		//WARN(2, "MESSAGE INCOMPLETE pos=%d len=%d toread=%d", receive_fragment_pos, receive_fragment->length, to_read);
 
 		// Not enough data for a complete message, so we poll the socket and attempt to receive some data.
 		bytes_read = socket_receive(gatewayfd, ((unsigned char *) receive_fragment) + receive_fragment_pos, to_read, false);
 
+//		WARN(2, "READ %d bytes", bytes_read);
+
 		if (bytes_read > 0) {
 			receive_fragment_pos += bytes_read;
 
-			INFO(1, "READ %d position now %ld", bytes_read, receive_fragment_pos);
+//			WARN(1, "READ %d position now %ld", bytes_read, receive_fragment_pos);
 		} else if (bytes_read == 0) {
 			// We give up if we fail to read any data and we are in non-blocking mode.
 			return 1;
@@ -1080,7 +1085,7 @@ static void process_server_fragment() {
 	virtual_connection *vc;
 	server_message *sm;
 
-	WARN(1, "Received server reply");
+//	WARN(1, "Received server reply");
 
 	// Get the virtual connection to the server
 	vc = connections[total_size];
@@ -1673,8 +1678,7 @@ static int wait_for_server_reply(int opcode) {
 	}
 
 	// Wait until the message is complete
-	while (connections[total_size]->receive_position
-			< connections[total_size]->receive_length) {
+	while (connections[total_size]->receive_position < connections[total_size]->receive_length) {
 		error = messaging_poll();
 
 		if (error != 0) {
@@ -1861,8 +1865,7 @@ int messaging_comm_create_send(communicator* c, group *g) {
 
 	DEBUG(1, "Sending group request of size %d", msgsize);
 
-	req = (group_request_msg *) malloc(
-	GROUP_REQUEST_MSG_SIZE + (g->size * sizeof(int)));
+	req = (group_request_msg *) malloc(GROUP_REQUEST_MSG_SIZE + (g->size * sizeof(int)));
 
 	if (req == NULL) {
 		ERROR(1, "Failed to allocate space COMM_CREATE request!");
@@ -1880,7 +1883,7 @@ int messaging_comm_create_send(communicator* c, group *g) {
 		req->members[i] = g->members[i];
 	}
 
-	DEBUG(1, "Group request header %d %d %d %d %d", req->header.opcode, req->header.length, req->comm, req->src, req->size);
+//	WARN(1, "Group request header %d %d %d %d %d", req->header.opcode, req->header.length, req->comm, req->src, req->size);
 
 	error = messaging_send_server((server_message *) req);
 

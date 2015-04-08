@@ -161,16 +161,16 @@ static int run_server()
 	int msgsize, error, i;
 
 	msgsize = MIN_MSG_SIZE;
-        i=1;
+    i=1;
 
 	while (msgsize <= MAX_MSG_SIZE) {
-                i++;
-		error = run_receive_test(msgsize);
+        error = run_receive_test(msgsize);
 
 		if (error != 0) {
 			return error;
 		}
 
+		i++;
 		msgsize = MIN_MSG_SIZE*i;
 	}
 
@@ -182,16 +182,15 @@ static int run_client()
 	int msgsize, error,i;
 
 	msgsize = MIN_MSG_SIZE;
-        i=1;
+    i=1;
 
 	while (msgsize <= MAX_MSG_SIZE) {
-
 		error = run_send_test(msgsize);
 
 		if (error != 0) {
 			return error;
 		}
-
+		i++;
 		msgsize = MIN_MSG_SIZE*i;
 	}
 

@@ -13,6 +13,9 @@ public class GroupReply extends ServerMessage {
     public final int rank;
     public final int size;
 
+    // This field indicates if this group is active, is splitting off, or is idle. 
+    public final int type;
+
     // These contain info about the distribution of the virtual communicator.
     public final int clusterCount;
     public final int flags;
@@ -25,8 +28,6 @@ public class GroupReply extends ServerMessage {
     public final int [] memberClusterIndex;
     public final int [] localRanks;
 
-    // This field indicates if the
-    public final int type;
 
     GroupReply(boolean overlap) {
 
@@ -54,14 +55,16 @@ public class GroupReply extends ServerMessage {
     GroupReply(int newComm, int rank, int size, int clusterCount, int flags,
             int [] coordinators, int [] clusterSizes, int [] members,
             int [] clusterRanks, int [] memberClusterIndex, int [] localRanks) {
-
+       
         super(Protocol.OPCODE_GROUP_REPLY, 6*4 + clusterCount*4*3 + size*4*3);
 
         this.newComm = newComm;
         this.rank = rank;
         this.size = size;
+        this.type = TYPE_ACTIVE;
         this.clusterCount = clusterCount;
         this.flags = flags;
+
         this.coordinators = coordinators;
         this.clusterSizes = clusterSizes;
         this.members = members;
@@ -69,12 +72,13 @@ public class GroupReply extends ServerMessage {
         this.clusterRanks = clusterRanks;
         this.memberClusterIndex = memberClusterIndex;
         this.localRanks = localRanks;
-
-        this.type = TYPE_ACTIVE;
     }
 
     void write(EndianDataOutputStream out) throws IOException {
 
+        System.err.println("WRITING GROUP REPLY of size " + (8*4 + clusterCount*3*4 + (type == TYPE_ACTIVE ? (size*3*4) : 0)) + 
+                " " + clusterCount + " " + size);
+        
         super.write(out);
         out.writeInt(newComm);
         out.writeInt(rank);
