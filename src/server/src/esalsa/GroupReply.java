@@ -86,7 +86,7 @@ public class GroupReply extends ServerMessage {
         out.writeInt(type);
         out.writeInt(clusterCount);
         out.writeInt(flags);
-
+            
         for (int i=0;i<clusterCount;i++) {
             out.writeInt(coordinators[i]);
         }
@@ -99,19 +99,20 @@ public class GroupReply extends ServerMessage {
             out.writeInt(clusterRanks[i]);
         }
 
-        if (type == TYPE_ACTIVE) {
-            for (int i=0;i<size;i++) {
-                out.writeInt(members[i]);
-            }
+       if (type == TYPE_ACTIVE) {
+            
+           for (int i=0;i<size;i++) {
+               out.writeInt(members[i]);
+           }
 
-            for (int i=0;i<size;i++) {
-                out.writeInt(memberClusterIndex[i]);
-            }
+           for (int i=0;i<size;i++) {
+               out.writeInt(memberClusterIndex[i]);
+           }
 
-            for (int i=0;i<size;i++) {
-                out.writeInt(localRanks[i]);
-            }
-        }
+           for (int i=0;i<size;i++) {
+               out.writeInt(localRanks[i]);
+           }
+       }
     }
 //
 //    public long dataSize() {

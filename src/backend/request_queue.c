@@ -44,7 +44,7 @@ request_queue *request_queue_create(int max_node_cache_size)
 
 	tmp->head = NULL;
 	tmp->tail = NULL;
-//	tmp->length = 0;
+	tmp->length = 0;
 
 	tmp->node_cache = NULL;
 	tmp->node_cache_size = 0;
@@ -92,12 +92,15 @@ bool request_queue_enqueue(request_queue *queue, request *elt)
 	}
 
 	n->data = elt;
+	n->next = NULL;
 
 	if (queue->head == NULL) {
 		queue->head = queue->tail = n;
+		queue->length = 1;
 	} else {
 		queue->tail->next = n;
 		queue->tail = n;
+		queue->length++;
 	}
 
 	return true;
@@ -117,8 +120,10 @@ request *request_queue_dequeue(request_queue *queue)
 
 	if (queue->head == queue->tail) {
 		queue->head = queue->tail = NULL;
+		queue->length = 0;
 	} else {
 		queue->head = queue->head->next;
+		queue->length--;
 	}
 
 	// Store the list node for later use
@@ -153,16 +158,20 @@ request *request_queue_dequeue_matching(request_queue *queue, int comm, int sour
 				// delete head. check if list is empty afterwards
 				if (queue->head == queue->tail) {
 					queue->head = queue->tail = NULL;
+					queue->length = 0;
 				} else {
 					queue->head = queue->head->next;
+					queue->length--;
 				}
 			} else if (current == queue->tail) {
 				// delete tail. set tail to prev
 				queue->tail = prev;
 				queue->tail->next = NULL;
+				queue->length--;
 			} else {
 				// delete middle.
 				prev->next = current->next;
+				queue->length--;
 			}
 
 			request_queue_put_node(queue, current);

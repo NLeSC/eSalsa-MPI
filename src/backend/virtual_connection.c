@@ -43,6 +43,7 @@ virtual_connection *virtual_connection_create(int index, int pid, int sliding_wi
 	tmp->transmit_sequence = 0;
 	tmp->receive_sequence = 0;
 	tmp->acknowledged_sequence_sent = 0;
+	tmp->acknowledged_sequence_received = 0;
 
 	return tmp;
 }

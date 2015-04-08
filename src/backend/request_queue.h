@@ -21,7 +21,7 @@ typedef struct {
 	request_queue_node *tail;
 
 	// The number of elements in the queue.
-	//int length;
+	int length;
 
 	// A cache of queue nodes.
 	request_queue_node *node_cache;

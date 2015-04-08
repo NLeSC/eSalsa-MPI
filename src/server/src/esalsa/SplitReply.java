@@ -1,6 +1,7 @@
 package esalsa;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 public class SplitReply extends ServerMessage {
 
@@ -69,6 +70,7 @@ public class SplitReply extends ServerMessage {
     }
 
     void write(EndianDataOutputStream out) throws IOException {
+               
         super.write(out);
         out.writeInt(newComm);
         out.writeInt(rank);

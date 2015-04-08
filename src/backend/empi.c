@@ -460,7 +460,7 @@ int EMPI_Isend(void *buf, int count, EMPI_Datatype type, int dest, int tag, EMPI
    H2C(comm, c)
    H2T(type, t)
 
-   DEBUG(2, "ISEND buf=%p count=%d type=%d dest=%d tag=%d comm=%d req=%p / %d", buf, count, type, dest, tag, comm, req, (req != NULL ? *req : 0));
+//   WARN(2, "ISEND buf=%p count=%d type=%d dest=%d tag=%d comm=%d req=%p / %d", buf, count, type, dest, tag, comm, req, (req != NULL ? *req : 0));
 
    CHECK_COUNT(count);
    CHECK_DESTINATION(c, dest);
@@ -922,7 +922,7 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
 		   }
 
 	   } else {
-		   //It was an unfinished non-persistent mixed receive request, so we must probe the local network and the WA link.
+		   // It was an unfinished non-persistent mixed receive request, so we must probe the local network and the WA link.
 		   DEBUG(2, "request=WA_RECEIVE_ANY blocking=%d", blocking);
 
 		   // Check local receive first
@@ -932,7 +932,7 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
 
 		   if (r->error == EMPI_SUCCESS && *flag == 1) {
 			   // We've receive a message! We must now translate local source rank to global rank.
-			   DEBUG(3, "request=WA_RECEIVE_ANY performed LOCAL receive");
+			   DEBUG(3, "request=WA_RECEIVE_ANY succesfull LOCAL receive");
 			   error = PMPI_Get_count(&mstatus, r->type->type, &count);
 			   DEBUG(2, "translating status %d %d %d %d", mstatus.MPI_SOURCE, mstatus.MPI_TAG, mstatus.MPI_ERROR, count);
 			   error = translate_status(r->c, r->type, s, &mstatus);
@@ -953,6 +953,15 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
 		   // to cancel the local request, and wait to see if the cancellation was successful, or if a local message was
 		   // received before the cancel was called. In the latter case, the local message will take precedence over the
 		   // WA one, since we can leave the WA message in the queue, but not the local one!
+
+		   // Give the network a little push to allow remote message to come in.
+		   if (messaging_poll() < 0) {
+			   ERROR(1, "Failed to poll network!");
+			   return EMPI_ERR_INTERN;
+		   }
+
+		   DEBUG(3, "request=WA_RECEIVE_ANY performed REMOTE receive");
+
 		   error = messaging_peek_receive_queue(r);
 
 		   if (error == -1) {
@@ -961,6 +970,9 @@ static int probe_request(EMPI_Request *req, int *flag, EMPI_Status *s, bool bloc
 		   }
 
 		   if (error == 0) {
+
+			   DEBUG(3, "GOT message so cancel local request");
+
 			   // There is a message available, so cancel the local request.
 			   error = PMPI_Cancel(&(r->req));
 

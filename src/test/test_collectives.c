@@ -4,7 +4,7 @@
 
 static int test_async(MPI_Comm comm, char *name)
 {
-   /* Test a frequently occuring pattern in CESM model initialization:
+   /* Test a frequently occurring pattern in CESM model initialization:
 
       One pe posts an irecv for all others using MPI_ANY_SOURCE, and
       uses the value received as the count in a new irecv that receives
@@ -62,12 +62,12 @@ static int test_async(MPI_Comm comm, char *name)
 
    for (j=0;j<size;j++) {
       sendbuffer2[j] = j;
-      recvbuffer1[j] = -1;
+      recvbuffer1[j] = -999;
       rreq[j] = MPI_REQUEST_NULL;
    }
 
    for (j=0;j<size*size;j++) {
-      recvbuffer2[j] = -1;
+      recvbuffer2[j] = -888;
    }
 
    for (i=0;i<size;i++) {
@@ -75,7 +75,7 @@ static int test_async(MPI_Comm comm, char *name)
       if (rank == i) {
          for (j=0;j<size;j++) {
 
-            fprintf(stderr, "%d: Receiving 1 int from ANY\n", rank);
+            fprintf(stderr, "%d: Receiving 1 int from ANY on position %d\n", rank, j);
 
             error = MPI_Irecv(recvbuffer1+j, 1, MPI_INTEGER, MPI_ANY_SOURCE, 100, comm, rreq+j);
 
@@ -92,7 +92,7 @@ static int test_async(MPI_Comm comm, char *name)
       fprintf(stderr, "%d: Sending 1 int (%d) to %d\n", rank, sendbuffer1, i);
 
       error = MPI_Isend(&sendbuffer1, 1, MPI_INTEGER, i, 100, comm, &sreq);
-//      error = MPI_Send(&sendbuffer1, 1, MPI_INTEGER, i, 100, comm);
+      // error = MPI_Send(&sendbuffer1, 1, MPI_INTEGER, i, 100, comm);
 
       if (error != MPI_SUCCESS) {
          fprintf(stderr, "ASYNC %s failed isend (1)!\n", name);
@@ -121,6 +121,11 @@ static int test_async(MPI_Comm comm, char *name)
                return 1;
             }
 
+            if (recvbuffer1[j] <= 0) {
+                fprintf(stderr, "%d: Cannot receive %d ints from %d\n", rank, recvbuffer1[j], status.MPI_SOURCE);
+                exit(1);
+            }
+
             fprintf(stderr, "%d: Receiving %d ints from %d\n", rank, recvbuffer1[j], status.MPI_SOURCE);
 
             error = MPI_Irecv(recvbuffer2+(j*size), recvbuffer1[j], MPI_INTEGER, status.MPI_SOURCE, 101, comm, rreq+j);
@@ -134,6 +139,8 @@ static int test_async(MPI_Comm comm, char *name)
       }
 
       fprintf(stderr, "%d: Sending %d ints to %d\n", rank, size-rank, i);
+
+      // error = MPI_Send(sendbuffer2, size-rank, MPI_INTEGER, i, 101, comm);
 
       error = MPI_Isend(sendbuffer2, size-rank, MPI_INTEGER, i, 101, comm, &sreq);
 
@@ -711,7 +718,7 @@ int main(int argc, char *argv[])
     error = MPI_Comm_split(MPI_COMM_WORLD, color, key, &half);
 
     if (error != MPI_SUCCESS) {
-	fprintf(stderr, "Half split failed!\n");
+    	fprintf(stderr, "Half split failed!\n");
         MPI_Finalize();
         return 1;
     }
@@ -730,7 +737,7 @@ int main(int argc, char *argv[])
     error = MPI_Comm_split(MPI_COMM_WORLD, color, key, &oddeven);
 
     if (error != MPI_SUCCESS) {
-	fprintf(stderr, "Odd-even split failed!\n");
+    	fprintf(stderr, "Odd-even split failed!\n");
         MPI_Finalize();
         return 1;
     }
@@ -741,7 +748,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Odd-even split succeeded: I am now process %d of %d on %s\n", newrank, newsize, processor_name);
 
     fprintf(stderr, "\n****************************************************\n\n");
-/*
+
     fprintf(stderr, "Starting BCAST tests\n");
 
     error = test_bcast(MPI_COMM_WORLD, "MPI_COMM_WORLD");
@@ -810,19 +817,18 @@ int main(int argc, char *argv[])
     fprintf(stderr, "\n****************************************************\n\n");
 
 
-    fprintf(stderr, "Starting SCAN tests\n");
+//    fprintf(stderr, "Starting SCAN tests\n");
+//
+//    error = test_scan(MPI_COMM_WORLD, "MPI_COMM_WORLD");
+//    if (error != 0) return error;
 
-    error = test_scan(MPI_COMM_WORLD, "MPI_COMM_WORLD");
-    if (error != 0) return error;
+//    error = test_scan(half, "world half");
+//    if (error != 0) return error;
 
-    error = test_scan(half, "world half");
-    if (error != 0) return error;
-
-    error = test_scan(oddeven, "world odd/even");
-    if (error != 0) return error;
+//    error = test_scan(oddeven, "world odd/even");
+//    if (error != 0) return error;
 
     fprintf(stderr, "\n****************************************************\n\n");
-
 
     fprintf(stderr, "Starting SCATTER tests\n");
 
@@ -849,12 +855,11 @@ int main(int argc, char *argv[])
     if (error != 0) return error;
 
     fprintf(stderr, "\n****************************************************\n\n");
-*/
 
     fprintf(stderr, "Starting ASYNC tests\n");
 
-//    error = test_async(MPI_COMM_WORLD, "MPI_COMM_WORLD");
-//    if (error != 0) return error;
+    error = test_async(MPI_COMM_WORLD, "MPI_COMM_WORLD");
+    if (error != 0) return error;
 
     error = test_async(half, "world half");
     if (error != 0) return error;
