@@ -1,9 +1,8 @@
 DIRS = src/shared src/frontend src/backend src/gateway src/test 
 
-all: check-env
+libs: check-env
 	mkdir -p lib
 	for d in $(DIRS); do (cd $$d; $(MAKE)); done
-	cd src/server ; ant
 
 check-env:
 ifndef EMPI_HOME
@@ -12,9 +11,17 @@ endif
 
 clean:
 	for d in $(DIRS); do (cd $$d; $(MAKE) clean ); done        
-	cd src/server ; ant clean
 	rm -rf lib
 
+server:
+	cd src/server ; ant
+
+clean-server:
+	cd src/server ; ant clean
+
+all: libs server
+
+distclean: clean clean-server
 
 
 	
