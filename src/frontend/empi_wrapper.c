@@ -1540,6 +1540,39 @@ int MPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, MPI_Datatype sendt
    return error;
 }
 
+int MPI_Scan ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
+{
+#if PROFILE_LEVEL > 0
+   uint64_t profile_start, profile_end;
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_CALLS
+   INFO(0, "MPI_Scan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
+#endif // TRACE_CALLS
+
+#ifdef CATCH_DERIVED_TYPES
+   CHECK_TYPE(datatype);
+#endif
+
+#if PROFILE_LEVEL > 0
+   profile_start = profile_start_ticks();
+#endif // PROFILE_LEVEL
+
+   int error = EMPI_Scan(sendbuf, recvbuf, count, type, op, comm);
+
+#if PROFILE_LEVEL > 0
+   profile_end = profile_stop_ticks();
+   profile_add_statistics(comm, STATS_SCAN, profile_end-profile_start);
+#endif // PROFILE_LEVEL
+
+#ifdef TRACE_ERRORS
+   if (error != MPI_SUCCESS) {
+      ERROR(0, "MPI_Scan failed (%d)!", error);
+   }
+#endif // TRACE_ERRORS
+   return error;
+}
+
 int MPI_Barrier ( MPI_Comm comm )
 {
 #if PROFILE_LEVEL > 0
@@ -7873,38 +7906,6 @@ int MPI_Rsend_init ( void *buf, int count, MPI_Datatype type, int dest, int tag,
 }
 
 
-int MPI_Scan ( void *sendbuf, void *recvbuf, int count, MPI_Datatype type, MPI_Op op, MPI_Comm comm )
-{
-#if PROFILE_LEVEL > 0
-   uint64_t profile_start, profile_end;
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_CALLS
-   INFO(0, "MPI_Scan(void *sendbuf=%p, void *recvbuf=%p, int count=%d, MPI_Datatype type=%s, MPI_Op op=%s, MPI_Comm comm=%s)", sendbuf, recvbuf, count, type_to_string(datatype), op_to_string(op), comm_to_string(comm));
-#endif // TRACE_CALLS
-
-#ifdef CATCH_DERIVED_TYPES
-   CHECK_TYPE(datatype);
-#endif
-
-#if PROFILE_LEVEL > 0
-   profile_start = profile_start_ticks();
-#endif // PROFILE_LEVEL
-
-   int error = EMPI_Scan(sendbuf, recvbuf, count, type, op, comm);
-
-#if PROFILE_LEVEL > 0
-   profile_end = profile_stop_ticks();
-   profile_add_statistics(comm, STATS_SCAN, profile_end-profile_start);
-#endif // PROFILE_LEVEL
-
-#ifdef TRACE_ERRORS
-   if (error != MPI_SUCCESS) {
-      ERROR(0, "MPI_Scan failed (%d)!", error);
-   }
-#endif // TRACE_ERRORS
-   return error;
-}
 
 
 

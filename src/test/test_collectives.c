@@ -816,17 +816,16 @@ int main(int argc, char *argv[])
 
     fprintf(stderr, "\n****************************************************\n\n");
 
+    fprintf(stderr, "Starting SCAN tests\n");
 
-//    fprintf(stderr, "Starting SCAN tests\n");
-//
-//    error = test_scan(MPI_COMM_WORLD, "MPI_COMM_WORLD");
-//    if (error != 0) return error;
+    error = test_scan(MPI_COMM_WORLD, "MPI_COMM_WORLD");
+    if (error != 0) return error;
 
-//    error = test_scan(half, "world half");
-//    if (error != 0) return error;
+    error = test_scan(half, "world half");
+    if (error != 0) return error;
 
-//    error = test_scan(oddeven, "world odd/even");
-//    if (error != 0) return error;
+    error = test_scan(oddeven, "world odd/even");
+    if (error != 0) return error;
 
     fprintf(stderr, "\n****************************************************\n\n");
 

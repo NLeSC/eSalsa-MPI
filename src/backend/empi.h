@@ -314,6 +314,7 @@ int EMPI_Alltoallv ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype s
 int EMPI_Alltoallw ( void *sendbuf, int *sendcnts, int *sdispls, EMPI_Datatype *sendtypes, void *recvbuf, int *recvcnts, int *rdispls, EMPI_Datatype *recvtypes, EMPI_Comm comm );
 int EMPI_Scatter ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm );
 int EMPI_Scatterv ( void *sendbuf, int *sendcnts, int *displs, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm );
+int EMPI_Scan ( void *sendbuf, void *recvbuf, int count, EMPI_Datatype datatype, EMPI_Op op, EMPI_Comm comm );
 int EMPI_Barrier ( EMPI_Comm comm );
 int EMPI_Bcast ( void *buffer, int count, EMPI_Datatype type, int root, EMPI_Comm comm );
 int EMPI_Gather ( void *sendbuf, int sendcnt, EMPI_Datatype sendtype, void *recvbuf, int recvcnt, EMPI_Datatype recvtype, int root, EMPI_Comm comm );

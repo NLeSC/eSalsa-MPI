@@ -54,8 +54,6 @@ void FORT_NAME( mpi_error_string , MPI_ERROR_STRING ) ( int *errorcode, char *st
    *ierr = MPI_Error_string(*errorcode, string, resultlen);
 }
 
-
-
 /* Communicators and groups */
 
 void FORT_NAME( mpi_comm_create , MPI_COMM_CREATE ) ( int *comm, int *g, int *newcomm , int *ierr )
@@ -171,6 +169,11 @@ void FORT_NAME( mpi_scatter , MPI_SCATTER ) ( void *sendbuf, int *sendcnt, int *
 void FORT_NAME( mpi_scatterv , MPI_SCATTERV ) ( void *sendbuf, int *sendcnts, int *displs, int *sendtype, void *recvbuf, int *recvcnt, int *recvtype, int *root, int *comm , int *ierr )
 {
    *ierr = MPI_Scatterv(sendbuf, sendcnts, displs, *sendtype, recvbuf, *recvcnt, *recvtype, *root, *comm);
+}
+
+void FORT_NAME( mpi_scan , MPI_SCAN ) ( void *sendbuf, void *recvbuf, int *count, int *datatype, int *op, int *comm , int *ierr )
+{
+	*ierr = MPI_Scan ( sendbuf, recvbuf, *count, *datatype, *op, *comm );
 }
 
 void FORT_NAME( mpi_barrier , MPI_BARRIER ) ( int *comm , int *ierr )
@@ -1145,9 +1148,6 @@ FORT_NAME( mpi_rsend_init , MPI_RSEND_INIT ) ( void *buf, int count, MPI_Datatyp
 {
 }
 
-FORT_NAME( mpi_scan , MPI_SCAN ) ( void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm , int *ierr )
-{
-}
 
 FORT_NAME( mpi_send_init , MPI_SEND_INIT ) ( void *buf, int count, MPI_Datatype datatype, int dest, int tag, MPI_Comm comm, MPI_Request *r , int *ierr )
 {

@@ -2565,8 +2565,7 @@ int EMPI_Allreduce(void *sendbuf, void *recvbuf, int count, EMPI_Datatype type, 
 }
 
 #define __EMPI_Scan
-int EMPI_Scan(void* sendbuf, void* recvbuf, int count,
-              EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm)
+int EMPI_Scan(void* sendbuf, void* recvbuf, int count, EMPI_Datatype type, EMPI_Op op, EMPI_Comm comm)
 {
    int i, tmp_cluster, error;
    MPI_Aint extent;
@@ -2586,7 +2585,6 @@ int EMPI_Scan(void* sendbuf, void* recvbuf, int count,
    }
 
    DEBUG(2, "WA scan");
-
 
    // We implement a WA Scan using simple send/receive primitives
 

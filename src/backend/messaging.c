@@ -1779,7 +1779,7 @@ int messaging_comm_split_receive(comm_reply *reply) {
 	// Since this is the result of a collective operation on a communicator (and this reply is sent in response to our own
 	// request), we can assume here that the reply has not be received yet. Nor can there be any other -server- messages in the
 	// receive buffer. It is possible, however, that -data- messages are ahead in the receive buffer.
-	int i;
+//	int i;
 
 	int error;
 	split_reply_msg *msg;
