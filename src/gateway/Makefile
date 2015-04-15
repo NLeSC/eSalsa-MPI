@@ -11,7 +11,7 @@ SHARED  = -I$(EMPI_HOME)/src/shared
 
 all: $(OBJECTS) 
 #	$(CC) $(OBJECTS) $(UDTLIB) -L$(LIBDIR) -lempi-shared -lstdc++ -lpthread -lm -o gateway.exe
-	$(CC) $(OBJECTS) -L$(LIBDIR) -lempi-shared -lstdc++ -lm -o gateway.exe
+	$(CC) -rdynamic $(OBJECTS) -L$(LIBDIR) -lempi-shared -lstdc++ -lm -o gateway.exe
 
 .c.o:
 	$(CC) -c -Wall $(OPT) $(DEBUG) $(PROF) $(CFLAGS) $(SHARED) $< -o $@

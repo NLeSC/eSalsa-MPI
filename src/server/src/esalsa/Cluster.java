@@ -714,12 +714,13 @@ public class Cluster {
         int length = getLength(message);
         
         if (length < FragmentationOutputStream.HEADER_LENGTH) { 
-            System.err.println("EEP: got message smaller than header! " + length + " " + FragmentationOutputStream.HEADER_LENGTH);
+            Logging.error("CLUSTER " + name + " ERROR: got message smaller than header! " + length + " " + 
+                    FragmentationOutputStream.HEADER_LENGTH);
         }        
         
         in.readFully(message, FragmentationOutputStream.HEADER_LENGTH, length-FragmentationOutputStream.HEADER_LENGTH);
                 
-        System.err.println("Got MESSAGE with opcode " + getOpcode(message));
+        Logging.println("CLUSTER " + name + " : Got MESSAGE with opcode " + getOpcode(message));
         
         if (getOpcode(message) == FragmentationOutputStream.OPCODE_TERMINATE) {
             // We are in the termination phase, and the gateway of this cluster is telling us his cluster is done. 

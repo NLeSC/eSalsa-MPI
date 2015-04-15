@@ -32,6 +32,8 @@
 #include "util.h"
 #include "debugging.h"
 #include "operation.h"
+#include "signal.h"
+
 //#include "profiling.h"
 
 // The number of processes in our cluster and our process' rank in this set.
@@ -106,6 +108,30 @@ static void init_constants()
    INFO(1, "FORTRAN_FALSE    = %d", FORTRAN_FALSE);
 }
 
+void segfault_handler(int signal, siginfo_t *si, void *arg)
+{
+	size_t size;
+	void *array[15];
+
+	fprintf(stderr, "FATAL: Caught segfault at address %p ", si->si_addr);
+
+	size = backtrace(array, 15);
+	backtrace_symbols_fd(array, size, 2);
+
+    exit(1);
+}
+
+void install_segfault_handler(void)
+{
+    struct sigaction sa;
+
+    memset(&sa, 0, sizeof(sigaction));
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = segfault_handler;
+    sa.sa_flags   = SA_SIGINFO;
+
+    sigaction(SIGSEGV, &sa, NULL);
+}
 
 #define __EMPI_Init
 int EMPI_Init(int *argc, char **argv[])
@@ -132,6 +158,9 @@ int EMPI_Init(int *argc, char **argv[])
    for (i=0;i<*argc;i++) {
       INFO(4, "argv[%d] = %s", i, (*argv)[i]);
    }
+
+   // Install signal handler that give us a stack trace when a core dump occurs.
+   install_segfault_handler();
 
    status = messaging_init(rank, size, argc, argv);
 

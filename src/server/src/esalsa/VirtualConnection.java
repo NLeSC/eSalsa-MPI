@@ -29,8 +29,11 @@ public class VirtualConnection {
     private FragmentationInputStream in;
     private FragmentationOutputStream out;
     
-    public VirtualConnection(int fragmentSize, boolean littleEndian, int peerPID) {
+    public VirtualConnection(int fragmentSize, boolean littleEndian, int peerPID) {             
         String name = Communicator.getClusterRank(peerPID) + ":" + Communicator.getProcessRank(peerPID);
+
+        Logging.println("VC " + name + " : Creating VC");
+        
         in = new FragmentationInputStream(littleEndian, name);
         out = new FragmentationOutputStream(peerPID, littleEndian, fragmentSize, name);
     }

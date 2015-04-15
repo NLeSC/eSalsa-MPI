@@ -101,7 +101,7 @@ public class FragmentationOutputStream {
 
         byte [] buffer = bao.getBuffer();
         
-        Logging.println("Fragmenting server message opcode=" + sm.opcode + " length=" + sm.length + " bytes=" + buffer.length);
+        Logging.println("VC " + name + " : Fragmenting server message opcode=" + sm.opcode + " length=" + sm.length + " bytes=" + buffer.length);
                 
         int position = 0;
         
@@ -120,6 +120,8 @@ public class FragmentationOutputStream {
             byte [] message = new byte[HEADER_LENGTH + payload];
         
             Logging.println("  Fragment " + i + " bytes=" + message.length);
+
+            Logging.println("VC " + name + " : Fragment " + i + " bytes=" + message.length);
             
             writeHeader(message, payload);
             

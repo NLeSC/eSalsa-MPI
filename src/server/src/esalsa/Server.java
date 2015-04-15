@@ -368,7 +368,7 @@ public class Server {
             communicators.add(c, comm);
         }
 
-        Logging.println("Created new communicator: " + comm.printInfo());
+        // Logging.println("Created new communicator: " + comm.printInfo());
         return comm;
     }
 

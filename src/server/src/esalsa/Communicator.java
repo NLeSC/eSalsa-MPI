@@ -94,7 +94,9 @@ public class Communicator {
 //                }
 //            }
 //        }
-
+        
+        Logging.println("COMM " + communicator + " : Creating new communicator with members " + printPIDs(members));
+        
         this.parent = parent;
         this.communicator = communicator;
         this.members = members;
@@ -181,7 +183,7 @@ public class Communicator {
     private int generateFlags(int [] memberPIDs) {
 
         if (memberPIDs == null || memberPIDs.length == 0) {
-            Logging.error("generateFlags called for empty member set!");
+            Logging.error("COMM " + communicator + " ERROR : generateFlags called for empty member set!");
             return 0;
         }
 
@@ -277,7 +279,7 @@ public class Communicator {
             LinkedList<SplitRequest> l = tmp.get(color);
 
             if (l == null || l.isEmpty()) {
-                Logging.error("Split created empty list!");
+                Logging.error("COMM " + communicator + " ERROR : Split created empty list!");
             } else {
                 // Create a new communicator, provided the color >= 0 (color -1 is used for non-participating processes).
                 int size = l.size();
@@ -296,7 +298,7 @@ public class Communicator {
                         pids[i++] = members[m.rank];
                     }
 
-                    Logging.println("Creating split " + color + " from communicator " + communicator);
+                    Logging.println("COMM " + communicator + " : Creating split " + color);
                     
                     // We generate a new 'virtual' communicator.
                     Communicator com = parent.createCommunicator(pids);
@@ -341,14 +343,14 @@ public class Communicator {
 
     private void processGroup() throws IOException {
 
-        Logging.println("Creating new group from communicator " + communicator);
+        Logging.println("COMM " + communicator + " : Creating new group from communicator");
 
         int [] group = ((GroupRequest) messages[0]).pids;
 
         // Sanity check: all group messages should contain the same ranks array.
         for (int i=1;i<messages.length;i++) {
             if (!Arrays.equals(group, ((GroupRequest) messages[i]).pids)) {
-                Logging.println("ERROR: collective group creation does not have matching parameters! "
+                Logging.println("COMM " + communicator + " ERROR: collective group creation does not have matching parameters! "
                         + Arrays.toString(group) + " != " + Arrays.toString(((GroupRequest) messages[i]).pids));
                 return; // FIXME: This return will hang the program!
             }
@@ -425,11 +427,13 @@ public class Communicator {
 
     private void processDup() throws IOException {
 
-        Logging.println("Performing DUP of communicator " + communicator);
+        Logging.println("COMM " + communicator + " : Performing DUP");
 
         // We generate a new 'virtual' communicator.
         int number = parent.createCommunicator(members).getNumber();
 
+        Logging.println("COMM " + communicator + " : Performed DUP to COMM " + number);
+        
         // Next, we send a reply to all participants, providing them with the new virtual communicator.
         for (int j=0;j<members.length;j++) {
             enqueueReply(members[j], new DupReply(communicator, number));            
@@ -438,7 +442,7 @@ public class Communicator {
 
     private void processFree() {
 
-        Logging.println("Performing FREE of communicator " + communicator);
+        Logging.println("COMM " + communicator + " : Performing FREE of this communicator");
 
         // We generate a new 'virtual' communicator.
         parent.freeCommunicator(getNumber());
@@ -457,11 +461,11 @@ public class Communicator {
     private void processFinalize() throws Exception {
         
         if (communicator != 0) { 
-            Logging.error("Cannot perform FINALIZE on communicator " + communicator);
+            Logging.error("COMM " + communicator + " : Cannot perform FINALIZE this communicator");
             return;
         }
 
-        Logging.println("Performing FINALIZE");
+        Logging.println("COMM " + communicator + " : Performing FINALIZE");
 
         parent.freeCommunicator(0);
 
@@ -487,7 +491,7 @@ public class Communicator {
     }
        
     public void terminate() {
-        Logging.println("Terminating communicator " + communicator + ": " + printStatistics());
+        Logging.println("COMM " + communicator + " : Terminating communicator " + printStatistics());
     }
 
     private void processRequest() throws Exception {
@@ -498,7 +502,8 @@ public class Communicator {
         // Sanity check: make sure that all opcodes match
         for (int i=1;i<messages.length;i++) {
             if (messages[i].opcode != opcode) {
-                Logging.error("Opcode mismatch in collective communicator operation! " + opcode + " != " + messages[1].opcode);
+                Logging.error("COMM " + communicator + " ERROR: Opcode mismatch in collective communicator operation! "
+                        + "(opcode " + opcode + " != " + messages[1].opcode +")");
                 return; 
             }
         }
@@ -526,7 +531,8 @@ public class Communicator {
 //            parent.terminateCommunicator(this);
             break;
         default:
-            Logging.error("Unknown opcode collective communicator operation! " + opcode);
+            Logging.error("COMM " + communicator + " ERROR: Unknown opcode collective communicator operation! (opcode = " 
+                    + opcode + ")");
             return; // FIXME: This return will hang the program!
         }
     }
@@ -602,11 +608,11 @@ public class Communicator {
 
     public synchronized void deliverRequest(CommunicatorRequest req) {
 
-//        System.out.println("Got request " + req.opcode + " " + req.communicator + " " + req.rank);
+        Logging.println("COMM " + communicator + " : Got request " + req.opcode + " " + req.communicator + " " + req.rank);
         
         // First check the message is legal
         if (req.rank < 0 || req.rank >= size) {
-            Logging.error("Unknown rank " + req.rank + " for operation on comm " + communicator);
+            Logging.error("COMM " + communicator + " ERROR : Unknown rank " + req.rank + " for operation");
             return;
         }
 
@@ -624,8 +630,13 @@ public class Communicator {
         messages[req.rank] = req;
         participants++;
 
+        Logging.println("COMM " + communicator + " : Request has " + participants + " participants of " + size);        
+        
         // If a message has been received for each communicator member, we are ready to perform the operation.
         if (participants == size) {            
+
+            Logging.println("COMM " + communicator + " : All " + participants + " are accounted for. Processing request");        
+            
             try { 
                 processRequest();
             } catch (Exception e) { 

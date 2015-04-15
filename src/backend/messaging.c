@@ -612,13 +612,11 @@ static virtual_connection *select_active_connection() {
 			}
 
 			// Calculate the number of pending message fragments. Make sure to wrap around where needed.
-			pending = ((vc->transmit_sequence + SEQUENCE_NUMBERS)
-					- vc->acknowledged_sequence_received) % SEQUENCE_NUMBERS;
+			pending = ((vc->transmit_sequence + SEQUENCE_NUMBERS) - vc->acknowledged_sequence_received) % SEQUENCE_NUMBERS;
 
 			if (pending <= vc->sliding_window_size) {
 				// There is room in the send window for this fragment, so return the connections.
 				//WARN(1, "VC %d selected as active", vc->index);
-
 				return vc;
 			}
 			// HIERO
@@ -745,18 +743,16 @@ static int add_active_sender(virtual_connection *vc) {
 		//WARN(1, "Increasing size of active connection list from %d to %d",
 		//		active_connections_size, active_connections_size * 2);
 
-		active_connections = calloc(2 * active_connections_size,
-				sizeof(virtual_connection *));
+		active_connections = calloc(2 * active_connections_size, sizeof(virtual_connection *));
 
 		if (active_connections == NULL) {
 			ERROR(0, "Failed to allocate space for active connection index!");
 			return -1;
 		}
 
-		active_connections_size = active_connections_size * 2;
+		memcpy(active_connections, tmp,	active_connections_size * sizeof(virtual_connection *));
 
-		memcpy(active_connections, tmp,
-				active_connections_size * sizeof(virtual_connection *));
+		active_connections_size = active_connections_size * 2;
 
 		free(tmp);
 	}
@@ -776,10 +772,16 @@ static int remove_active_sender(virtual_connection *vc) {
 
 	for (i = 0; i < next_active_connection; i++) {
 		if (active_connections[i] == vc) {
-			// Found it, so swap with last one and decrease the counter. Also works if list has only one element.
+			// Found it, now remove it from the list
+			if (i == next_active_connection-1) {
+				// It was the last element, so simply remove
+				active_connections[i] = NULL;
+			} else {
+				// It was not the last element, so swap with last.
+				active_connections[i] = active_connections[next_active_connection-1];
+				active_connections[next_active_connection-1] = NULL;
+			}
 			next_active_connection--;
-			active_connections[i] = active_connections[next_active_connection];
-			active_connections[next_active_connection] = NULL;
 			vc->active_sender = false;
 			return 0;
 		}
@@ -1518,8 +1520,7 @@ int messaging_send(void* buf, int count, datatype *t, int dest, int tag,
 }
 
 // Blocking receive for a wide area message.
-int messaging_receive(void *buf, int count, datatype *t, int source, int tag,
-		EMPI_Status *status, communicator* c) {
+int messaging_receive(void *buf, int count, datatype *t, int source, int tag, EMPI_Status *status, communicator* c) {
 	int error;
 	data_message *m;
 	request *req;
@@ -1567,9 +1568,7 @@ int messaging_bcast(void* buf, int count, datatype *t, int root,
 
 	for (i = 0; i < cluster_count; i++) {
 		if (i != cluster_rank) {
-			error = messaging_send(buf, count, t, c->coordinators[i], BCAST_TAG,
-					c, NULL, false);
-			// error = do_send(OPCODE_COLLECTIVE_BCAST, buf, count, t, c->coordinators[i], BCAST_TAG, c);
+			error = messaging_send(buf, count, t, c->coordinators[i], BCAST_TAG, c, NULL, false);
 
 			if (error != EMPI_SUCCESS) {
 				ERROR(1, "Failed to send bcast to cluster coordinators!");
@@ -1582,10 +1581,8 @@ int messaging_bcast(void* buf, int count, datatype *t, int root,
 }
 
 // Receive a broadcast message on the cluster coordinators.
-int messaging_bcast_receive(void *buf, int count, datatype *t, int root,
-		communicator* c) {
-	return messaging_receive(buf, count, t, root, BCAST_TAG, EMPI_STATUS_IGNORE,
-			c);
+int messaging_bcast_receive(void *buf, int count, datatype *t, int root, communicator* c) {
+	return messaging_receive(buf, count, t, root, BCAST_TAG, EMPI_STATUS_IGNORE, c);
 }
 
 /*
@@ -2095,9 +2092,13 @@ int messaging_comm_dup_send(communicator* c) {
 	req->comm = c->handle;
 	req->src = c->global_rank;
 
+	WARN(2, "%d %d Sending DUP request ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
+
 	error = messaging_send_server((server_message *) req);
 
 	free(req);
+
+	WARN(2, "%d %d Sending DUP request completed ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
 
 	return error;
 }
@@ -2108,7 +2109,11 @@ int messaging_comm_dup_receive(dup_reply *reply) {
 	int error;
 	dup_reply_msg *msg;
 
+	WARN(2, "%d %d Receiving DUP reply ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
+
 	error = wait_for_server_reply(OPCODE_DUP_REPLY);
+
+	WARN(2, "%d %d Receiving DUP reply completed", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
 
 	if (error != EMPI_SUCCESS) {
 		return error;
