@@ -46,7 +46,7 @@
 #define MAX_GROUPS 1024
 
 // Maximum number of requests that can be created (at once, for each individual process).
-#define MAX_REQUESTS 1024
+#define MAX_REQUESTS (32*1024)
 
 // Maximum number of operations that can be created (at once, for each individual process).
 #define MAX_OPERATIONS 256

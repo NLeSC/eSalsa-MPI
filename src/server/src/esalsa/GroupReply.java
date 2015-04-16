@@ -76,9 +76,6 @@ public class GroupReply extends ServerMessage {
 
     void write(EndianDataOutputStream out) throws IOException {
 
-        System.err.println("WRITING GROUP REPLY of size " + (8*4 + clusterCount*3*4 + (type == TYPE_ACTIVE ? (size*3*4) : 0)) + 
-                " " + clusterCount + " " + size);
-        
         super.write(out);
         out.writeInt(newComm);
         out.writeInt(rank);

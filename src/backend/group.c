@@ -540,8 +540,7 @@ int group_range_incl(group *in, int n, int ranges[][3], group **out)
       error = get_range(in, tmp, &next, ranges[i][0], ranges[i][1], ranges[i][2]);
 
       if (error != EMPI_SUCCESS) {
-         ERROR(1, "Failed to retrieve range %d (%d,%d,%d)!",
-  			i, ranges[i][0], ranges[i][1], ranges[i][2]);
+         ERROR(1, "Failed to retrieve range %d (%d,%d,%d)!", i, ranges[i][0], ranges[i][1], ranges[i][2]);
          free(tmp);
          return error;
       }

@@ -772,18 +772,17 @@ static void enqueue_message_from_compute_node(socket_info *info)
 	// is active at a time.
 	int cluster, index;
 	socket_info *dest;
-    int *tmp;
+    // int *tmp;
 
 	generic_message *m = (generic_message *) info->in_msg;
 
 	if (m->dst_pid == server_pid) {
 		// This message contains a request for the server!
 
-		tmp = (int *) &m->payload[0];
-
-		WARN(1, "ENQ SERVER REQUEST src=%d:%d length=%d opcode=%d len=%d int1=%d int2=%d",
-				GET_CLUSTER_RANK(m->src_pid), GET_PROCESS_RANK(m->src_pid),	m->length,
-				tmp[0], tmp[1], tmp[2], tmp[3]);
+//		tmp = (int *) &m->payload[0];
+//		INFO(1, "ENQ SERVER REQUEST src=%d:%d length=%d opcode=%d len=%d int1=%d int2=%d",
+//				GET_CLUSTER_RANK(m->src_pid), GET_PROCESS_RANK(m->src_pid),	m->length,
+//				tmp[0], tmp[1], tmp[2], tmp[3]);
 
 		dest = server_info;
 

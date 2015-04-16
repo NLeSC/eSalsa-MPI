@@ -891,7 +891,6 @@ static int receive_message_fragment() {
 
 		if (bytes_read > 0) {
 			receive_fragment_pos += bytes_read;
-
 //			WARN(1, "READ %d position now %ld", bytes_read, receive_fragment_pos);
 		} else if (bytes_read == 0) {
 			// We give up if we fail to read any data and we are in non-blocking mode.
@@ -1096,8 +1095,6 @@ INFO(1, "Will FORCE ACK on VC %d window_used=%d last seq rec=%d last ack sent=%d
 
 static void process_server_fragment() {
 
-	// FIXME: merge with process data fragment!!!!
-
 	// We've received an SERVER message reply.
 	virtual_connection *vc;
 	server_message *sm;
@@ -1142,7 +1139,7 @@ static void process_server_fragment() {
 
 	 */
 
-	vc->receive_position += receive_fragment->length;
+	vc->receive_position += receive_fragment->length-GENERIC_MESSAGE_HEADER_SIZE;
 }
 
 static int poll_receive() {
@@ -1952,7 +1949,7 @@ int messaging_comm_create_send(communicator* c, group *g) {
 }
 
 int messaging_comm_create_receive(group_reply *reply) {
-	// What we need to receive an group reply of variable length:
+	// What we need to receive a group reply of variable length:
 	//
 	//    message_header header;
 	//    int newComm;             // communicator created
@@ -1989,8 +1986,8 @@ int messaging_comm_create_receive(group_reply *reply) {
 	}
 
 	reply->newComm = msg->newComm;
-	reply->rank = msg->rank;
 	reply->size = msg->size;
+	reply->rank = msg->rank;
 	reply->type = msg->type;
 	reply->cluster_count = msg->cluster_count;
 	reply->flags = msg->flags;
@@ -2000,24 +1997,21 @@ int messaging_comm_create_receive(group_reply *reply) {
 
 	if (reply->type == GROUP_TYPE_ACTIVE) {
 
-		reply->coordinators = copy_int_array((int *) &(msg->payload[0]), 0,
-				reply->cluster_count);
+		reply->coordinators = copy_int_array((int *) &(msg->payload[0]), 0, reply->cluster_count);
 
 		if (reply->coordinators == NULL) {
 			ERROR(1, "Failed to allocate or receive coordinators");
 			return EMPI_ERR_INTERN;
 		}
 
-		reply->cluster_sizes = copy_int_array((int *) &(msg->payload),
-				reply->cluster_count, reply->cluster_count);
+		reply->cluster_sizes = copy_int_array((int *) &(msg->payload[0]), reply->cluster_count, reply->cluster_count);
 
 		if (reply->cluster_sizes == NULL) {
 			ERROR(1, "Failed to allocate or receive cluster sizes");
 			return EMPI_ERR_INTERN;
 		}
 
-		reply->cluster_ranks = copy_int_array((int *) &(msg->payload[0]),
-				2 * reply->cluster_count, reply->cluster_count);
+		reply->cluster_ranks = copy_int_array((int *) &(msg->payload[0]), 2 * reply->cluster_count, reply->cluster_count);
 
 		if (reply->cluster_ranks == NULL) {
 			ERROR(1, "Failed to allocate or receive cluster ranks");
@@ -2026,32 +2020,26 @@ int messaging_comm_create_receive(group_reply *reply) {
 
 		if (reply->size > 0) {
 
-			reply->members = (uint32_t *) copy_int_array(
-					(int *) &(msg->payload[0]), 3 * reply->cluster_count,
-					reply->size);
+			reply->members = (uint32_t *) copy_int_array((int *) &(msg->payload[0]), 3 * reply->cluster_count, reply->size);
 
 			if (reply->members == NULL) {
 				ERROR(1, "Failed to allocate or receive communicator members");
 				return EMPI_ERR_INTERN;
 			}
 
-			reply->member_cluster_index = (uint32_t *) copy_int_array(
-					(int *) &(msg->payload[0]),
+			reply->member_cluster_index = (uint32_t *) copy_int_array((int *) &(msg->payload[0]),
 					3 * reply->cluster_count + reply->size, reply->size);
 
 			if (reply->member_cluster_index == NULL) {
-				ERROR(1,
-						"Failed to allocate or receive communicator member cluster index");
+				ERROR(1, "Failed to allocate or receive communicator member cluster index");
 				return EMPI_ERR_INTERN;
 			}
 
-			reply->local_ranks = (uint32_t *) copy_int_array(
-					(int *) &(msg->payload[0]),
+			reply->local_ranks = (uint32_t *) copy_int_array((int *) &(msg->payload[0]),
 					3 * reply->cluster_count + 2 * reply->size, reply->size);
 
 			if (reply->local_ranks == NULL) {
-				ERROR(1,
-						"Failed to allocate or receive communicator member local ranks");
+				ERROR(1, "Failed to allocate or receive communicator member local ranks");
 				return EMPI_ERR_INTERN;
 			}
 		} else {
@@ -2092,13 +2080,13 @@ int messaging_comm_dup_send(communicator* c) {
 	req->comm = c->handle;
 	req->src = c->global_rank;
 
-	WARN(2, "%d %d Sending DUP request ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
+//	WARN(2, "%d %d Sending DUP request ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
 
 	error = messaging_send_server((server_message *) req);
 
 	free(req);
 
-	WARN(2, "%d %d Sending DUP request completed ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
+//	WARN(2, "%d %d Sending DUP request completed ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
 
 	return error;
 }
@@ -2109,11 +2097,11 @@ int messaging_comm_dup_receive(dup_reply *reply) {
 	int error;
 	dup_reply_msg *msg;
 
-	WARN(2, "%d %d Receiving DUP reply ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
+//	WARN(2, "%d %d Receiving DUP reply ", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
 
 	error = wait_for_server_reply(OPCODE_DUP_REPLY);
 
-	WARN(2, "%d %d Receiving DUP reply completed", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
+//  WARN(2, "%d %d Receiving DUP reply completed", GET_CLUSTER_RANK(my_pid), GET_PROCESS_RANK(my_pid));
 
 	if (error != EMPI_SUCCESS) {
 		return error;

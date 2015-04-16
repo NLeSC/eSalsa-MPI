@@ -23,8 +23,8 @@ int main(int argc, char *argv[])
 
     fprintf(stderr, "Process %d of %d on %s\n", rank, size, processor_name);
 
-    if (size != 16) {
-        fprintf(stderr, "Need 16 processes for this test\n");
+    if (size < 2) {
+        fprintf(stderr, "Need at least 2 processes for this test\n");
         return 1;
     }
 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 
     fprintf(stderr, "I am process %d of %d in world group\n", newrank, newsize);
 
-    rev[0][0] = 15;
+    rev[0][0] = size-1;
     rev[0][1] = 0;
     rev[0][2] = -1;
 
