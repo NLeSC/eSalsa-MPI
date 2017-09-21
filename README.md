@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/11925913.svg)](https://zenodo.org/badge/latestdoi/11925913)
+
 eSalsa-MPI
 ==========
 
